@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GameAssets } from './AssetManager';
+import type { GameAssets } from './AssetManager';
 import { Player, PlayerState } from './Player';
 import { Ball } from './Ball';
 import { inputManager } from './InputManager';
