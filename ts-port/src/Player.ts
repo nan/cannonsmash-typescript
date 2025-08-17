@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GameAssets, Motion } from './AssetManager';
+import type { GameAssets, Motion } from './AssetManager';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
