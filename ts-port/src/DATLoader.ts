@@ -70,6 +70,10 @@ export class DATLoader extends THREE.Loader {
                         // Color index - ignore for now
                         continue;
                     }
+                    if (tokens[i].startsWith('#')) {
+                        // Stop at comments
+                        break;
+                    }
                     const index = parseInt(tokens[i], 10);
                     if (!isNaN(index)) {
                         faceIndices.push(index);
