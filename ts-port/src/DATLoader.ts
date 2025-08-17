@@ -36,7 +36,7 @@ export class DATLoader extends THREE.Loader {
         const uvs: number[] = [];
         const faces: number[] = [];
 
-        const lines = text.split('\\n');
+        const lines = text.split('\n');
 
         for (const line of lines) {
             const trimmedLine = line.trim();
@@ -44,24 +44,26 @@ export class DATLoader extends THREE.Loader {
                 continue;
             }
 
-            const tokens = trimmedLine.split(/[\\s,();]+/);
+            const tokens = trimmedLine.split(/[\\s,();]+/).filter(Boolean);
             const command = tokens[0];
 
             if (command === 'point') {
                 // Example: point 0,(-0.05,0.1,0.2),(0.5,0.5);
+                // tokens: ["point", "0", "-0.05", "0.1", "0.2", "0.5", "0.5"]
                 const x = parseFloat(tokens[2]);
                 const y = parseFloat(tokens[3]);
                 const z = parseFloat(tokens[4]);
                 vertices.push(x, y, z);
 
-                if (tokens.length > 6) {
-                    const u = parseFloat(tokens[6]);
-                    const v = 1.0 - parseFloat(tokens[7]); // V is inverted
+                if (tokens.length > 5) {
+                    const u = parseFloat(tokens[5]);
+                    const v = 1.0 - parseFloat(tokens[6]); // V is inverted
                     uvs.push(u, v);
                 }
 
             } else if (command === 'plane') {
                 // Example: plane 0,1,2,3,C4;
+                // tokens: ["plane", "0", "1", "2", "3", "C4"]
                 const faceIndices: number[] = [];
                 for (let i = 1; i < tokens.length; i++) {
                     if (tokens[i].startsWith('C')) {
