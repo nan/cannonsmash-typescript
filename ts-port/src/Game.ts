@@ -30,6 +30,26 @@ export class Game {
         // Position them for now
         this.player1.mesh.position.set(0, 0, 0.5);
         this.ball.mesh.position.set(0, 0.5, 1);
+
+        // --- Programmatic Debugging ---
+        this.player1.mesh.updateWorldMatrix(true, true); // Ensure world matrices are up-to-date
+
+        const head = this.player1.bodyParts['head'];
+        const leftFoot = this.player1.bodyParts['Lfoot'];
+        const headPos = new THREE.Vector3();
+        const footPos = new THREE.Vector3();
+        if (head) head.getWorldPosition(headPos);
+        if (leftFoot) leftFoot.getWorldPosition(footPos);
+
+        const boundingBox = new THREE.Box3().setFromObject(this.player1.mesh);
+        const size = new THREE.Vector3();
+        boundingBox.getSize(size);
+
+        console.log("--- Player Model State ---");
+        console.log("Head world position:", headPos);
+        console.log("Left Foot world position:", footPos);
+        console.log("Player bounding box size:", size);
+        console.log("--------------------------");
     }
 
     private handleInput() {

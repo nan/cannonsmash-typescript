@@ -14,7 +14,7 @@ export class Player {
     public state: PlayerState = PlayerState.IDLE;
 
     private assets: GameAssets;
-    private bodyParts: { [name: string]: THREE.Object3D } = {};
+    public bodyParts: { [name: string]: THREE.Object3D } = {}; // Made public for debugging
 
     private mixer: THREE.AnimationMixer;
     private animationClips: { [name: string]: THREE.AnimationClip } = {};
@@ -56,9 +56,9 @@ export class Player {
     }
 
     private buildModel() {
-        // ... (rest of the file is unchanged, so I will omit it for brevity)
         const material = new THREE.MeshNormalMaterial();
 
+        // First, create all the bone Groups and Meshes, and store them.
         for (const modelName in this.assets.baseModels) {
             const geometry = this.assets.baseModels[modelName];
             if (geometry) {
@@ -70,8 +70,46 @@ export class Player {
                 bone.add(partMesh);
 
                 this.bodyParts[modelName] = bone;
-                this.rootBone.add(bone);
             }
+        }
+
+        // Define the bone hierarchy. 'child': 'parent'
+        const boneHierarchy: { [child: string]: string } = {
+            "chest": "hip",
+            "head": "chest",
+            "Lshoulder": "chest",
+            "Rshoulder": "chest",
+            "Larm": "Lshoulder",
+            "Lelbow": "Larm",
+            "Lforearm": "Lelbow",
+            "Lhand": "Lforearm",
+            "Rarm": "Rshoulder",
+            "Relbow": "Rarm",
+            "Rforearm": "Relbow",
+            "Rhand": "Rforearm",
+            "racket": "Rhand",
+            "Lthigh": "hip",
+            "Rthigh": "hip",
+            "Lshin": "Lthigh",
+            "Rshin": "Rthigh",
+            "Lfoot": "Lshin",
+            "Rfoot": "Rshin",
+        };
+
+        // Connect the bones to form the hierarchy
+        for (const childName in boneHierarchy) {
+            const parentName = boneHierarchy[childName];
+            const childBone = this.bodyParts[childName];
+            const parentBone = this.bodyParts[parentName];
+
+            if (childBone && parentBone) {
+                parentBone.add(childBone);
+            }
+        }
+
+        // Finally, add the root of the skeleton ('hip') to the player's root bone
+        if (this.bodyParts['hip']) {
+            this.rootBone.add(this.bodyParts['hip']);
         }
     }
 
