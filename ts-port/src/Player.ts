@@ -14,7 +14,7 @@ export class Player {
     public state: PlayerState = PlayerState.IDLE;
 
     private assets: GameAssets;
-    private bodyParts: { [name: string]: THREE.Object3D } = {};
+    public bodyParts: { [name: string]: THREE.Object3D } = {}; // Made public for debugging
 
     private mixer: THREE.AnimationMixer;
     private animationClips: { [name: string]: THREE.AnimationClip } = {};
