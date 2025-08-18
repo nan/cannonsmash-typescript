@@ -329,6 +329,8 @@ export class Player {
                 kneeAngle,
                 baseAngle,
                 thighPitchAngle,
+                thighQuaternion: thigh.quaternion.toArray(),
+                shinQuaternion: shin.quaternion.toArray(),
             });
         }
     }
