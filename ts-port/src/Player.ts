@@ -57,7 +57,7 @@ export class Player {
 
     private buildModel() {
         // ... (rest of the file is unchanged, so I will omit it for brevity)
-        const material = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
+        const material = new THREE.MeshNormalMaterial();
 
         for (const modelName in this.assets.baseModels) {
             const geometry = this.assets.baseModels[modelName];
