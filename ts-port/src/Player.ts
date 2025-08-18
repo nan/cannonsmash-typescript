@@ -320,7 +320,7 @@ export class Player {
         foot.quaternion.identity();
 
         if (side === 'R') { // Log only for one leg to avoid spam
-            console.log({
+            console.log(JSON.stringify({
                 side,
                 hipToToe: hipToToe.toArray(),
                 distance2D,
@@ -331,7 +331,7 @@ export class Player {
                 thighPitchAngle,
                 thighQuaternion: thigh.quaternion.toArray(),
                 shinQuaternion: shin.quaternion.toArray(),
-            });
+            }, null, 2));
         }
     }
 }
