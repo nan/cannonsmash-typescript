@@ -9,6 +9,7 @@ import type { QuaternionData } from './QuaternionLoader';
 export interface Motion {
     centerAffine: AffineData;
     boneQuaternions: { [boneName: string]: QuaternionData };
+    boneAffineData: { [boneName: string]: AffineData };
 }
 
 // A structure to hold all game assets
@@ -88,31 +89,49 @@ class AssetManager {
             this.affineLoader.load(`${basePath}-center.affine`, resolve, undefined, reject);
         });
 
+        const partsWithAffine = ["racket", "Rarm", "Rforearm", "Rthigh", "Rshin", "Rfoot", "Larm", "Lforearm", "Lthigh", "Lshin", "Lfoot"];
+        const partsWithQuaternion = this.modelNames.filter(name => !partsWithAffine.includes(name));
+
         // Load all the bone .quaternion files
-        const quaternionPromises: Promise<{ boneName: string, data: QuaternionData }>[] = [];
-        for (const boneName of this.modelNames) {
-            const promise = new Promise<{ boneName: string, data: QuaternionData }>((resolve, reject) => {
+        const quaternionPromises = partsWithQuaternion.map(boneName =>
+            new Promise<{ boneName: string, data: QuaternionData }>((resolve, reject) => {
                 const path = `${basePath}-${boneName}.quaternion`;
                 this.quaternionLoader.load(path, (data) => {
                     resolve({ boneName, data });
-                }, (err) => {
-                    // It's possible some files don't exist, which seems to be by design.
-                    // Instead of rejecting, resolve with null data.
-                    console.warn(`Could not load ${path}, assuming no animation for this bone.`);
-                    resolve({ boneName, data: { origin: new THREE.Vector3(), quaternions: [] } });
-                });
-            });
-            quaternionPromises.push(promise);
-        }
+                }, undefined, reject);
+            })
+        );
 
-        const [centerAffine, ...boneQuaternionsResolved] = await Promise.all([affinePromise, ...quaternionPromises]);
+        // Load all the bone .affine files
+        const affineBonePromises = partsWithAffine.map(boneName =>
+            new Promise<{ boneName: string, data: AffineData }>((resolve, reject) => {
+                const path = `${basePath}-${boneName}.affine`;
+                this.affineLoader.load(path, (data) => {
+                    resolve({ boneName, data });
+                }, (err) => {
+                    // Not all motions have all parts, so gracefully handle missing files
+                    console.warn(`Could not load ${path}, assuming no animation for this bone.`);
+                    resolve({ boneName, data: { matrices: [] } });
+                });
+            })
+        );
+
+        const [centerAffine, ...results] = await Promise.all([affinePromise, ...quaternionPromises, ...affineBonePromises]);
 
         const boneQuaternions: { [boneName: string]: QuaternionData } = {};
-        for (const result of boneQuaternionsResolved) {
-            boneQuaternions[result.boneName] = result.data;
-        }
+        const boneAffineData: { [boneName: string]: AffineData } = {};
 
-        return { centerAffine, boneQuaternions };
+        results.forEach(result => {
+            if ('matrices' in result.data) {
+                // It's an AffineData result
+                boneAffineData[result.boneName] = result.data;
+            } else if ('quaternions' in result.data) {
+                // It's a QuaternionData result
+                boneQuaternions[result.boneName] = result.data;
+            }
+        });
+
+        return { centerAffine, boneQuaternions, boneAffineData };
     }
 }
 

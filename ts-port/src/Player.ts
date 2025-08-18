@@ -128,45 +128,68 @@ export class Player {
             const tracks: THREE.KeyframeTrack[] = [];
             let duration = 0;
 
+            // Root motion from center.affine
             const rootPositionTimes: number[] = [];
             const rootPositionValues: number[] = [];
             const rootQuaternionTimes: number[] = [];
             const rootQuaternionValues: number[] = [];
-
             motion.centerAffine.matrices.forEach((matrix, index) => {
                 const time = index / FRAME_RATE;
                 rootPositionTimes.push(time);
                 rootQuaternionTimes.push(time);
-
                 const pos = new THREE.Vector3();
                 const quat = new THREE.Quaternion();
                 const scale = new THREE.Vector3();
                 matrix.decompose(pos, quat, scale);
-
                 rootPositionValues.push(pos.x, pos.y, pos.z);
                 rootQuaternionValues.push(quat.x, quat.y, quat.z, quat.w);
+                duration = Math.max(duration, time);
             });
-
             if (rootPositionTimes.length > 0) {
                 tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
                 tracks.push(new THREE.QuaternionKeyframeTrack('root.quaternion', rootQuaternionTimes, rootQuaternionValues));
-                duration = Math.max(duration, rootPositionTimes[rootPositionTimes.length - 1]);
             }
 
+            // Bone rotations from .quaternion files
             for (const boneName in motion.boneQuaternions) {
                 const boneData = motion.boneQuaternions[boneName];
                 const times: number[] = [];
                 const values: number[] = [];
-
                 boneData.quaternions.forEach((q, index) => {
                     times.push(index / FRAME_RATE);
                     values.push(q.x, q.y, q.z, q.w);
+                    duration = Math.max(duration, times[times.length - 1]);
+                });
+                if (times.length > 0) {
+                    tracks.push(new THREE.QuaternionKeyframeTrack(`${boneName}.quaternion`, times, values));
+                }
+            }
+
+            // Bone transforms from .affine files
+            for (const boneName in motion.boneAffineData) {
+                const boneData = motion.boneAffineData[boneName];
+                const positionTimes: number[] = [];
+                const positionValues: number[] = [];
+                const quaternionTimes: number[] = [];
+                const quaternionValues: number[] = [];
+
+                boneData.matrices.forEach((matrix, index) => {
+                    const time = index / FRAME_RATE;
+                    const pos = new THREE.Vector3();
+                    const quat = new THREE.Quaternion();
+                    const scale = new THREE.Vector3();
+                    matrix.decompose(pos, quat, scale);
+
+                    positionTimes.push(time);
+                    positionValues.push(pos.x, pos.y, pos.z);
+                    quaternionTimes.push(time);
+                    quaternionValues.push(quat.x, quat.y, quat.z, quat.w);
+                    duration = Math.max(duration, time);
                 });
 
-                if (times.length > 0) {
-                    const trackName = `${boneName}.quaternion`;
-                    tracks.push(new THREE.QuaternionKeyframeTrack(trackName, times, values));
-                    duration = Math.max(duration, times[times.length - 1]);
+                if (positionTimes.length > 0) {
+                    tracks.push(new THREE.VectorKeyframeTrack(`${boneName}.position`, positionTimes, positionValues));
+                    tracks.push(new THREE.QuaternionKeyframeTrack(`${boneName}.quaternion`, quaternionTimes, quaternionValues));
                 }
             }
 
@@ -181,11 +204,27 @@ export class Player {
         const fNormalMotion = this.assets.motions['Fnormal'];
         if (!fNormalMotion) return;
 
+        // Apply initial pose from quaternion files
         for(const boneName in fNormalMotion.boneQuaternions) {
             const bone = this.bodyParts[boneName];
             const boneData = fNormalMotion.boneQuaternions[boneName];
             if (bone && boneData) {
                 bone.position.copy(boneData.origin);
+            }
+        }
+
+        // Apply initial pose from affine files
+        for(const boneName in fNormalMotion.boneAffineData) {
+            const bone = this.bodyParts[boneName];
+            const boneData = fNormalMotion.boneAffineData[boneName];
+            if (bone && boneData && boneData.matrices.length > 0) {
+                const initialMatrix = boneData.matrices[0];
+                const pos = new THREE.Vector3();
+                const quat = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                initialMatrix.decompose(pos, quat, scale);
+                bone.position.copy(pos);
+                bone.quaternion.copy(quat);
             }
         }
     }
