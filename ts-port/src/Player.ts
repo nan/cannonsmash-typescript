@@ -57,7 +57,7 @@ export class Player {
 
     private buildModel() {
         // ... (rest of the file is unchanged, so I will omit it for brevity)
-        const material = new THREE.MeshNormalMaterial();
+        const material = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
 
         for (const modelName in this.assets.baseModels) {
             const geometry = this.assets.baseModels[modelName];
@@ -68,10 +68,6 @@ export class Player {
                 const bone = new THREE.Group();
                 bone.name = modelName;
                 bone.add(partMesh);
-
-                // Add a debug axis helper to each bone
-                const axesHelper = new THREE.AxesHelper(0.1);
-                bone.add(axesHelper);
 
                 this.bodyParts[modelName] = bone;
                 this.rootBone.add(bone);
