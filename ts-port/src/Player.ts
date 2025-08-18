@@ -33,7 +33,6 @@ export class Player {
         console.log("Player class instantiated");
         this.buildModel();
         this.createAnimationClips();
-        this.applyInitialPose();
 
         this.setState(PlayerState.IDLE);
     }
@@ -196,35 +195,6 @@ export class Player {
             if (tracks.length > 0) {
                 const clip = new THREE.AnimationClip(motionName, duration, tracks);
                 this.animationClips[motionName] = clip;
-            }
-        }
-    }
-
-    private applyInitialPose() {
-        const fNormalMotion = this.assets.motions['Fnormal'];
-        if (!fNormalMotion) return;
-
-        // Apply initial pose from quaternion files
-        for(const boneName in fNormalMotion.boneQuaternions) {
-            const bone = this.bodyParts[boneName];
-            const boneData = fNormalMotion.boneQuaternions[boneName];
-            if (bone && boneData) {
-                bone.position.copy(boneData.origin);
-            }
-        }
-
-        // Apply initial pose from affine files
-        for(const boneName in fNormalMotion.boneAffineData) {
-            const bone = this.bodyParts[boneName];
-            const boneData = fNormalMotion.boneAffineData[boneName];
-            if (bone && boneData && boneData.matrices.length > 0) {
-                const initialMatrix = boneData.matrices[0];
-                const pos = new THREE.Vector3();
-                const quat = new THREE.Quaternion();
-                const scale = new THREE.Vector3();
-                initialMatrix.decompose(pos, quat, scale);
-                bone.position.copy(pos);
-                bone.quaternion.copy(quat);
             }
         }
     }
