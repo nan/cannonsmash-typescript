@@ -10,7 +10,7 @@ export class AffineLoader extends THREE.Loader {
         url: string,
         onLoad: (data: AffineData) => void,
         onProgress?: (event: ProgressEvent) => void,
-        onError?: (event: ErrorEvent) => void
+        onError?: (error: unknown) => void
     ) {
         const loader = new THREE.FileLoader(this.manager);
         loader.setPath(this.path);
@@ -19,14 +19,14 @@ export class AffineLoader extends THREE.Loader {
             try {
                 const data = this.parse(text as string);
                 onLoad(data);
-            } catch (e: any) {
+            } catch (e) {
                 if (onError) {
                     onError(e);
                 } else {
                     console.error(e);
                 }
             }
-        }, onProgress, onError);
+        }, onProgress, (err) => onError ? onError(err) : undefined);
     }
 
     parse(text: string): AffineData {

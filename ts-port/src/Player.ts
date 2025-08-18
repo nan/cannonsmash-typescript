@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { GameAssets, Motion } from './AssetManager';
+import type { GameAssets } from './AssetManager';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -8,6 +8,18 @@ export enum PlayerState {
     SWING_DRIVE,
     SWING_CUT,
 }
+
+const thighLength = 0.396;
+const shinLength = 0.430;
+
+const RHIPORIGINX = 0.1;
+const RHIPORIGINY = -0.16;
+const RHIPORIGINZ = 0.77;
+const LHIPORIGINX = -0.1;
+const RFOOTORIGINX = 0.25;
+const RFOOTORIGINY = 0;
+const RFOOTORIGINZ = 0;
+const LFOOTORIGINX = -0.25;
 
 export class Player {
     public mesh: THREE.Group;
@@ -214,5 +226,76 @@ export class Player {
 
     public update(deltaTime: number) {
         this.mixer.update(deltaTime);
+        this.updateLegsIK();
+    }
+
+    private updateLegsIK() {
+        const hip = this.bodyParts['hip'];
+        if (!hip) return;
+
+        this.solveIKForLeg('R');
+        this.solveIKForLeg('L');
+    }
+
+    private solveIKForLeg(side: 'R' | 'L') {
+        const thigh = this.bodyParts[side + 'thigh'];
+        const shin = this.bodyParts[side + 'shin'];
+        const foot = this.bodyParts[side + 'foot'];
+
+        if (!thigh || !shin || !foot) return;
+
+        // IK calculations are done in the hip's local space.
+        // The thigh is a child of the hip, so we calculate its local rotation.
+
+        const hipPosition = new THREE.Vector3(
+            side === 'R' ? RHIPORIGINX : LHIPORIGINX,
+            RHIPORIGINY,
+            RHIPORIGINZ
+        );
+
+        const toePosition = new THREE.Vector3(
+            side === 'R' ? RFOOTORIGINX : LFOOTORIGINX,
+            RFOOTORIGINY,
+            RFOOTORIGINZ
+        );
+
+        const hipToToe = new THREE.Vector3().subVectors(toePosition, hipPosition);
+        const distance = hipToToe.length();
+
+        // Check if the target is reachable
+        if (distance > thighLength + shinLength) {
+            // Target is too far, stretch the leg
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), hipToToe.normalize());
+            thigh.quaternion.copy(q);
+            shin.quaternion.identity(); // Straighten the shin
+            return;
+        }
+
+        // Law of cosines to find the angle of the knee
+        const kneeAngle = Math.acos(
+            (thighLength * thighLength + shinLength * shinLength - distance * distance) /
+            (2 * thighLength * shinLength)
+        );
+
+        // Angle of the thigh relative to the hip-to-toe vector
+        const thighAngle = Math.acos(
+            (distance * distance + thighLength * thighLength - shinLength * shinLength) /
+            (2 * distance * thighLength)
+        );
+
+        const axis = new THREE.Vector3().crossVectors(hipToToe, new THREE.Vector3(0, 1, 0)).normalize();
+
+        // Rotation to align the thigh with the hip-to-toe vector
+        const alignRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), hipToToe.normalize());
+
+        // Rotation to bend the thigh at the hip
+        const thighBendRotation = new THREE.Quaternion().setFromAxisAngle(axis, thighAngle);
+
+        // Combine rotations for the thigh
+        thigh.quaternion.multiplyQuaternions(alignRotation, thighBendRotation);
+
+        // Shin rotation is relative to the thigh
+        const shinRotation = new THREE.Quaternion().setFromAxisAngle(axis, -kneeAngle);
+        shin.quaternion.copy(shinRotation);
     }
 }
