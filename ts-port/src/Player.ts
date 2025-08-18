@@ -69,6 +69,10 @@ export class Player {
                 bone.name = modelName;
                 bone.add(partMesh);
 
+                // Add a debug axis helper to each bone
+                const axesHelper = new THREE.AxesHelper(0.1);
+                bone.add(axesHelper);
+
                 this.bodyParts[modelName] = bone;
                 this.rootBone.add(bone);
             }
