@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
 
@@ -17,6 +18,10 @@ async function main() {
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
   camera.position.z = 2.5;
   camera.position.y = 1.2;
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1, 0);
+  controls.update();
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x333333);
@@ -59,6 +64,7 @@ async function main() {
     }
 
     game.update(deltaTime);
+    controls.update();
 
     renderer.render(scene, camera);
 
