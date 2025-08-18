@@ -305,7 +305,7 @@ export class Player {
         const baseAngle = Math.atan2(hipToToe.y, hipToToe.z);
 
         // Combine angles for the thigh's pitch.
-        const thighPitchAngle = baseAngle + thighAngle;
+        const thighPitchAngle = baseAngle - thighAngle;
 
         const thighPitchRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), thighPitchAngle);
 
@@ -318,20 +318,5 @@ export class Player {
 
         // For now, let's keep the foot straight relative to the shin.
         foot.quaternion.identity();
-
-        if (side === 'R') { // Log only for one leg to avoid spam
-            console.log(JSON.stringify({
-                side,
-                hipToToe: hipToToe.toArray(),
-                distance2D,
-                yawAngle,
-                thighAngle,
-                kneeAngle,
-                baseAngle,
-                thighPitchAngle,
-                thighQuaternion: thigh.quaternion.toArray(),
-                shinQuaternion: shin.quaternion.toArray(),
-            }, null, 2));
-        }
     }
 }
