@@ -56,21 +56,68 @@ export class Player {
     }
 
     private buildModel() {
-        // ... (rest of the file is unchanged, so I will omit it for brevity)
         const material = new THREE.MeshNormalMaterial();
 
-        for (const modelName in this.assets.baseModels) {
-            const geometry = this.assets.baseModels[modelName];
-            if (geometry) {
-                const partMesh = new THREE.Mesh(geometry, material);
-                partMesh.name = modelName;
+        // A helper function to create a bone with its mesh
+        const createBone = (name: string): THREE.Group | undefined => {
+            const geometry = this.assets.baseModels[name];
+            if (!geometry) {
+                console.warn(`Geometry for ${name} not found!`);
+                return undefined;
+            }
+            const partMesh = new THREE.Mesh(geometry, material);
+            partMesh.name = name;
 
-                const bone = new THREE.Group();
-                bone.name = modelName;
-                bone.add(partMesh);
+            const bone = new THREE.Group();
+            bone.name = name;
+            bone.add(partMesh);
 
-                this.bodyParts[modelName] = bone;
-                this.rootBone.add(bone);
+            this.bodyParts[name] = bone;
+            return bone;
+        };
+
+        // Define the skeletal hierarchy
+        const hierarchy = {
+            "hip": { parent: this.rootBone, children: ["chest", "Lthigh", "Rthigh"] },
+            "chest": { parentName: "hip", children: ["head", "Lshoulder", "Rshoulder"] },
+            "head": { parentName: "chest", children: [] },
+            "Lshoulder": { parentName: "chest", children: ["Larm"] },
+            "Larm": { parentName: "Lshoulder", children: ["Lelbow"] },
+            "Lelbow": { parentName: "Larm", children: ["Lforearm"] },
+            "Lforearm": { parentName: "Lelbow", children: ["Lhand"] },
+            "Lhand": { parentName: "Lforearm", children: [] },
+            "Rshoulder": { parentName: "chest", children: ["Rarm"] },
+            "Rarm": { parentName: "Rshoulder", children: ["Relbow"] },
+            "Relbow": { parentName: "Rarm", children: ["Rforearm"] },
+            "Rforearm": { parentName: "Relbow", children: ["Rhand"] },
+            "Rhand": { parentName: "Rforearm", children: [] },
+            "Lthigh": { parentName: "hip", children: ["Lshin"] },
+            "Lshin": { parentName: "Lthigh", children: ["Lfoot"] },
+            "Lfoot": { parentName: "Lshin", children: [] },
+            "Rthigh": { parentName: "hip", children: ["Rshin"] },
+            "Rshin": { parentName: "Rthigh", children: ["Rfoot"] },
+            "Rfoot": { parentName: "Rshin", children: [] },
+            "racket": { parentName: "Rhand", children: [] },
+        };
+
+        // Create all the bones first
+        for (const name of Object.keys(hierarchy)) {
+            createBone(name);
+        }
+
+        // Parent them according to the hierarchy
+        for (const name in hierarchy) {
+            const bone = this.bodyParts[name];
+            if (!bone) continue;
+
+            const def = (hierarchy as any)[name];
+            if (def.parent) { // For the root bone's direct child
+                def.parent.add(bone);
+            } else if (def.parentName) {
+                const parentBone = this.bodyParts[def.parentName];
+                if (parentBone) {
+                    parentBone.add(bone);
+                }
             }
         }
     }
