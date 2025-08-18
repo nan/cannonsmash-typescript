@@ -15,8 +15,7 @@ async function main() {
   const near = 0.1;
   const far = 100;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-  camera.position.z = 2;
-  camera.position.y = 1;
+  camera.position.set(0, 1.2, 2.5);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x333333);
