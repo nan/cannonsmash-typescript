@@ -106,13 +106,17 @@ class AssetManager {
         const affineBonePromises = partsWithAffine.map(boneName =>
             new Promise<{ boneName: string, data: AffineData }>((resolve, reject) => {
                 const path = `${basePath}-${boneName}.affine`;
-                this.affineLoader.load(path, (data) => {
-                    resolve({ boneName, data });
-                }, (err) => {
-                    // Not all motions have all parts, so gracefully handle missing files
-                    console.warn(`Could not load ${path}, assuming no animation for this bone.`);
-                    resolve({ boneName, data: { matrices: [] } });
-                });
+                this.affineLoader.load(path,
+                    (data) => { // onLoad
+                        resolve({ boneName, data });
+                    },
+                    undefined, // onProgress
+                    (err) => { // onError
+                        // Not all motions have all parts, so gracefully handle missing files
+                        console.warn(`Could not load ${path}, assuming no animation for this bone.`);
+                        resolve({ boneName, data: { matrices: [] } });
+                    }
+                );
             })
         );
 
