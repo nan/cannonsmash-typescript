@@ -31,7 +31,7 @@ export class AffineLoader extends THREE.Loader {
 
     parse(text: string): AffineData {
         const matrices: THREE.Matrix4[] = [];
-        const lines = text.split('\\n');
+        const lines = text.split('\n');
         const numbers: number[] = [];
 
         for (const line of lines) {

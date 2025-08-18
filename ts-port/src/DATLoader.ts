@@ -36,7 +36,7 @@ export class DATLoader extends THREE.Loader {
         const uvs: number[] = [];
         const faces: number[] = [];
 
-        const lines = text.split('\\n');
+        const lines = text.split('\n');
 
         for (const line of lines) {
             const trimmedLine = line.trim();

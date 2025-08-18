@@ -33,7 +33,7 @@ export class QuaternionLoader extends THREE.Loader {
         const origin = new THREE.Vector3();
         const quaternions: THREE.Quaternion[] = [];
 
-        const lines = text.split('\\n');
+        const lines = text.split('\n');
 
         for (const line of lines) {
             const trimmedLine = line.trim();
