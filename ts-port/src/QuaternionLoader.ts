@@ -33,31 +33,34 @@ export class QuaternionLoader extends THREE.Loader {
         const origin = new THREE.Vector3();
         const quaternions: THREE.Quaternion[] = [];
 
-        const lines = text.split('\\n');
+        const lines = text.split('\n');
+
+        const quaternionRegex = /Quaternion\((.+?),\s*\((.+?),\s*(.+?),\s*(.+?)\)\)/;
 
         for (const line of lines) {
             const trimmedLine = line.trim();
-            if (!trimmedLine || trimmedLine.startsWith('#')) {
+            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('Frame')) {
                 continue;
             }
 
-            const tokens = trimmedLine.split(/[\\s,();]+/);
-            const command = tokens[0];
-
-            if (command === 'Origin') {
+            if (trimmedLine.startsWith('Origin')) {
+                const tokens = trimmedLine.split(/[(),\s]+/).filter(Boolean);
                 const x = parseFloat(tokens[1]);
                 const y = parseFloat(tokens[2]);
                 const z = parseFloat(tokens[3]);
                 origin.set(x, y, z);
-            } else if (command === 'Quaternion') {
-                // C++ code reads w, x, y, z
-                // v[0] is w, and it's negated.
-                const w = -parseFloat(tokens[1]);
-                const x = parseFloat(tokens[2]);
-                const y = parseFloat(tokens[3]);
-                const z = parseFloat(tokens[4]);
-                // THREE.Quaternion constructor is (x, y, z, w)
-                quaternions.push(new THREE.Quaternion(x, y, z, w));
+            } else if (trimmedLine.startsWith('Quaternion')) {
+                const match = trimmedLine.match(quaternionRegex);
+                if (match) {
+                    // C++ code reads w, x, y, z
+                    // v[0] is w, and it's negated.
+                    const w = -parseFloat(match[1]);
+                    const x = parseFloat(match[2]);
+                    const y = parseFloat(match[3]);
+                    const z = parseFloat(match[4]);
+                    // THREE.Quaternion constructor is (x, y, z, w)
+                    quaternions.push(new THREE.Quaternion(x, y, z, w));
+                }
             }
         }
 
