@@ -91,15 +91,16 @@ class AssetManager {
         // Load all the bone .quaternion files
         const quaternionPromises: Promise<{ boneName: string, data: QuaternionData }>[] = [];
         for (const boneName of this.modelNames) {
-             // As seen in C++ code, some quaternion files are skipped
-            if (["racket", "Rarm", "Rforearm", "Rthigh", "Rshin", "Rfoot", "Larm", "Lforearm", "Lthigh", "Lshin", "Lfoot"].includes(boneName)) {
-                continue;
-            }
             const promise = new Promise<{ boneName: string, data: QuaternionData }>((resolve, reject) => {
                 const path = `${basePath}-${boneName}.quaternion`;
                 this.quaternionLoader.load(path, (data) => {
                     resolve({ boneName, data });
-                }, undefined, reject);
+                }, (err) => {
+                    // It's possible some files don't exist, which seems to be by design.
+                    // Instead of rejecting, resolve with null data.
+                    console.warn(`Could not load ${path}, assuming no animation for this bone.`);
+                    resolve({ boneName, data: { origin: new THREE.Vector3(), quaternions: [] } });
+                });
             });
             quaternionPromises.push(promise);
         }
