@@ -31,12 +31,16 @@ export class DATLoader extends THREE.Loader {
 
     parse(text: string): THREE.BufferGeometry {
         const geometry = new THREE.BufferGeometry();
-
         const vertices: number[] = [];
         const uvs: number[] = [];
         const faces: number[] = [];
 
         const lines = text.split('\n');
+
+        // Regex to capture point data: point 0,(x,y,z); or point 0,(x,y,z),(u,v);
+        const pointRegex = /point\s+\d+,\((.+?),(.+?),(.+?)\)(?:,\((.+?),(.+?)\))?;/;
+        // Regex to capture plane data: plane 0,1,2; or plane 0,1,2,3;
+        const planeRegex = /plane\s+([\d,]+);/;
 
         for (const line of lines) {
             const trimmedLine = line.trim();
@@ -44,40 +48,28 @@ export class DATLoader extends THREE.Loader {
                 continue;
             }
 
-            const tokens = trimmedLine.split(/[\\s,();]+/).filter(Boolean);
-            const command = tokens[0];
-
-            if (command === 'point') {
-                // Example: point 0,(-0.05,0.1,0.2),(0.5,0.5);
-                // tokens: ["point", "0", "-0.05", "0.1", "0.2", "0.5", "0.5"]
-                const x = parseFloat(tokens[2]);
-                const y = parseFloat(tokens[3]);
-                const z = parseFloat(tokens[4]);
+            const pointMatch = trimmedLine.match(pointRegex);
+            if (pointMatch) {
+                const x = parseFloat(pointMatch[1]);
+                const y = parseFloat(pointMatch[2]);
+                const z = parseFloat(pointMatch[3]);
                 vertices.push(x, y, z);
 
-                if (tokens.length > 5) {
-                    const u = parseFloat(tokens[5]);
-                    const v = 1.0 - parseFloat(tokens[6]); // V is inverted
+                // Check if UVs were captured
+                if (pointMatch[4] && pointMatch[5]) {
+                    const u = parseFloat(pointMatch[4]);
+                    const v = 1.0 - parseFloat(pointMatch[5]); // V is inverted
                     uvs.push(u, v);
                 }
+                continue;
+            }
 
-            } else if (command === 'plane') {
-                // Example: plane 0,1,2,3,C4;
-                // tokens: ["plane", "0", "1", "2", "3", "C4"]
-                const faceIndices: number[] = [];
-                for (let i = 1; i < tokens.length; i++) {
-                    if (tokens[i].startsWith('C')) {
-                        // Color index - ignore for now
-                        continue;
-                    }
-                    if (tokens[i].startsWith('#')) {
-                        // Stop at comments
-                        break;
-                    }
-                    const index = parseInt(tokens[i], 10);
-                    if (!isNaN(index)) {
-                        faceIndices.push(index);
-                    }
+            const planeMatch = trimmedLine.match(planeRegex);
+            if (planeMatch) {
+                const faceIndices = planeMatch[1].split(',').map(s => parseInt(s, 10));
+
+                if (faceIndices.some(isNaN)) {
+                    continue;
                 }
 
                 if (faceIndices.length === 3) {
@@ -88,6 +80,7 @@ export class DATLoader extends THREE.Loader {
                     faces.push(faceIndices[0], faceIndices[1], faceIndices[2]);
                     faces.push(faceIndices[0], faceIndices[2], faceIndices[3]);
                 }
+                continue;
             }
         }
 
