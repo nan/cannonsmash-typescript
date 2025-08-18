@@ -3,11 +3,7 @@ import type { GameAssets } from './AssetManager';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
-export enum PlayerState {
-    IDLE,
-    SWING_DRIVE,
-    SWING_CUT,
-}
+export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 
 const thighLength = 0.396;
 const shinLength = 0.430;
@@ -23,7 +19,7 @@ const LFOOTORIGINX = -0.25;
 
 export class Player {
     public mesh: THREE.Group;
-    public state: PlayerState = PlayerState.IDLE;
+    public state: PlayerState = 'IDLE';
 
     private assets: GameAssets;
     private bodyParts: { [name: string]: THREE.Object3D } = {};
@@ -47,7 +43,7 @@ export class Player {
         this.createAnimationClips();
         this.applyInitialPose();
 
-        this.setState(PlayerState.IDLE);
+        this.setState('IDLE');
     }
 
     public setState(newState: PlayerState) {
@@ -55,13 +51,13 @@ export class Player {
         this.state = newState;
 
         switch (this.state) {
-            case PlayerState.IDLE:
+            case 'IDLE':
                 this.playAnimation('Fnormal', true);
                 break;
-            case PlayerState.SWING_DRIVE:
+            case 'SWING_DRIVE':
                 this.playAnimation('Fdrive', false);
                 break;
-            case PlayerState.SWING_CUT:
+            case 'SWING_CUT':
                 this.playAnimation('Fcut', false);
                 break;
         }
@@ -215,7 +211,7 @@ export class Player {
             if (!loop) {
                 this.mixer.addEventListener('finished', (e) => {
                     if (e.action === this.currentAction) {
-                        this.setState(PlayerState.IDLE);
+                        this.setState('IDLE');
                     }
                 });
             }

@@ -5,7 +5,7 @@ export class DATLoader extends THREE.Loader {
         url: string,
         onLoad: (geometry: THREE.BufferGeometry) => void,
         onProgress?: (event: ProgressEvent) => void,
-        onError?: (event: ErrorEvent) => void
+        onError?: (error: unknown) => void
     ) {
         const loader = new THREE.FileLoader(this.manager);
         loader.setPath(this.path);
@@ -16,7 +16,7 @@ export class DATLoader extends THREE.Loader {
                 try {
                     const geometry = this.parse(text as string);
                     onLoad(geometry);
-                } catch (e: any) {
+                } catch (e) {
                     if (onError) {
                         onError(e);
                     } else {
@@ -25,7 +25,7 @@ export class DATLoader extends THREE.Loader {
                 }
             },
             onProgress,
-            onError
+            (err) => onError ? onError(err) : undefined
         );
     }
 

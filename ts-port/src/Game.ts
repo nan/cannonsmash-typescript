@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
-import { Player, PlayerState } from './Player';
+import { Player } from './Player';
 import { Ball } from './Ball';
 import { inputManager } from './InputManager';
 
 export class Game {
     private scene: THREE.Scene;
     private assets: GameAssets;
-    private player1: Player;
-    private ball: Ball;
+    private player1!: Player;
+    private ball!: Ball;
 
     constructor(scene: THREE.Scene, assets: GameAssets) {
         this.scene = scene;
@@ -34,10 +34,10 @@ export class Game {
 
     private handleInput() {
         if (inputManager.isKeyPressed('j')) {
-            this.player1.setState(PlayerState.SWING_DRIVE);
+            this.player1.setState('SWING_DRIVE');
         }
         if (inputManager.isKeyPressed('k')) {
-            this.player1.setState(PlayerState.SWING_CUT);
+            this.player1.setState('SWING_CUT');
         }
     }
 
