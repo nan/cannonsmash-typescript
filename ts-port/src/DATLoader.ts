@@ -31,9 +31,7 @@ export class DATLoader extends THREE.Loader {
 
     parse(text: string): THREE.BufferGeometry {
         const geometry = new THREE.BufferGeometry();
-
         const vertices: number[] = [];
-        const uvs: number[] = [];
         const faces: number[] = [];
 
         const lines = text.split('\n');
@@ -44,41 +42,33 @@ export class DATLoader extends THREE.Loader {
                 continue;
             }
 
-            const tokens = trimmedLine.split(/[\\s,();]+/);
-            const command = tokens[0];
-
-            if (command === 'point') {
-                // Example: point 0,(-0.05,0.1,0.2),(0.5,0.5);
-                const x = parseFloat(tokens[2]);
-                const y = parseFloat(tokens[3]);
-                const z = parseFloat(tokens[4]);
-                vertices.push(x, y, z);
-
-                if (tokens.length > 6) {
-                    const u = parseFloat(tokens[6]);
-                    const v = 1.0 - parseFloat(tokens[7]); // V is inverted
-                    uvs.push(u, v);
+            if (trimmedLine.startsWith('point')) {
+                const match = trimmedLine.match(/\((.*),(.*),(.*)\)/);
+                if (match) {
+                    const x = parseFloat(match[1]);
+                    const y = parseFloat(match[2]);
+                    const z = parseFloat(match[3]);
+                    vertices.push(x, y, z);
                 }
-
-            } else if (command === 'plane') {
-                // Example: plane 0,1,2,3,C4;
+            } else if (trimmedLine.startsWith('plane')) {
+                const indicesStr = trimmedLine.substring(
+                    trimmedLine.indexOf(' ') + 1,
+                    trimmedLine.lastIndexOf(';')
+                );
+                const tokens = indicesStr.split(',');
                 const faceIndices: number[] = [];
-                for (let i = 1; i < tokens.length; i++) {
-                    if (tokens[i].startsWith('C')) {
-                        // Color index - ignore for now
-                        continue;
-                    }
-                    const index = parseInt(tokens[i], 10);
-                    if (!isNaN(index)) {
-                        faceIndices.push(index);
+                for (const token of tokens) {
+                    if (!token.startsWith('C')) {
+                        const index = parseInt(token, 10);
+                        if (!isNaN(index)) {
+                            faceIndices.push(index);
+                        }
                     }
                 }
 
                 if (faceIndices.length === 3) {
-                    // Triangle
                     faces.push(faceIndices[0], faceIndices[1], faceIndices[2]);
                 } else if (faceIndices.length === 4) {
-                    // Quad, triangulate as (v0, v1, v2) and (v0, v2, v3)
                     faces.push(faceIndices[0], faceIndices[1], faceIndices[2]);
                     faces.push(faceIndices[0], faceIndices[2], faceIndices[3]);
                 }
@@ -86,9 +76,6 @@ export class DATLoader extends THREE.Loader {
         }
 
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        if (uvs.length > 0) {
-            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        }
         geometry.setIndex(faces);
         geometry.computeVertexNormals();
 
