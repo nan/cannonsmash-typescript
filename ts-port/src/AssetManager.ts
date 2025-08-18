@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { DATLoader } from './DATLoader';
-import { AffineLoader, AffineData } from './AffineLoader';
-import { QuaternionLoader, QuaternionData } from './QuaternionLoader';
+import { AffineLoader, type AffineData } from './AffineLoader';
+import { QuaternionLoader, type QuaternionData } from './QuaternionLoader';
 
 // A structure to hold the data for a single motion (e.g., Fnormal)
 export interface Motion {
