@@ -240,9 +240,6 @@ export class Player {
 
         if (!thigh || !shin || !foot) return;
 
-        // IK calculations are done in the hip's local space.
-        // The thigh is a child of the hip, so we calculate its local rotation.
-
         const hipPosition = new THREE.Vector3(
             side === 'R' ? RHIPORIGINX : LHIPORIGINX,
             RHIPORIGINY,
@@ -256,42 +253,44 @@ export class Player {
         );
 
         const hipToToe = new THREE.Vector3().subVectors(toePosition, hipPosition);
-        const distance = hipToToe.length();
 
-        // Check if the target is reachable
-        if (distance > thighLength + shinLength) {
-            // Target is too far, stretch the leg
-            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), hipToToe.normalize());
-            thigh.quaternion.copy(q);
-            shin.quaternion.identity(); // Straighten the shin
-            return;
-        }
+        // --- Yaw rotation (around Y axis) ---
+        // This rotation points the leg towards the target in the XZ plane.
+        const yawAngle = Math.atan2(hipToToe.x, hipToToe.z);
+        const yawRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawAngle);
 
-        // Law of cosines to find the angle of the knee
+        // --- Pitch rotation (2D IK in YZ plane) ---
+        // We project the hip-to-toe vector onto the YZ plane to solve the 2D IK.
+        const distance2D = new THREE.Vector2(hipToToe.y, hipToToe.z).length();
+
+        // Law of cosines to find the angles of the thigh and knee.
+        // We use the 2D distance for this calculation.
+        const thighAngle = Math.acos(
+            (distance2D * distance2D + thighLength * thighLength - shinLength * shinLength) /
+            (2 * distance2D * thighLength)
+        );
+
         const kneeAngle = Math.acos(
-            (thighLength * thighLength + shinLength * shinLength - distance * distance) /
+            (thighLength * thighLength + shinLength * shinLength - distance2D * distance2D) /
             (2 * thighLength * shinLength)
         );
 
-        // Angle of the thigh relative to the hip-to-toe vector
-        const thighAngle = Math.acos(
-            (distance * distance + thighLength * thighLength - shinLength * shinLength) /
-            (2 * distance * thighLength)
-        );
+        // The initial angle of the hip-to-toe vector in the YZ plane.
+        const baseAngle = Math.atan2(hipToToe.y, hipToToe.z);
 
-        const axis = new THREE.Vector3().crossVectors(hipToToe, new THREE.Vector3(0, 1, 0)).normalize();
+        // Combine angles for the thigh's pitch.
+        const thighPitchAngle = baseAngle + thighAngle;
 
-        // Rotation to align the thigh with the hip-to-toe vector
-        const alignRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), hipToToe.normalize());
+        const thighPitchRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), thighPitchAngle);
 
-        // Rotation to bend the thigh at the hip
-        const thighBendRotation = new THREE.Quaternion().setFromAxisAngle(axis, thighAngle);
+        // The shin's rotation is relative to the thigh.
+        const shinPitchRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), kneeAngle - Math.PI);
 
-        // Combine rotations for the thigh
-        thigh.quaternion.multiplyQuaternions(alignRotation, thighBendRotation);
+        // Combine yaw and pitch for the final thigh rotation.
+        thigh.quaternion.multiplyQuaternions(yawRotation, thighPitchRotation);
+        shin.quaternion.copy(shinPitchRotation);
 
-        // Shin rotation is relative to the thigh
-        const shinRotation = new THREE.Quaternion().setFromAxisAngle(axis, -kneeAngle);
-        shin.quaternion.copy(shinRotation);
+        // For now, let's keep the foot straight relative to the shin.
+        foot.quaternion.identity();
     }
 }
