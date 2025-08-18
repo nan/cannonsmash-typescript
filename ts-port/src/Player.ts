@@ -280,17 +280,26 @@ export class Player {
         // We project the hip-to-toe vector onto the YZ plane to solve the 2D IK.
         const distance2D = new THREE.Vector2(hipToToe.y, hipToToe.z).length();
 
-        // Law of cosines to find the angles of the thigh and knee.
-        // We use the 2D distance for this calculation.
-        const thighAngle = Math.acos(
-            (distance2D * distance2D + thighLength * thighLength - shinLength * shinLength) /
-            (2 * distance2D * thighLength)
-        );
+        // Safety check for reachability and division by zero
+        if (distance2D > thighLength + shinLength || distance2D === 0) {
+            // Target is too far or at the same location, stretch the leg
+            const stretchRotation = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(hipToToe.x, hipToToe.y, hipToToe.z).normalize()
+            );
+            thigh.quaternion.copy(stretchRotation);
+            shin.quaternion.identity();
+            foot.quaternion.identity();
+            return;
+        }
 
-        const kneeAngle = Math.acos(
-            (thighLength * thighLength + shinLength * shinLength - distance2D * distance2D) /
-            (2 * thighLength * shinLength)
-        );
+        // Law of cosines to find the angles of the thigh and knee.
+        // We use the 2D distance for this calculation and clamp the input to acos to prevent NaN.
+        const cosThighAngle = (distance2D * distance2D + thighLength * thighLength - shinLength * shinLength) / (2 * distance2D * thighLength);
+        const thighAngle = Math.acos(THREE.MathUtils.clamp(cosThighAngle, -1, 1));
+
+        const cosKneeAngle = (thighLength * thighLength + shinLength * shinLength - distance2D * distance2D) / (2 * thighLength * shinLength);
+        const kneeAngle = Math.acos(THREE.MathUtils.clamp(cosKneeAngle, -1, 1));
 
         // The initial angle of the hip-to-toe vector in the YZ plane.
         const baseAngle = Math.atan2(hipToToe.y, hipToToe.z);
@@ -309,5 +318,18 @@ export class Player {
 
         // For now, let's keep the foot straight relative to the shin.
         foot.quaternion.identity();
+
+        if (side === 'R') { // Log only for one leg to avoid spam
+            console.log({
+                side,
+                hipToToe: hipToToe.toArray(),
+                distance2D,
+                yawAngle,
+                thighAngle,
+                kneeAngle,
+                baseAngle,
+                thighPitchAngle,
+            });
+        }
     }
 }
