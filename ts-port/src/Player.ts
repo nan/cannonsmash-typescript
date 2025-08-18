@@ -214,58 +214,60 @@ export class Player {
         if (!thigh || !shin || !foot) return;
 
         const hip = this.bodyParts['hip'];
+        if (!hip) return;
 
-        // The C++ code applies a hardcoded translation before drawing the legs.
-        // We can simulate this by creating a temporary parent object for the hip.
-        const legRoot = new THREE.Object3D();
-        hip.getWorldQuaternion(legRoot.quaternion);
-        hip.getWorldPosition(legRoot.position);
-        legRoot.position.add(LEG_OFFSET.clone().applyQuaternion(legRoot.quaternion));
-        legRoot.updateWorldMatrix(true);
-
-        const thighPosition = new THREE.Vector3(
-            side === 'R' ? RHIPORIGINX : LHIPORIGINX,
-            RHIPORIGINY,
-            RHIPORIGINZ
-        );
-
-        // Transform thigh position into world space
-        const thighWorldPosition = thighPosition.clone().applyMatrix4(legRoot.matrixWorld);
-
-        const toePosition = new THREE.Vector3(
+        // --- 1. Define target positions in local space ---
+        const targetToePos = new THREE.Vector3(
             side === 'R' ? RFOOTORIGINX : LFOOTORIGINX,
             RFOOTORIGINY,
             RFOOTORIGINZ
         );
 
-        // Transform toe position into world space
-        const toeWorldPosition = toePosition.clone().applyMatrix4(legRoot.matrixWorld);
+        // --- 2. Get current world transforms ---
+        const thighWorldPos = new THREE.Vector3();
+        const thighWorldQuat = new THREE.Quaternion();
+        thigh.getWorldPosition(thighWorldPos);
+        thigh.parent!.getWorldQuaternion(thighWorldQuat); // Parent is hip
 
-        const hipToToe = new THREE.Vector3().subVectors(toeWorldPosition, thighWorldPosition);
-        const distance = hipToToe.length();
+        // --- 3. Calculate target vector in world space ---
+        // The toe position is relative to the hip, so transform it by hip's world matrix
+        const toeWorldPos = targetToePos.clone().applyMatrix4(hip.matrixWorld);
+        const thighToToe = new THREE.Vector3().subVectors(toeWorldPos, thighWorldPos);
+        const distance = thighToToe.length();
 
+        // --- 4. Solve 2D IK ---
         if (distance > thighLength + shinLength || distance < 0.01) {
-            return; // Cannot solve
+            return; // Unreachable
         }
-
         const kneeAngle = -Math.acos(THREE.MathUtils.clamp((thighLength * thighLength + shinLength * shinLength - distance * distance) / (2 * thighLength * shinLength), -1, 1));
         const thighAngle = Math.acos(THREE.MathUtils.clamp((distance * distance + thighLength * thighLength - shinLength * shinLength) / (2 * distance * thighLength), -1, 1));
 
-        const axis = new THREE.Vector3().crossVectors(hipToToe, new THREE.Vector3(0, 1, 0)).normalize();
-        if (axis.length() === 0) {
-            axis.set(1, 0, 0); // Default axis if hipToToe is aligned with up vector
+        // --- 5. Calculate world space rotations ---
+        const axis = new THREE.Vector3().crossVectors(thighToToe, new THREE.Vector3(0, 1, 0)).normalize();
+        if (axis.lengthSq() === 0) {
+            axis.set(1, 0, 0); // Default axis
         }
 
-        const alignThigh = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), hipToToe.normalize());
-        const bendThigh = new THREE.Quaternion().setFromAxisAngle(axis, thighAngle);
-        const finalThighQuaternion = new THREE.Quaternion().multiplyQuaternions(bendThigh, alignThigh);
+        const alignThighQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), thighToToe.normalize());
+        const bendThighQuat = new THREE.Quaternion().setFromAxisAngle(axis, thighAngle);
+        const thighWorldQuatTarget = new THREE.Quaternion().multiplyQuaternions(bendThighQuat, alignThighQuat);
 
-        // Apply the rotation
-        thigh.quaternion.copy(finalThighQuaternion);
+        const shinWorldQuatTarget = new THREE.Quaternion().setFromAxisAngle(axis, kneeAngle);
 
-        const shinRotation = new THREE.Quaternion().setFromAxisAngle(axis, kneeAngle);
-        shin.quaternion.copy(shinRotation);
+        // --- 6. Convert world rotations to local rotations ---
+        const parentWorldQuat = new THREE.Quaternion();
+        thigh.parent!.getWorldQuaternion(parentWorldQuat);
+        const invParentQuat = parentWorldQuat.invert();
 
+        const thighLocalQuat = new THREE.Quaternion().multiplyQuaternions(invParentQuat, thighWorldQuatTarget);
+
+        // Shin's rotation is relative to the thigh
+        const invThighQuat = thighWorldQuatTarget.clone().invert();
+        const shinLocalQuat = new THREE.Quaternion().multiplyQuaternions(invThighQuat, shinWorldQuatTarget);
+
+        // --- 7. Apply local rotations ---
+        thigh.quaternion.copy(thighLocalQuat);
+        shin.quaternion.copy(shinLocalQuat);
         foot.quaternion.identity();
     }
 }
