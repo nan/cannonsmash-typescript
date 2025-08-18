@@ -81,6 +81,15 @@ export class Player {
             }
         }
 
+        // Create hip socket groups for correct leg positioning
+        const lHipSocket = new THREE.Group();
+        lHipSocket.name = 'L_hip_socket';
+        this.bodyParts['L_hip_socket'] = lHipSocket;
+
+        const rHipSocket = new THREE.Group();
+        rHipSocket.name = 'R_hip_socket';
+        this.bodyParts['R_hip_socket'] = rHipSocket;
+
         // Define the bone hierarchy. 'child': 'parent'
         const boneHierarchy: { [child: string]: string } = {
             "chest": "hip",
@@ -96,8 +105,10 @@ export class Player {
             "Rforearm": "Relbow",
             "Rhand": "Rforearm",
             "racket": "Rhand",
-            "Lthigh": "hip",
-            "Rthigh": "hip",
+            "L_hip_socket": "hip",
+            "R_hip_socket": "hip",
+            "Lthigh": "L_hip_socket",
+            "Rthigh": "R_hip_socket",
             "Lshin": "Lthigh",
             "Rshin": "Rthigh",
             "Lfoot": "Lshin",
@@ -114,6 +125,10 @@ export class Player {
                 parentBone.add(childBone);
             }
         }
+
+        // Set the position of the hip sockets relative to the hip bone
+        lHipSocket.position.set(LHIPORIGINX, RHIPORIGINY, RHIPORIGINZ);
+        rHipSocket.position.set(RHIPORIGINX, RHIPORIGINY, RHIPORIGINZ);
 
         // Finally, add the root of the skeleton ('hip') to the player's root bone
         if (this.bodyParts['hip']) {
@@ -240,19 +255,21 @@ export class Player {
 
         if (!thigh || !shin || !foot) return;
 
-        const hipPosition = new THREE.Vector3(
+        // The thigh is a child of the hip socket, so its origin is (0,0,0) in the socket's space.
+        const hipSocketPosition = new THREE.Vector3(
             side === 'R' ? RHIPORIGINX : LHIPORIGINX,
             RHIPORIGINY,
             RHIPORIGINZ
         );
 
+        // The toe position is defined in world space, but we need it relative to the hip socket.
         const toePosition = new THREE.Vector3(
             side === 'R' ? RFOOTORIGINX : LFOOTORIGINX,
             RFOOTORIGINY,
             RFOOTORIGINZ
         );
 
-        const hipToToe = new THREE.Vector3().subVectors(toePosition, hipPosition);
+        const hipToToe = new THREE.Vector3().subVectors(toePosition, hipSocketPosition);
 
         // --- Yaw rotation (around Y axis) ---
         // This rotation points the leg towards the target in the XZ plane.
