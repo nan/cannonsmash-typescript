@@ -9,7 +9,7 @@ export class CameraManager {
     private ball: Ball;
 
     // From Player.h
-    private eyeOffset = new THREE.Vector3(0.0, 1.0, -0.2); // Adjusted for THREE.js coordinates
+    private eyeOffset = new THREE.Vector3(0.0, 1.0, -1.5); // Adjusted for THREE.js coordinates, pulled back
     private lookAtTarget = new THREE.Vector3();
 
     constructor(camera: THREE.PerspectiveCamera, player: Player, ball: Ball) {
