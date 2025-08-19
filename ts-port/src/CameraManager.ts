@@ -9,7 +9,7 @@ export class CameraManager {
     private ball: Ball;
 
     // From Player.h
-    private eyeOffset = new THREE.Vector3(0.0, 1.0, -1.5); // Adjusted for THREE.js coordinates, pulled back
+    private eyeOffset = new THREE.Vector3(0.0, 0.2, -1.0); // Correctly mapped from C++
     private lookAtTarget = new THREE.Vector3();
 
     constructor(camera: THREE.PerspectiveCamera, player: Player, ball: Ball) {
@@ -52,7 +52,7 @@ export class CameraManager {
         } else {
             // C++: srcX[1] += -m_thePlayer->GetSide()*1.0;
             // Assuming player side is +1 (on +Z side), this pulls camera back
-            srcX.z += 1.0;
+            srcX.z += 2.0; // Increased from 1.0 to pull camera further back
         }
 
         this.camera.position.copy(srcX);
