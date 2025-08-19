@@ -42,8 +42,8 @@ export class Game {
         this.scene.add(this.ball.mesh);
 
         // Position them based on C++ code
-        this.player1.mesh.position.set(0, 0, TABLE_LENGTH / 2 + 0.2);
-        this.player2.mesh.position.set(0, 0, -(TABLE_LENGTH / 2 + 0.2));
+        this.player1.mesh.position.set(0, 1.4, TABLE_LENGTH / 2 + 0.2);
+        this.player2.mesh.position.set(0, 1.4, -(TABLE_LENGTH / 2 + 0.2));
         this.player2.mesh.rotation.y = Math.PI; // Face the other player
 
         this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0); // Place ball on the table

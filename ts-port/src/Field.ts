@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TABLE_LENGTH, TABLE_WIDTH, TABLE_HEIGHT, TABLE_THICK, NET_HEIGHT, AREAXSIZE, AREAYSIZE } from './constants';
+import { TABLE_LENGTH, TABLE_WIDTH, TABLE_HEIGHT, TABLE_THICK, NET_HEIGHT, AREAXSIZE, AREAYSIZE, AREAZSIZE } from './constants';
 
 export class Field {
     public mesh: THREE.Group;
@@ -37,25 +37,40 @@ export class Field {
     }
 
     private createWalls() {
-        // NOTE: This is a simplified version of the walls from the C++ code.
-        // The original had more complex positioning.
-        // For now, placing simple walls around the area.
-        const wallHeight = 4;
-        const wallGeometry = new THREE.PlaneGeometry(AREAXSIZE * 2, wallHeight);
-        const wallMaterial = new THREE.MeshStandardMaterial({color: 0x888888});
-        const wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
-        wall1.position.set(0, wallHeight/2, -AREAYSIZE);
-        this.mesh.add(wall1);
+        // Mapping from C++ code (Y is depth, Z is height) to Three.js (Z is depth, Y is height)
+        const wallHeight = AREAZSIZE;
+        const halfHeight = wallHeight / 2;
 
-        const wall2 = new THREE.Mesh(new THREE.PlaneGeometry(AREAYSIZE * 2, wallHeight), wallMaterial);
-        wall2.position.set(-AREAXSIZE, wallHeight/2, 0);
-        wall2.rotation.y = Math.PI / 2;
-        this.mesh.add(wall2);
+        // Wall 0 (Left)
+        const leftTexture = this.textureLoader.load('images/Left.jpg');
+        const leftMaterial = new THREE.MeshStandardMaterial({ map: leftTexture });
+        const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(AREAYSIZE * 2, wallHeight), leftMaterial);
+        leftWall.position.set(-AREAXSIZE, halfHeight, 0);
+        leftWall.rotation.y = Math.PI / 2;
+        this.mesh.add(leftWall);
 
-        const wall3 = new THREE.Mesh(new THREE.PlaneGeometry(AREAYSIZE * 2, wallHeight), wallMaterial);
-        wall3.position.set(AREAXSIZE, wallHeight/2, 0);
-        wall3.rotation.y = -Math.PI / 2;
-        this.mesh.add(wall3);
+        // Wall 1 (Front in C++, which is the back wall at -Z)
+        const frontTexture = this.textureLoader.load('images/Front.jpg');
+        const frontMaterial = new THREE.MeshStandardMaterial({ map: frontTexture });
+        const frontWall = new THREE.Mesh(new THREE.PlaneGeometry(AREAXSIZE * 2, wallHeight), frontMaterial);
+        frontWall.position.set(0, halfHeight, -AREAYSIZE);
+        this.mesh.add(frontWall);
+
+        // Wall 2 (Right)
+        const rightTexture = this.textureLoader.load('images/Right.jpg');
+        const rightMaterial = new THREE.MeshStandardMaterial({ map: rightTexture });
+        const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(AREAYSIZE * 2, wallHeight), rightMaterial);
+        rightWall.position.set(AREAXSIZE, halfHeight, 0);
+        rightWall.rotation.y = -Math.PI / 2;
+        this.mesh.add(rightWall);
+
+        // Wall 3 (Back in C++, which is the front wall at +Z)
+        const backTexture = this.textureLoader.load('images/Back.jpg');
+        const backMaterial = new THREE.MeshStandardMaterial({ map: backTexture });
+        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(AREAXSIZE * 2, wallHeight), backMaterial);
+        backWall.position.set(0, halfHeight, AREAYSIZE);
+        backWall.rotation.y = Math.PI;
+        this.mesh.add(backWall);
     }
 
     private createTable() {
