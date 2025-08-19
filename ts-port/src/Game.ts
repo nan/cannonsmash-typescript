@@ -43,7 +43,7 @@ export class Game {
 
         // Position them based on C++ code
         this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
-        this.player1.mesh.rotation.x = Math.PI / 2; // Stand the player up
+        this.player1.mesh.rotation.x = -Math.PI / 2; // Stand the player up
         this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
         this.player2.mesh.rotation.y = Math.PI; // Face the other player
         this.player2.mesh.rotation.x = Math.PI / 2; // Stand the player up
