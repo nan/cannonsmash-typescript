@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
+import { inputManager } from './InputManager';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH } from './constants';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -8,6 +10,8 @@ export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
+    public velocity = new THREE.Vector3();
+    public targetPosition = new THREE.Vector2();
 
     private assets: GameAssets;
     private bodyParts: { [name: string]: THREE.Object3D } = {};
@@ -180,6 +184,38 @@ export class Player {
     }
 
     public update(deltaTime: number) {
+        // Based on HumanController.cpp logic
+        const mousePos = inputManager.getMousePosition();
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Calculate velocity based on mouse position relative to center
+        // The scaling factors are adjusted from the C++ code
+        this.velocity.x = (mousePos.x - screenWidth / 2) / (screenWidth / 10);
+        this.velocity.z = (mousePos.y - screenHeight / 2) / (screenHeight / 10); // z is depth in our scene
+
+        // Apply velocity to mesh position
+        this.mesh.position.x += this.velocity.x * deltaTime;
+        this.mesh.position.z += this.velocity.z * deltaTime;
+
+        // Boundary checks (simplified from C++ code)
+        const halfArena = AREAXSIZE / 2;
+        if (this.mesh.position.x < -halfArena) {
+            this.mesh.position.x = -halfArena;
+        }
+        if (this.mesh.position.x > halfArena) {
+            this.mesh.position.x = halfArena;
+        }
+
+        // Simple boundary for z, player should stay on their side
+        if (this.mesh.position.z < TABLE_LENGTH / 2) {
+             this.mesh.position.z = TABLE_LENGTH / 2;
+        }
+        if (this.mesh.position.z > AREAYSIZE) { // A reasonable far boundary
+            this.mesh.position.z = AREAYSIZE;
+        }
+
+
         this.mixer.update(deltaTime);
     }
 }

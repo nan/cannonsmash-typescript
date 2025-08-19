@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
 
@@ -35,11 +34,7 @@ async function main() {
   const assets = await assetManager.loadAll();
   console.log("Assets loaded!");
 
-  const game = new Game(scene, assets);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 1, 0);
-  controls.update();
-
+  const game = new Game(scene, camera, assets);
 
   function resizeRendererToDisplaySize(renderer: THREE.WebGLRenderer) {
     const canvas = renderer.domElement;
@@ -62,7 +57,6 @@ async function main() {
     }
 
     game.update(deltaTime);
-    controls.update();
 
     renderer.render(scene, camera);
 
