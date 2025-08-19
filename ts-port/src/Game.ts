@@ -12,6 +12,7 @@ export class Game {
     private camera: THREE.PerspectiveCamera;
     private assets: GameAssets;
     private player1!: Player;
+    private player2!: Player;
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
@@ -31,14 +32,20 @@ export class Game {
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets);
+        this.player1 = new Player(this.assets, false); // Human player
         this.scene.add(this.player1.mesh);
+
+        this.player2 = new Player(this.assets, true); // AI player
+        this.scene.add(this.player2.mesh);
 
         this.ball = new Ball();
         this.scene.add(this.ball.mesh);
 
-        // Position them for now
-        this.player1.mesh.position.set(0, 0, 1.5); // Adjusted position to be behind the table
+        // Position them based on C++ code
+        this.player1.mesh.position.set(0, 0, TABLE_LENGTH / 2 + 0.2);
+        this.player2.mesh.position.set(0, 0, -(TABLE_LENGTH / 2 + 0.2));
+        this.player2.mesh.rotation.y = Math.PI; // Face the other player
+
         this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0); // Place ball on the table
 
         this.cameraManager = new CameraManager(this.camera, this.player1, this.ball);
@@ -111,7 +118,8 @@ export class Game {
     public update(deltaTime: number) {
         this.handleInput();
 
-        this.player1.update(deltaTime);
+        this.player1.update(deltaTime, this.ball);
+        this.player2.update(deltaTime, this.ball);
         this.ball.update(deltaTime);
         this.cameraManager.update();
 

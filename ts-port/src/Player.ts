@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH } from './constants';
+import { Ball } from './Ball';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -12,6 +13,7 @@ export class Player {
     public state: PlayerState = 'IDLE';
     public velocity = new THREE.Vector3();
     public targetPosition = new THREE.Vector2();
+    public isAi: boolean;
 
     private assets: GameAssets;
     private bodyParts: { [name: string]: THREE.Object3D } = {};
@@ -21,8 +23,9 @@ export class Player {
     private currentAction: THREE.AnimationAction | null = null;
     private rootBone: THREE.Group;
 
-    constructor(assets: GameAssets) {
+    constructor(assets: GameAssets, isAi = false) {
         this.assets = assets;
+        this.isAi = isAi;
         this.mesh = new THREE.Group();
         this.rootBone = new THREE.Group();
         this.rootBone.name = 'root';
@@ -183,22 +186,43 @@ export class Player {
         }
     }
 
-    public update(deltaTime: number) {
-        // Based on HumanController.cpp logic
-        const mousePos = inputManager.getMousePosition();
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
+    public update(deltaTime: number, ball: Ball) {
+        if (!this.isAi) {
+            // Human-controlled movement based on mouse
+            const mousePos = inputManager.getMousePosition();
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
 
-        // Calculate velocity based on mouse position relative to center
-        // The scaling factors are adjusted from the C++ code
-        this.velocity.x = (mousePos.x - screenWidth / 2) / (screenWidth / 10);
-        this.velocity.z = (mousePos.y - screenHeight / 2) / (screenHeight / 10); // z is depth in our scene
+            this.velocity.x = (mousePos.x - screenWidth / 2) / (screenWidth / 10);
+            this.velocity.z = (mousePos.y - screenHeight / 2) / (screenHeight / 10);
 
-        // Apply velocity to mesh position
-        this.mesh.position.x += this.velocity.x * deltaTime;
-        this.mesh.position.z += this.velocity.z * deltaTime;
+            this.mesh.position.x += this.velocity.x * deltaTime;
+            this.mesh.position.z += this.velocity.z * deltaTime;
 
-        // Boundary checks (simplified from C++ code)
+            // Boundary for z
+            if (this.mesh.position.z < TABLE_LENGTH / 2) {
+                this.mesh.position.z = TABLE_LENGTH / 2;
+            }
+            if (this.mesh.position.z > AREAYSIZE) {
+                this.mesh.position.z = AREAYSIZE;
+            }
+        } else {
+            // AI-controlled movement
+            // Simple AI: follow the ball's x position
+            const targetX = ball.mesh.position.x;
+            const currentX = this.mesh.position.x;
+            const speed = 2; // AI movement speed
+
+            if (Math.abs(targetX - currentX) > 0.1) {
+                this.velocity.x = Math.sign(targetX - currentX) * speed;
+            } else {
+                this.velocity.x = 0;
+            }
+            this.mesh.position.x += this.velocity.x * deltaTime;
+        }
+
+        // Common logic for both human and AI
+        // Boundary checks for x
         const halfArena = AREAXSIZE / 2;
         if (this.mesh.position.x < -halfArena) {
             this.mesh.position.x = -halfArena;
@@ -206,15 +230,6 @@ export class Player {
         if (this.mesh.position.x > halfArena) {
             this.mesh.position.x = halfArena;
         }
-
-        // Simple boundary for z, player should stay on their side
-        if (this.mesh.position.z < TABLE_LENGTH / 2) {
-             this.mesh.position.z = TABLE_LENGTH / 2;
-        }
-        if (this.mesh.position.z > AREAYSIZE) { // A reasonable far boundary
-            this.mesh.position.z = AREAYSIZE;
-        }
-
 
         this.mixer.update(deltaTime);
     }
