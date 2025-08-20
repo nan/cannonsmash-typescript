@@ -98,7 +98,7 @@ export class Game {
         let targetUpdated = false;
         for(const key in keyMapX) {
             if(inputManager.isKeyPressed(key)) {
-                targetX = keyMapX[key] * side;
+                targetX = keyMapX[key]; // Do not multiply by side, X is absolute
                 targetUpdated = true;
                 break;
             }
