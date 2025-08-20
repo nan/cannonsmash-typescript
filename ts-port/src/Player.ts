@@ -131,6 +131,12 @@ export class Player {
                 const times: number[] = [];
                 const values: number[] = [];
                 boneData.quaternions.forEach((q, index) => {
+                    if (isNaN(q.x) || isNaN(q.y) || isNaN(q.z) || isNaN(q.w)) {
+                        console.error(`Corrupt data: NaN quaternion in ${motionName}, bone ${boneName}, frame ${index}`);
+                    }
+                    if (q.x === 0 && q.y === 0 && q.z === 0 && q.w === 0) {
+                        console.warn(`Zero quaternion in ${motionName}, bone ${boneName}, frame ${index}. This might be invalid.`);
+                    }
                     times.push(index / FRAME_RATE);
                     values.push(q.x, q.y, q.z, q.w);
                 });
@@ -168,7 +174,7 @@ export class Player {
         if (clip) {
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-            newAction.clampWhenFinished = false; // DEBUG: a non-clamping animation may reveal if the last frame is the issue
+            newAction.clampWhenFinished = !loop;
 
             if (this.currentAction) {
                 this.currentAction.stop();
