@@ -33,7 +33,6 @@ export class Player {
 
         this.mixer = new THREE.AnimationMixer(this.rootBone);
 
-        console.log("Player class instantiated");
         this.buildModel();
         this.createAnimationClips();
         this.applyInitialPose();

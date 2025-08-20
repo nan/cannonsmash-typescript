@@ -12,7 +12,6 @@ export class Ball {
         const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
         this.mesh = new THREE.Mesh(geometry, material);
 
-        console.log("Ball class instantiated");
     }
 
     public update(deltaTime: number) {

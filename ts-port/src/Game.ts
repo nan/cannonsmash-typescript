@@ -22,13 +22,10 @@ export class Game {
         this.camera = camera;
         this.assets = assets;
 
-        console.log("Game class instantiated");
         this.setupScene();
     }
 
     private setupScene() {
-        console.log("Setting up game scene...");
-
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
@@ -113,7 +110,6 @@ export class Game {
 
         if(targetUpdated) {
             this.player1.targetPosition.set(targetX, targetY);
-            // console.log(`Target updated: ${this.player1.targetPosition.x}, ${this.player1.targetPosition.y}`);
         }
     }
 
