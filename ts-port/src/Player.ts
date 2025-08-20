@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
+import { inputManager } from './InputManager';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH } from './constants';
+import { Ball } from './Ball';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -8,6 +11,9 @@ export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
+    public velocity = new THREE.Vector3();
+    public targetPosition = new THREE.Vector2();
+    public isAi: boolean;
 
     private assets: GameAssets;
     private bodyParts: { [name: string]: THREE.Object3D } = {};
@@ -17,8 +23,9 @@ export class Player {
     private currentAction: THREE.AnimationAction | null = null;
     private rootBone: THREE.Group;
 
-    constructor(assets: GameAssets) {
+    constructor(assets: GameAssets, isAi = false) {
         this.assets = assets;
+        this.isAi = isAi;
         this.mesh = new THREE.Group();
         this.rootBone = new THREE.Group();
         this.rootBone.name = 'root';
@@ -26,7 +33,6 @@ export class Player {
 
         this.mixer = new THREE.AnimationMixer(this.rootBone);
 
-        console.log("Player class instantiated");
         this.buildModel();
         this.createAnimationClips();
         this.applyInitialPose();
@@ -114,8 +120,8 @@ export class Player {
             });
 
             if (rootPositionTimes.length > 0) {
-                tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
-                tracks.push(new THREE.QuaternionKeyframeTrack('root.quaternion', rootQuaternionTimes, rootQuaternionValues));
+                // tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
+                // tracks.push(new THREE.QuaternionKeyframeTrack('root.quaternion', rootQuaternionTimes, rootQuaternionValues));
                 duration = Math.max(duration, rootPositionTimes[rootPositionTimes.length - 1]);
             }
 
@@ -124,6 +130,12 @@ export class Player {
                 const times: number[] = [];
                 const values: number[] = [];
                 boneData.quaternions.forEach((q, index) => {
+                    if (isNaN(q.x) || isNaN(q.y) || isNaN(q.z) || isNaN(q.w)) {
+                        console.error(`Corrupt data: NaN quaternion in ${motionName}, bone ${boneName}, frame ${index}`);
+                    }
+                    if (q.x === 0 && q.y === 0 && q.z === 0 && q.w === 0) {
+                        console.warn(`Zero quaternion in ${motionName}, bone ${boneName}, frame ${index}. This might be invalid.`);
+                    }
                     times.push(index / FRAME_RATE);
                     values.push(q.x, q.y, q.z, q.w);
                 });
@@ -162,10 +174,12 @@ export class Player {
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
+
             if (this.currentAction) {
-                this.currentAction.fadeOut(0.1);
+                this.currentAction.stop();
             }
-            newAction.reset().fadeIn(0.1).play();
+            newAction.reset().play();
+
             this.currentAction = newAction;
             if (!loop) {
                 this.mixer.addEventListener('finished', (e) => {
@@ -179,7 +193,51 @@ export class Player {
         }
     }
 
-    public update(deltaTime: number) {
+    public update(deltaTime: number, ball: Ball) {
+        if (!this.isAi) {
+            // Human-controlled movement based on mouse
+            const mousePos = inputManager.getMousePosition();
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+
+            this.velocity.x = (mousePos.x - screenWidth / 2) / (screenWidth / 10);
+            this.velocity.z = (mousePos.y - screenHeight / 2) / (screenHeight / 10);
+
+            this.mesh.position.x += this.velocity.x * deltaTime;
+            this.mesh.position.z += this.velocity.z * deltaTime;
+
+            // Boundary for z
+            if (this.mesh.position.z < TABLE_LENGTH / 2) {
+                this.mesh.position.z = TABLE_LENGTH / 2;
+            }
+            if (this.mesh.position.z > AREAYSIZE) {
+                this.mesh.position.z = AREAYSIZE;
+            }
+        } else {
+            // AI-controlled movement
+            // Simple AI: follow the ball's x position
+            const targetX = ball.mesh.position.x;
+            const currentX = this.mesh.position.x;
+            const speed = 2; // AI movement speed
+
+            if (Math.abs(targetX - currentX) > 0.1) {
+                this.velocity.x = Math.sign(targetX - currentX) * speed;
+            } else {
+                this.velocity.x = 0;
+            }
+            this.mesh.position.x += this.velocity.x * deltaTime;
+        }
+
+        // Common logic for both human and AI
+        // Boundary checks for x
+        const halfArena = AREAXSIZE / 2;
+        if (this.mesh.position.x < -halfArena) {
+            this.mesh.position.x = -halfArena;
+        }
+        if (this.mesh.position.x > halfArena) {
+            this.mesh.position.x = halfArena;
+        }
+
         this.mixer.update(deltaTime);
     }
 }
