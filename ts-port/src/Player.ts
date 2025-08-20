@@ -142,6 +142,7 @@ export class Player {
             }
 
             if (tracks.length > 0) {
+                console.log(`Creating animation clip: ${motionName}, duration: ${duration}`);
                 const clip = new THREE.AnimationClip(motionName, duration, tracks);
                 this.animationClips[motionName] = clip;
             }
