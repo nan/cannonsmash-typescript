@@ -50,9 +50,7 @@ export class Player {
                 this.playAnimation('Fnormal', true);
                 break;
             case 'SWING_DRIVE':
-                // DEBUG: Play a known good animation to isolate the problem
-                this.playAnimation('Fnormal', false);
-                // this.playAnimation('Fdrive', false);
+                this.playAnimation('Fdrive', false);
                 break;
             case 'SWING_CUT':
                 this.playAnimation('Fcut', false);
@@ -171,10 +169,12 @@ export class Player {
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
+
             if (this.currentAction) {
-                this.currentAction.fadeOut(0.1);
+                this.currentAction.stop();
             }
-            newAction.reset().fadeIn(0.1).play();
+            newAction.reset().play();
+
             this.currentAction = newAction;
             if (!loop) {
                 this.mixer.addEventListener('finished', (e) => {
