@@ -63,7 +63,7 @@ export class Game {
         }
 
         // Target controls from HumanController.cpp
-        const side = 1; // Assuming player 1 side
+        const side = -1; // Use -1 to target the opponent's side (-Z)
         let targetX = this.player1.targetPosition.x;
         let targetY = this.player1.targetPosition.y;
 
