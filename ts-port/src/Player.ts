@@ -142,7 +142,6 @@ export class Player {
             }
 
             if (tracks.length > 0) {
-                console.log(`Creating animation clip: ${motionName}, duration: ${duration}`);
                 const clip = new THREE.AnimationClip(motionName, duration, tracks);
                 this.animationClips[motionName] = clip;
             }
@@ -169,7 +168,7 @@ export class Player {
         if (clip) {
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-            newAction.clampWhenFinished = !loop;
+            newAction.clampWhenFinished = false; // DEBUG: a non-clamping animation may reveal if the last frame is the issue
 
             if (this.currentAction) {
                 this.currentAction.stop();
