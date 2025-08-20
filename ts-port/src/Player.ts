@@ -121,7 +121,7 @@ export class Player {
             });
 
             if (rootPositionTimes.length > 0) {
-                tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
+                // tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
                 tracks.push(new THREE.QuaternionKeyframeTrack('root.quaternion', rootQuaternionTimes, rootQuaternionValues));
                 duration = Math.max(duration, rootPositionTimes[rootPositionTimes.length - 1]);
             }
