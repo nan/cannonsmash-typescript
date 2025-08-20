@@ -50,7 +50,9 @@ export class Player {
                 this.playAnimation('Fnormal', true);
                 break;
             case 'SWING_DRIVE':
-                this.playAnimation('Fdrive', false);
+                // DEBUG: Play a known good animation to isolate the problem
+                this.playAnimation('Fnormal', false);
+                // this.playAnimation('Fdrive', false);
                 break;
             case 'SWING_CUT':
                 this.playAnimation('Fcut', false);
