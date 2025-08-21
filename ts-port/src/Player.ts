@@ -195,18 +195,29 @@ export class Player {
 
     public update(deltaTime: number, ball: Ball) {
         if (!this.isAi) {
-            // Human-controlled movement based on mouse
+            // Human-controlled movement based on mouse position (direct position control)
             const mousePos = inputManager.getMousePosition();
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
 
-            this.velocity.x = (mousePos.x - screenWidth / 2) / (screenWidth / 10);
-            this.velocity.z = (mousePos.y - screenHeight / 2) / (screenHeight / 10);
+            // Map mouse X to player X position
+            // Mouse X from 0 to screenWidth -> Player X from -AREAXSIZE/2 to AREAXSIZE/2
+            const targetX = (mousePos.x / screenWidth - 0.5) * AREAXSIZE;
 
-            this.mesh.position.x += this.velocity.x * deltaTime;
-            this.mesh.position.z += this.velocity.z * deltaTime;
+            // Map mouse Y to player Z position
+            // Mouse Y from 0 (top) to screenHeight (bottom) -> Player Z from AREAYSIZE (far) to TABLE_LENGTH/2 (near)
+            const targetZ = AREAYSIZE - (mousePos.y / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
 
-            // Boundary for z
+            // Smoothly move the player towards the target position using linear interpolation (lerp)
+            const lerpFactor = 0.2;
+            this.mesh.position.x += (targetX - this.mesh.position.x) * lerpFactor;
+            this.mesh.position.z += (targetZ - this.mesh.position.z) * lerpFactor;
+
+            // Update velocity for any other systems that might use it
+            this.velocity.x = (targetX - this.mesh.position.x) * lerpFactor / deltaTime;
+            this.velocity.z = (targetZ - this.mesh.position.z) * lerpFactor / deltaTime;
+
+            // Boundary for z (still useful as a safeguard)
             if (this.mesh.position.z < TABLE_LENGTH / 2) {
                 this.mesh.position.z = TABLE_LENGTH / 2;
             }
