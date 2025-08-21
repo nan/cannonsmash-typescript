@@ -58,10 +58,18 @@ export class Player {
     }
 
     private buildModel() {
-        const material = new THREE.MeshNormalMaterial({
-            transparent: true,
-            opacity: 0.5
-        });
+        let material: THREE.MeshNormalMaterial;
+
+        if (this.isAi) {
+            // AI is fully opaque
+            material = new THREE.MeshNormalMaterial();
+        } else {
+            // Human player is semi-transparent
+            material = new THREE.MeshNormalMaterial({
+                transparent: true,
+                opacity: 0.5
+            });
+        }
 
         for (const modelName in this.assets.baseModels) {
             const geometry = this.assets.baseModels[modelName];
