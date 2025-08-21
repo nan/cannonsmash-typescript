@@ -58,7 +58,10 @@ export class Player {
     }
 
     private buildModel() {
-        const material = new THREE.MeshNormalMaterial();
+        const material = new THREE.MeshNormalMaterial({
+            transparent: true,
+            opacity: 0.5
+        });
 
         for (const modelName in this.assets.baseModels) {
             const geometry = this.assets.baseModels[modelName];
