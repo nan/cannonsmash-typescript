@@ -205,8 +205,8 @@ export class Player {
             const targetX = (mousePos.x / screenWidth - 0.5) * AREAXSIZE;
 
             // Map mouse Y to player Z position
-            // Mouse Y from 0 (top) to screenHeight (bottom) -> Player Z from AREAYSIZE (far) to TABLE_LENGTH/2 (near)
-            const targetZ = AREAYSIZE - (mousePos.y / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
+            // Mouse Y from 0 (top) to screenHeight (bottom) -> Player Z from TABLE_LENGTH/2 (near) to AREAYSIZE (far)
+            const targetZ = (TABLE_LENGTH / 2) + (mousePos.y / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
 
             // Smoothly move the player towards the target position using linear interpolation (lerp)
             const lerpFactor = 0.2;
