@@ -148,10 +148,10 @@ export class Game {
         // --- Pre-serve logic ---
         // If it's the player's turn to serve, get them into ready state.
         if (this.ball.status === 8 && this.getService() === this.player1.side) {
+            this.ball.reset(this.player1);
             if (this.player1.swingType < SERVE_MIN) {
                 this.player1.swingType = SERVE_NORMAL;
             }
-            // TODO: Move player to baseline
         }
 
         this.player1.update(deltaTime, this.ball);

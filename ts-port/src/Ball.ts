@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
+import { stype, TABLE_HEIGHT } from './constants';
 
 const BALL_RADIUS = 0.02; // Assuming meters
 
@@ -34,7 +35,7 @@ export class Ball {
     }
 
     public toss(player: Player, power: number) {
-        this.velocity.z = power;
+        this.velocity.y = power; // Y is the vertical axis in this scene
         this.spin.x = 0;
         this.spin.y = 0;
 
@@ -43,5 +44,29 @@ export class Ball {
         } else {
             this.status = 7; // Tossed by player 2 (far side)
         }
+    }
+
+    public reset(player: Player) {
+        const serveParams = stype.get(player.swingType);
+        if (!serveParams) {
+            console.error("Could not find serve params for swing type:", player.swingType);
+            return;
+        }
+
+        // Position the ball in front of the player, based on C++ Ball::Reset()
+        // Note: C++ y-axis is our z-axis
+        const playerPos = player.mesh.position;
+        if (player.side > 0) {
+            this.mesh.position.x = playerPos.x + serveParams.hitX;
+            this.mesh.position.z = playerPos.z + serveParams.hitY;
+        } else {
+            this.mesh.position.x = playerPos.x - serveParams.hitX;
+            this.mesh.position.z = playerPos.z + serveParams.hitY;
+        }
+        this.mesh.position.y = TABLE_HEIGHT + 0.15;
+
+        this.velocity.set(0, 0, 0);
+        this.spin.set(0, 0);
+        this.status = 8; // Waiting for serve
     }
 }
