@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT } from './constants';
+import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK } from './constants';
 
 const BALL_RADIUS = 0.02; // Assuming meters
 
@@ -30,8 +30,58 @@ export class Ball {
     }
 
     public update(deltaTime: number) {
-        // Ball physics
-        this.mesh.position.addScaledVector(this.velocity, deltaTime);
+        // This update logic is ported from the C++ version's Ball::Move()
+        // It uses an analytical solution with a fixed TICK, ignoring deltaTime for now for fidelity.
+        // TODO: Consider adapting to variable deltaTime if needed.
+
+        if (this.status < 0 || this.status === 8) {
+            if (this.status < -100) {
+                // TODO: Implement ball reset logic from C++
+            }
+            this.status--;
+            return;
+        }
+
+        const oldPos = this.mesh.position.clone();
+        const oldVel = this.velocity.clone();
+        const oldSpin = this.spin.clone();
+
+        const time = TICK;
+
+        // Update velocity based on spin (Magnus effect) and air resistance
+        // Vxy =  Vxy0*Rot(SpinX/PHY*(1-exp(-PHY*t)))*exp(-PHY*t)
+        // Vz  = (Vz0+g/PHY)*exp(-PHY*t) - g/PHY
+        // C++ Z is our Y (vertical), C++ Y is our Z (depth)
+
+        const exp_phy_t = Math.exp(-PHY * time);
+
+        // Horizontal velocity update (X and Z plane) due to side-spin and drag
+        const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
+        this.velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t;
+        this.velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
+
+        // Vertical velocity update due to gravity, top/back-spin, and drag
+        this.velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
+
+        // Update position using analytical solution from C++
+        // This is more complex than simple Euler integration (pos += vel * dt)
+        if (oldSpin.x === 0.0) {
+            this.mesh.position.x = oldPos.x + oldVel.x / PHY - oldVel.x / PHY * exp_phy_t;
+            this.mesh.position.z = oldPos.z + oldVel.z / PHY - oldVel.z / PHY * exp_phy_t;
+        } else {
+            const theta = rot; // Same rotation angle as velocity
+            const r = new THREE.Vector2(oldVel.z / oldSpin.x, -oldVel.x / oldSpin.x); // Radius of curvature vector
+            this.mesh.position.x = r.x * Math.cos(theta) - r.y * Math.sin(theta) + oldPos.x - r.x;
+            this.mesh.position.z = r.x * Math.sin(theta) + r.y * Math.cos(theta) + oldPos.z - r.y;
+        }
+
+        this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) - (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
+
+        // Update spin decay
+        this.spin.x = oldSpin.x * exp_phy_t;
+
+        // TODO: Implement CollisionCheck
+        // CollisionCheck(oldPos, oldVel, oldSpin);
     }
 
     public toss(player: Player, power: number) {

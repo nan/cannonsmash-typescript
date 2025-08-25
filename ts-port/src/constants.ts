@@ -60,3 +60,8 @@ export const SERVEPARAM: number[][] = [
     [SERVE_SIDESPIN2,  0.6, 0.2,  0.8,  0.0,  0.6, -0.2],
     [-1,               0.0, 0.0,  0.0,  0.0,  0.0,  0.0]
 ];
+
+// Physics constants from ttinc.h
+export const PHY = 0.15; // Air resistance coefficient
+export const GRAVITY = (spin: number) => 9.8 + spin * 5; // Gravity combined with Magnus effect
+export const TICK = 0.01; // Original fixed time step
