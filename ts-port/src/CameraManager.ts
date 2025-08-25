@@ -46,14 +46,10 @@ export class CameraManager {
         // --- Start of SoloPlay::LookAt logic ---
         const srcX = playerPos.clone().add(this.eyeOffset);
 
-        // C++ code used player's y-distance from origin, which is z in Three.js
-        if (Math.abs(playerPos.z) < 2.0) {
-            srcX.z += playerPos.z / 2.0;
-        } else {
-            // C++: srcX[1] += -m_thePlayer->GetSide()*1.0;
-            // Assuming player side is +1 (on +Z side), this pulls camera back
-            srcX.z += 2.0; // Increased from 1.0 to pull camera further back
-        }
+        // Smoothly pull the camera back as the player moves away from the net.
+        // This replaces a discontinuous if/else block that caused a camera jump.
+        const zOffset = Math.min(playerPos.z / 1.5, 2.5);
+        srcX.z += zOffset;
 
         this.camera.position.copy(srcX);
         this.camera.lookAt(this.lookAtTarget);
