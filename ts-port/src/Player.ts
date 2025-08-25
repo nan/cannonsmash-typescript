@@ -131,8 +131,6 @@ export class Player {
             });
 
             if (rootPositionTimes.length > 0) {
-                // tracks.push(new THREE.VectorKeyframeTrack('root.position', rootPositionTimes, rootPositionValues));
-                // tracks.push(new THREE.QuaternionKeyframeTrack('root.quaternion', rootQuaternionTimes, rootQuaternionValues));
                 duration = Math.max(duration, rootPositionTimes[rootPositionTimes.length - 1]);
             }
 
@@ -223,10 +221,6 @@ export class Player {
             const lerpFactor = 0.2;
             this.mesh.position.x += (targetX - this.mesh.position.x) * lerpFactor;
             this.mesh.position.z += (targetZ - this.mesh.position.z) * lerpFactor;
-
-            // Update velocity for any other systems that might use it
-            this.velocity.x = (targetX - this.mesh.position.x) * lerpFactor / deltaTime;
-            this.velocity.z = (targetZ - this.mesh.position.z) * lerpFactor / deltaTime;
 
             // Boundary for z (still useful as a safeguard)
             if (this.mesh.position.z < TABLE_LENGTH / 2) {
