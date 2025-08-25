@@ -198,8 +198,9 @@ export class Game {
 
         // In the C++ code, player 1 (human) is on the near side (y < 0), which corresponds to side 1.
         // Player 2 (com) is on the far side (y > 0), which corresponds to side -1.
-        // The C++ GetService returns -1 for near side and 1 for far side.
-        // We need to flip this to match our player side assignments.
-        return -ret;
+        // The C++ GetService returns -1 for near side (player1) and 1 for far side (player2).
+        // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
+        // However, for testing, we will temporarily NOT flip it, so the user always serves first.
+        return ret;
     }
 }
