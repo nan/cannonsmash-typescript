@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Player } from './Player';
+import type { Player } from './Player';
 
 const BALL_RADIUS = 0.02; // Assuming meters
 

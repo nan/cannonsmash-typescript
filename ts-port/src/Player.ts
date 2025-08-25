@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype } from './constants';
-import { Ball } from './Ball';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL } from './constants';
+import type { Ball } from './Ball';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
