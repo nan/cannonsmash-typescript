@@ -4,7 +4,7 @@ import { Player } from './Player';
 import { Ball } from './Ball';
 import { Field } from './Field';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL } from './constants';
 import { CameraManager } from './CameraManager';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
