@@ -7,15 +7,24 @@ import { inputManager } from './InputManager';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH } from './constants';
 import { CameraManager } from './CameraManager';
 
+type GameMode = '5PTS' | '11PTS' | '21PTS';
+
 export class Game {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
     private assets: GameAssets;
-    private player1!: Player;
-    private player2!: Player;
+    public player1!: Player;
+    public player2!: Player;
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
+
+    // Game state properties
+    private score1 = 0;
+    private score2 = 0;
+    private game1 = 0;
+    private game2 = 0;
+    private gameMode: GameMode = '11PTS';
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -29,10 +38,10 @@ export class Game {
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets, false); // Human player
+        this.player1 = new Player(this.assets, false, 1); // Human player, side 1
         this.scene.add(this.player1.mesh);
 
-        this.player2 = new Player(this.assets, true); // AI player
+        this.player2 = new Player(this.assets, true, -1); // AI player, side -1
         this.scene.add(this.player2.mesh);
 
         this.ball = new Ball();
@@ -51,13 +60,33 @@ export class Game {
     }
 
     private handleInput() {
-        // Swing controls (temporary)
-        if (inputManager.isMouseButtonDown(0)) { // Left click
-            this.player1.setState('SWING_DRIVE');
+        // --- Serve controls ---
+        if (inputManager.isKeyJustPressed(' ')) {
+            this.player1.changeServeType();
         }
-        if (inputManager.isMouseButtonDown(2)) { // Right click
-            this.player1.setState('SWING_CUT');
+
+        // Check if it's player 1's turn to serve
+        if (this.ball.status === 8 && this.getService() === this.player1.side) {
+            if (inputManager.isMouseButtonJustPressed(0)) { // Left click
+                this.ball.toss(this.player1, 1);
+                this.player1.startServe(1);
+            } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
+                this.ball.toss(this.player1, 2);
+                this.player1.startServe(2);
+            } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click
+                this.ball.toss(this.player1, 3);
+                this.player1.startServe(3);
+            }
+        } else {
+            // --- Rally swing controls (temporary) ---
+            if (inputManager.isMouseButtonDown(0)) { // Left click
+                this.player1.setState('SWING_DRIVE');
+            }
+            if (inputManager.isMouseButtonDown(2)) { // Right click
+                this.player1.setState('SWING_CUT');
+            }
         }
+
 
         // Target controls from HumanController.cpp
         const side = -1; // Use -1 to target the opponent's side (-Z)
@@ -124,5 +153,53 @@ export class Game {
         // Update target indicator position
         this.field.targetIndicator.position.x = this.player1.targetPosition.x;
         this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+
+        // This must be the last thing in the update loop
+        inputManager.update();
+    }
+
+    /**
+     * Determines which side has the service right based on the score.
+     * @returns 1 for player 1 (near side), -1 for player 2 (far side).
+     */
+    public getService(): number {
+        let ret = 0;
+        switch (this.gameMode) {
+            case '5PTS':
+                ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
+                break;
+            case '11PTS':
+                if (this.score1 >= 10 && this.score2 >= 10) { // Deuce
+                    ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
+                } else {
+                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 1) {
+                        ret = -1;
+                    } else {
+                        ret = 1;
+                    }
+                }
+                break;
+            case '21PTS':
+                if (this.score1 >= 20 && this.score2 >= 20) { // Deuce
+                    ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
+                } else {
+                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 1) {
+                        ret = -1;
+                    } else {
+                        ret = 1;
+                    }
+                }
+                break;
+        }
+
+        if ((this.game1 + this.game2) % 2 === 1) {
+            ret = -ret;
+        }
+
+        // In the C++ code, player 1 (human) is on the near side (y < 0), which corresponds to side 1.
+        // Player 2 (com) is on the far side (y > 0), which corresponds to side -1.
+        // The C++ GetService returns -1 for near side and 1 for far side.
+        // We need to flip this to match our player side assignments.
+        return -ret;
     }
 }

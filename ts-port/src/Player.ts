@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH } from './constants';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype } from './constants';
 import { Ball } from './Ball';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
@@ -14,6 +14,12 @@ export class Player {
     public velocity = new THREE.Vector3();
     public targetPosition = new THREE.Vector2();
     public isAi: boolean;
+    public side: number;
+
+    // Serve-related properties
+    public swingType: number = SWING_NORMAL;
+    public swing: number = 0; // Animation counter for swing
+    public spin = new THREE.Vector2(); // x, y spin for the upcoming shot
 
     private assets: GameAssets;
     private bodyParts: { [name: string]: THREE.Object3D } = {};
@@ -23,9 +29,10 @@ export class Player {
     private currentAction: THREE.AnimationAction | null = null;
     private rootBone: THREE.Group;
 
-    constructor(assets: GameAssets, isAi = false) {
+    constructor(assets: GameAssets, isAi = false, side: number = 1) {
         this.assets = assets;
         this.isAi = isAi;
+        this.side = side;
         this.mesh = new THREE.Group();
         this.rootBone = new THREE.Group();
         this.rootBone.name = 'root';
@@ -202,7 +209,109 @@ export class Player {
         }
     }
 
+    /**
+     * Cycles through the available serve types.
+     * Called when the user presses the space bar.
+     */
+    public changeServeType() {
+        // This check will be more robust once Game.getService() is implemented.
+        // For now, we assume we can always change serve type if not swinging.
+        if (this.swing > 0) return;
+
+        if (this.swingType < SERVE_MIN) {
+            this.swingType = SERVE_NORMAL;
+        } else {
+            this.swingType++;
+        }
+
+        if (this.swingType > SERVE_MAX) {
+            this.swingType = SERVE_MIN;
+        }
+        console.log(`Serve type changed to: ${this.swingType}`);
+    }
+
+    /**
+     * Checks if the player is in a state where they can serve the ball.
+     * @param ball The ball object.
+     * @returns True if the ball is tossed and ready to be hit for a serve.
+     */
+    public canServe(ball: Ball): boolean {
+        if ((ball.status === 6 && this.side === 1) || (ball.status === 7 && this.side === -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Initiates the serving motion.
+     * @param spinCategory The category of spin/power (1, 2, or 3) based on mouse button.
+     */
+    public startServe(spinCategory: number) {
+        if (this.swing > 0) return false;
+
+        this.swing = 1; // Start the swing animation
+
+        // Find the serve parameters from the constants table
+        const params = SERVEPARAM.find(p => p[0] === this.swingType);
+        if (params) {
+            // The C++ code uses the spinCategory (1, 2, or 3) to index into the params array
+            this.spin.x = params[(spinCategory - 1) * 2 + 1];
+            this.spin.y = params[(spinCategory - 1) * 2 + 2];
+        } else {
+            this.spin.x = 0;
+            this.spin.y = 0;
+        }
+
+        this.playAnimation('Fcut', false); // Placeholder animation
+        console.log(`Starting serve type ${this.swingType} with spin`, this.spin);
+        return true;
+    }
+
+    /**
+     * Executes the logic for hitting the ball during a serve.
+     * @param ball The ball object.
+     */
+    public hitBall(ball: Ball) {
+        console.log(`Hitting ball at swing frame ${this.swing}`);
+        if (this.canServe(ball)) {
+            // TODO: Implement TargetToVS to calculate ball velocity
+            const mockVelocity = new THREE.Vector3(0, -5 * this.side, 2);
+            // TODO: The ball needs a 'hit' method
+            // ball.hit(mockVelocity, this.spin, this);
+            console.log("Ball hit during serve!");
+        }
+    }
+
     public update(deltaTime: number, ball: Ball) {
+        // --- Swing and Serve Logic ---
+        if (this.swing > 0) {
+            const swingParams = stype.get(this.swingType);
+            if (swingParams) {
+                // Increment swing counter
+                this.swing++;
+
+                // Impact
+                if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
+                    this.hitBall(ball);
+                }
+
+                // End of swing
+                if (this.swing >= swingParams.swingLength) {
+                    this.swing = 0;
+                    if (this.swingType >= SERVE_MIN) {
+                        this.swingType = SWING_NORMAL;
+                    }
+                    this.setState('IDLE');
+                }
+            } else {
+                // Invalid swing type, reset
+                this.swing = 0;
+            }
+        }
+
+        // TODO: Add pre-serve logic here once Game.getService() is available
+        // if (game.getService() === this.side && ball.status === 8) { ... }
+
         if (!this.isAi) {
             // Human-controlled movement based on mouse position (direct position control)
             const mousePos = inputManager.getMousePosition();
