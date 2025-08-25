@@ -309,9 +309,6 @@ export class Player {
             }
         }
 
-        // TODO: Add pre-serve logic here once Game.getService() is available
-        // if (game.getService() === this.side && ball.status === 8) { ... }
-
         if (!this.isAi) {
             // Human-controlled movement based on mouse position (direct position control)
             const mousePos = inputManager.getMousePosition();
