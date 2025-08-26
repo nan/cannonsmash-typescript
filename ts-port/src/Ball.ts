@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK } from './constants';
+import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH } from './constants';
 
 const BALL_RADIUS = 0.02; // Assuming meters
 
@@ -81,8 +81,55 @@ export class Ball {
         // Update spin decay
         this.spin.x = oldSpin.x * exp_phy_t;
 
-        // TODO: Implement CollisionCheck
-        // CollisionCheck(oldPos, oldVel, oldSpin);
+        // --- Collision Check ---
+        // A simplified, discrete collision detection.
+
+        // Ground collision
+        if (this.mesh.position.y < BALL_RADIUS) {
+            this.mesh.position.y = BALL_RADIUS;
+            this.velocity.y *= -TABLE_E;
+            this.ballDead();
+        }
+
+        // Table collision
+        const halfTableW = TABLE_WIDTH / 2;
+        const halfTableL = TABLE_LENGTH / 2;
+        if (
+            this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS &&
+            this.velocity.y < 0 &&
+            this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
+            this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL
+        ) {
+            this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
+            this.velocity.y *= -TABLE_E;
+
+            // Apply spin decay on bounce
+            this.spin.x *= 0.95;
+            this.spin.y *= 0.8;
+
+            // Update status based on which side of the net the bounce occurred
+            if (this.mesh.position.z > 0) { // Player 1's side (near)
+                switch(this.status) {
+                    case 2: this.status = 3; break; // Bounced on P2, now bounced on P1
+                    case 4: this.status = 0; break; // Hit by P1 (serve), now bounced on P1
+                    default: this.ballDead(); break;
+                }
+            } else { // Player 2's side (far)
+                switch(this.status) {
+                    case 0: this.status = 1; break; // In play towards P2, now bounced on P2
+                    case 5: this.status = 2; break; // Hit by P2, now bounced on P2
+                    default: this.ballDead(); break;
+                }
+            }
+        }
+    }
+
+    private ballDead() {
+        if (this.status >= 0) {
+            // TODO: In C++, this is where score is changed.
+            // ((PlayGame *)Control::TheControl())->ChangeScore();
+            this.status = -1;
+        }
     }
 
     public toss(player: Player, power: number) {
