@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL } from './constants';
-import type { Ball } from './Ball';
+import { Ball } from './Ball';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -272,13 +272,13 @@ export class Player {
      * @param ball The ball object.
      */
     public hitBall(ball: Ball) {
-        console.log(`Hitting ball at swing frame ${this.swing}`);
         if (this.canServe(ball)) {
-            // TODO: Implement TargetToVS to calculate ball velocity
-            const mockVelocity = new THREE.Vector3(0, -5 * this.side, 2);
-            // TODO: The ball needs a 'hit' method
-            // ball.hit(mockVelocity, this.spin, this);
-            console.log("Ball hit during serve!");
+            // C++ code has a complex calculation for level based on swing error.
+            // We'll use a fixed value for now.
+            const level = 0.9;
+            const velocity = ball.targetToVS(this.targetPosition, level, this.spin);
+            ball.hit(velocity, this.spin);
+            console.log("Ball hit with velocity:", velocity);
         }
     }
 
