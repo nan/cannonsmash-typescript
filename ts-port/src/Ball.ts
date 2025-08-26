@@ -34,11 +34,12 @@ export class Ball {
         // It uses an analytical solution with a fixed TICK, ignoring deltaTime for now for fidelity.
         // TODO: Consider adapting to variable deltaTime if needed.
 
-        if (this.status < 0 || this.status === 8) {
-            if (this.status < -100) {
-                // TODO: Implement ball reset logic from C++
-            }
+        if (this.status === 8) { // Waiting for serve
+            return; // Do nothing, ball should be stationary
+        }
+        if (this.status < 0) { // Ball is dead
             this.status--;
+            // TODO: Reset logic after some time
             return;
         }
 
