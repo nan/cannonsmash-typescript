@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
 import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH } from './constants';
+import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02; // Assuming meters
 
@@ -29,7 +30,7 @@ export class Ball {
         this.mesh = new THREE.Mesh(geometry, material);
     }
 
-    public update(deltaTime: number) {
+    public update(deltaTime: number, game: Game) {
         // This update logic is ported from the C++ version's Ball::Move()
         // It uses an analytical solution with a fixed TICK, ignoring deltaTime for now for fidelity.
         // TODO: Consider adapting to variable deltaTime if needed.
@@ -39,7 +40,10 @@ export class Ball {
         }
         if (this.status < 0) { // Ball is dead
             this.status--;
-            // TODO: Reset logic after some time
+            if (this.status < -100) {
+                const server = game.getService() === game.player1.side ? game.player1 : game.player2;
+                this.reset(server);
+            }
             return;
         }
 

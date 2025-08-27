@@ -156,7 +156,7 @@ export class Game {
 
         this.player1.update(deltaTime, this.ball);
         this.player2.update(deltaTime, this.ball);
-        this.ball.update(deltaTime);
+        this.ball.update(deltaTime, this);
         this.cameraManager.update();
 
         // Update target indicator position
