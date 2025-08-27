@@ -284,8 +284,20 @@ export class Player {
         if (this.swing > 0) {
             const swingParams = stype.get(this.swingType);
             if (swingParams) {
-                // Increment swing counter
-                this.swing++;
+                // This logic mirrors the C++ code's Player::Move function
+                if (this.canServe(ball)) {
+                    // Ball is already tossed, just continue the swing
+                    if (ball.velocity.y < 0) { // Wait for toss to reach apex
+                        this.swing++;
+                    }
+                } else {
+                    // Ball is not yet tossed. Check if it's time to toss.
+                    if (swingParams.toss > 0 && this.swing === swingParams.toss) {
+                        ball.toss(this, swingParams.tossV);
+                    }
+                    this.swing++;
+                }
+
 
                 // Impact
                 if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
