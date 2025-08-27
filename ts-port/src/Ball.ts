@@ -189,13 +189,12 @@ export class Ball {
     }
 
     public targetToVS(target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        console.log(`targetToVS: target=${target.x},${target.y} spin=${spin.x},${spin.y}`);
         const v = new THREE.Vector3();
         let tmpV = new THREE.Vector3();
 
-        for (let boundZ = -TABLE_LENGTH / 2; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 10) { // Increased step to reduce logs
-            if (boundZ * this.mesh.position.z >= 0.0) continue;
-
+        // The loop should iterate over the near side of the table for the first bounce.
+        // Player's side is positive Z, so we iterate from 0 to TABLE_LENGTH / 2.
+        for (let boundZ = 0.1; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 10) { // Increased step
             let vMin = 0.1;
             let vMax = 30.0;
             let vXY = 0;
@@ -246,8 +245,6 @@ export class Ball {
                 innerLoopCount++;
             }
 
-            console.log(`boundZ: ${boundZ.toFixed(2)}, final vXY: ${vXY.toFixed(2)}, final z diff: ${z.toFixed(2)}`);
-
             if (Math.abs(z!) > 0.1) continue; // Loosened threshold
 
             const finalV = new THREE.Vector3();
@@ -255,13 +252,11 @@ export class Ball {
             const t2 = this.getTimeToReachTarget(bound.clone().sub(new THREE.Vector2(this.mesh.position.x, this.mesh.position.z)), vMax, spin, finalV);
             finalV.y = this.getVz0ToReachTarget(TABLE_HEIGHT - this.mesh.position.y, spin, t2);
 
-            console.log(`Found a potential solution: v=(${finalV.x.toFixed(2)}, ${finalV.y.toFixed(2)}, ${finalV.z.toFixed(2)})`);
             if (finalV.lengthSq() > tmpV.lengthSq()) {
                 tmpV.copy(finalV);
             }
         }
         v.copy(tmpV);
-        console.log(`Final selected velocity: v=(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`);
         return v;
     }
 
