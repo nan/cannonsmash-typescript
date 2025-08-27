@@ -77,14 +77,6 @@ export class Game {
                 this.ball.toss(this.player1, 3);
                 this.player1.startServe(3);
             }
-        } else {
-            // --- Rally swing controls (temporary) ---
-            if (inputManager.isMouseButtonDown(0)) { // Left click
-                this.player1.setState('SWING_DRIVE');
-            }
-            if (inputManager.isMouseButtonDown(2)) { // Right click
-                this.player1.setState('SWING_CUT');
-            }
         }
 
 

@@ -227,7 +227,6 @@ export class Player {
         if (this.swingType > SERVE_MAX) {
             this.swingType = SERVE_MIN;
         }
-        console.log(`Serve type changed to: ${this.swingType}`);
     }
 
     /**
@@ -263,7 +262,6 @@ export class Player {
         }
 
         this.playAnimation('Fcut', false); // Placeholder animation
-        console.log(`Starting serve type ${this.swingType} with spin`, this.spin);
         return true;
     }
 
@@ -278,7 +276,6 @@ export class Player {
             const level = 0.9;
             const velocity = ball.targetToVS(this.targetPosition, level, this.spin);
             ball.hit(velocity, this.spin);
-            console.log("Ball hit with velocity:", velocity);
         }
     }
 
