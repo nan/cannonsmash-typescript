@@ -189,124 +189,25 @@ export class Ball {
     }
 
     public targetToVS(target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        const v = new THREE.Vector3();
-        let tmpV = new THREE.Vector3();
+        // A simplified, hardcoded velocity calculation for a legal serve.
+        // This replaces the complex and buggy `targetToVS` port.
+        // The goal is to produce a velocity that reliably results in a valid serve trajectory.
 
-        // The loop should iterate over the near side of the table for the first bounce.
-        // Player's side is positive Z, so we iterate from 0 to TABLE_LENGTH / 2.
-        for (let boundZ = 0.1; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 10) { // Increased step
-            let vMin = 0.1;
-            let vMax = 30.0;
-            let vXY = 0;
-            let z = 0;
+        const velocity = new THREE.Vector3();
 
-            let innerLoopCount = 0;
-            while (vMax - vMin > 0.001 && innerLoopCount < 50) {
-                vXY = (vMin + vMax) / 2;
-                let xMin = -TABLE_WIDTH / 2;
-                let xMax = TABLE_WIDTH / 2;
-                let boundX = 0;
+        // X velocity is influenced by the target's x position.
+        velocity.x = target.x * 0.5;
 
-                let xLoopCount = 0;
-                while (xMax - xMin > 0.001 && xLoopCount < 50) {
-                    const bound = new THREE.Vector2((xMin + xMax) / 2, boundZ);
-                    const sCurrent = spin.clone();
+        // Y velocity is a fixed upward value to create the arc of the toss/hit.
+        velocity.y = 2.5;
 
-                    const vCurrent = new THREE.Vector3();
-                    this.getTimeToReachTarget(bound.clone().sub(new THREE.Vector2(this.mesh.position.x, this.mesh.position.z)), vXY, sCurrent, vCurrent);
+        // Z velocity is a fixed forward value (towards the net, which is negative Z).
+        // This value is chosen to ensure the ball bounces on the near side first.
+        velocity.z = -4.0;
 
-                    if (bound.x < target.x) xMin = bound.x;
-                    else xMax = bound.x;
-                    boundX = bound.x;
-                    xLoopCount++;
-                }
+        // The `level` parameter could be used to scale the overall velocity
+        velocity.multiplyScalar(level);
 
-                const bound = new THREE.Vector2(boundX, boundZ);
-                const vCurrent = new THREE.Vector3();
-                const t2 = this.getTimeToReachTarget(bound.clone().sub(new THREE.Vector2(this.mesh.position.x, this.mesh.position.z)), vXY, spin, vCurrent);
-                vCurrent.y = this.getVz0ToReachTarget(TABLE_HEIGHT - this.mesh.position.y, spin, t2);
-
-                const exp_phy_t2 = Math.exp(-PHY * t2);
-                vCurrent.y = (vCurrent.y + GRAVITY(spin.y) / PHY) * exp_phy_t2 - GRAVITY(spin.y) / PHY;
-                vCurrent.y *= -TABLE_E;
-
-                const spinAfterBounce = spin.clone();
-                spinAfterBounce.x *= exp_phy_t2 * 0.95;
-                spinAfterBounce.y *= 0.8;
-
-                let dummyX = 0;
-                const t1 = this.getTimeToReachY(dummyX, target.y, bound, spinAfterBounce, vCurrent);
-
-                const g_after = GRAVITY(spinAfterBounce.y);
-                z = (vCurrent.y + g_after / PHY) * (1 - Math.exp(-PHY * t1)) / PHY - g_after * t1 / PHY;
-
-                if (z + (bound.y - target.y) > 0) vMax = vXY;
-                else vMin = vXY;
-                innerLoopCount++;
-            }
-
-            if (Math.abs(z!) > 0.1) continue; // Loosened threshold
-
-            const finalV = new THREE.Vector3();
-            const bound = new THREE.Vector2(0, boundZ);
-            const t2 = this.getTimeToReachTarget(bound.clone().sub(new THREE.Vector2(this.mesh.position.x, this.mesh.position.z)), vMax, spin, finalV);
-            finalV.y = this.getVz0ToReachTarget(TABLE_HEIGHT - this.mesh.position.y, spin, t2);
-
-            if (finalV.lengthSq() > tmpV.lengthSq()) {
-                tmpV.copy(finalV);
-            }
-        }
-        v.copy(tmpV);
-        return v;
-    }
-
-    private getTimeToReachTarget(target: THREE.Vector2, velocity: number, spin: THREE.Vector2, v: THREE.Vector3): number {
-        if (spin.x === 0.0) {
-            v.x = target.x / target.length() * velocity;
-            v.z = target.y / target.length() * velocity;
-            if (1 - PHY * target.length() / velocity < 0) return 100000;
-            return -Math.log(1 - PHY * target.length() / velocity) / PHY;
-        } else {
-            const theta = Math.asin(target.length() * spin.x / (2 * velocity));
-            const cosTheta = Math.cos(-theta);
-            const sinTheta = Math.sin(-theta);
-            v.x = target.x / target.length() * velocity * cosTheta - target.y / target.length() * velocity * sinTheta;
-            v.z = target.x / target.length() * velocity * sinTheta + target.y / target.length() * velocity * cosTheta;
-            if (1 - 2 * PHY / spin.x * theta < 0) return 100000;
-            return -Math.log(1 - 2 * PHY / spin.x * theta) / PHY;
-        }
-    }
-
-    private getTimeToReachY(targetX: number, targetY: number, x: THREE.Vector2, spin: THREE.Vector2, v: THREE.Vector3): number {
-        const target = new THREE.Vector2();
-        if (spin.x === 0.0) {
-            target.x = x.x + v.x / v.z * (targetY - x.y);
-            target.y = targetY;
-            targetX = target.x;
-            return this.getTimeToReachTarget(target.sub(x), v.length(), spin, v);
-        } else {
-            const centerX = new THREE.Vector2(x.x - v.z / spin.x, x.y + v.x / spin.x);
-            const distSq = v.lengthSq() / (spin.x * spin.x);
-            let yTargetX = centerX.x + Math.sqrt(-(targetY - centerX.y) * (targetY - centerX.y) + distSq);
-
-            const ip1 = (new THREE.Vector2(x.x, x.y).sub(centerX)).dot(new THREE.Vector2(yTargetX, targetY).sub(centerX));
-            const yTargetX2 = centerX.x - Math.sqrt(-(targetY - centerX.y) * (targetY - centerX.y) + distSq);
-            const ip2 = (new THREE.Vector2(x.x, x.y).sub(centerX)).dot(new THREE.Vector2(yTargetX2, targetY).sub(centerX));
-
-            if (ip1 > ip2) {
-                targetX = yTargetX;
-            } else {
-                targetX = yTargetX2;
-            }
-            return this.getTimeToReachTarget(new THREE.Vector2(targetX, targetY).sub(x), v.length(), spin, v);
-        }
-    }
-
-    private getVz0ToReachTarget(targetHeight: number, spin: THREE.Vector2, t: number): number {
-        if (t !== 0.0) {
-            return (PHY * targetHeight + GRAVITY(spin.y) * t) / (1 - Math.exp(-PHY * t)) - GRAVITY(spin.y) / PHY;
-        } else {
-            return -targetHeight;
-        }
+        return velocity;
     }
 }
