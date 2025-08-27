@@ -189,27 +189,27 @@ export class Ball {
     }
 
     public targetToVS(target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        // This is a direct port of the complex TargetToVS logic from C++.
-        // It iterates to find a valid velocity to serve the ball to the target.
-        // Note: C++ y-axis is our z-axis, C++ z-axis is our y-axis.
+        console.log(`targetToVS: target=${target.x},${target.y} spin=${spin.x},${spin.y}`);
         const v = new THREE.Vector3();
         let tmpV = new THREE.Vector3();
 
-        for (let boundZ = -TABLE_LENGTH / 2; boundZ < TABLE_LENGTH / 2; boundZ += TICK) {
-            if (boundZ * this.mesh.position.z <= 0.0) continue;
+        for (let boundZ = -TABLE_LENGTH / 2; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 10) { // Increased step to reduce logs
+            if (boundZ * this.mesh.position.z >= 0.0) continue;
 
             let vMin = 0.1;
             let vMax = 30.0;
-            let vXY;
-            let z;
+            let vXY = 0;
+            let z = 0;
 
-            while (vMax - vMin > 0.001) {
+            let innerLoopCount = 0;
+            while (vMax - vMin > 0.001 && innerLoopCount < 50) {
                 vXY = (vMin + vMax) / 2;
                 let xMin = -TABLE_WIDTH / 2;
                 let xMax = TABLE_WIDTH / 2;
                 let boundX = 0;
 
-                while (xMax - xMin > 0.001) {
+                let xLoopCount = 0;
+                while (xMax - xMin > 0.001 && xLoopCount < 50) {
                     const bound = new THREE.Vector2((xMin + xMax) / 2, boundZ);
                     const sCurrent = spin.clone();
 
@@ -219,6 +219,7 @@ export class Ball {
                     if (bound.x < target.x) xMin = bound.x;
                     else xMax = bound.x;
                     boundX = bound.x;
+                    xLoopCount++;
                 }
 
                 const bound = new THREE.Vector2(boundX, boundZ);
@@ -237,24 +238,30 @@ export class Ball {
                 let dummyX = 0;
                 const t1 = this.getTimeToReachY(dummyX, target.y, bound, spinAfterBounce, vCurrent);
 
-                z = -(vCurrent.y + GRAVITY(spinAfterBounce.y) / PHY) * Math.exp(-PHY * t1) / PHY - GRAVITY(spinAfterBounce.y) / PHY * t1 + (vCurrent.y + GRAVITY(spinAfterBounce.y) / PHY) / PHY;
+                const g_after = GRAVITY(spinAfterBounce.y);
+                z = (vCurrent.y + g_after / PHY) * (1 - Math.exp(-PHY * t1)) / PHY - g_after * t1 / PHY;
 
-                if (z > 0) vMax = vXY;
+                if (z + (bound.y - target.y) > 0) vMax = vXY;
                 else vMin = vXY;
+                innerLoopCount++;
             }
 
-            if (Math.abs(z!) > 0.01) continue;
+            console.log(`boundZ: ${boundZ.toFixed(2)}, final vXY: ${vXY.toFixed(2)}, final z diff: ${z.toFixed(2)}`);
+
+            if (Math.abs(z!) > 0.1) continue; // Loosened threshold
 
             const finalV = new THREE.Vector3();
-            const bound = new THREE.Vector2(0, boundZ); // simplified for now
+            const bound = new THREE.Vector2(0, boundZ);
             const t2 = this.getTimeToReachTarget(bound.clone().sub(new THREE.Vector2(this.mesh.position.x, this.mesh.position.z)), vMax, spin, finalV);
             finalV.y = this.getVz0ToReachTarget(TABLE_HEIGHT - this.mesh.position.y, spin, t2);
 
+            console.log(`Found a potential solution: v=(${finalV.x.toFixed(2)}, ${finalV.y.toFixed(2)}, ${finalV.z.toFixed(2)})`);
             if (finalV.lengthSq() > tmpV.lengthSq()) {
                 tmpV.copy(finalV);
             }
         }
         v.copy(tmpV);
+        console.log(`Final selected velocity: v=(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`);
         return v;
     }
 
