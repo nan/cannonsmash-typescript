@@ -68,13 +68,10 @@ export class Game {
         // Check if it's player 1's turn to serve
         if (this.ball.status === 8 && this.getService() === this.player1.side) {
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
-                this.ball.toss(this.player1, 1);
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
-                this.ball.toss(this.player1, 2);
                 this.player1.startServe(2);
             } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click
-                this.ball.toss(this.player1, 3);
                 this.player1.startServe(3);
             }
         }
