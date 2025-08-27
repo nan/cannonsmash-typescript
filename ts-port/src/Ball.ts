@@ -92,7 +92,15 @@ export class Ball {
         if (this.mesh.position.y < BALL_RADIUS) {
             this.mesh.position.y = BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
-            this.ballDead();
+
+            // Apply friction to horizontal velocity
+            this.velocity.x *= 0.8;
+            this.velocity.z *= 0.8;
+
+            // If the ball has almost stopped moving, consider it dead
+            if (this.velocity.lengthSq() < 0.1) {
+                this.ballDead();
+            }
         }
 
         // Table collision
