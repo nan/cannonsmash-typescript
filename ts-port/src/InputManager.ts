@@ -1,13 +1,17 @@
 class InputManager {
     private static instance: InputManager;
     private keys: Set<string>;
+    private previousKeys: Set<string>;
     private mousePosition: { x: number, y: number };
     private mouseButtons: Set<number>;
+    private previousMouseButtons: Set<number>;
 
     private constructor() {
         this.keys = new Set();
+        this.previousKeys = new Set();
         this.mousePosition = { x: 0, y: 0 };
         this.mouseButtons = new Set();
+        this.previousMouseButtons = new Set();
 
         window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()));
         window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
@@ -18,6 +22,8 @@ class InputManager {
         });
         window.addEventListener('mousedown', (e) => this.mouseButtons.add(e.button));
         window.addEventListener('mouseup', (e) => this.mouseButtons.delete(e.button));
+        // Prevent context menu on right-click
+        window.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     public static getInstance(): InputManager {
@@ -27,8 +33,17 @@ class InputManager {
         return InputManager.instance;
     }
 
+    public update() {
+        this.previousKeys = new Set(this.keys);
+        this.previousMouseButtons = new Set(this.mouseButtons);
+    }
+
     public isKeyPressed(key: string): boolean {
         return this.keys.has(key.toLowerCase());
+    }
+
+    public isKeyJustPressed(key: string): boolean {
+        return this.keys.has(key.toLowerCase()) && !this.previousKeys.has(key.toLowerCase());
     }
 
     public getMousePosition(): { x: number, y: number } {
@@ -37,6 +52,10 @@ class InputManager {
 
     public isMouseButtonDown(button: number): boolean {
         return this.mouseButtons.has(button);
+    }
+
+    public isMouseButtonJustPressed(button: number): boolean {
+        return this.mouseButtons.has(button) && !this.previousMouseButtons.has(button);
     }
 }
 

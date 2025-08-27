@@ -52,6 +52,10 @@ export class CameraManager {
         srcX.z += zOffset;
 
         this.camera.position.copy(srcX);
+
+        // Clamp the lookAtTarget to prevent it from going below the ground
+        this.lookAtTarget.y = Math.max(this.lookAtTarget.y, 0.0);
+
         this.camera.lookAt(this.lookAtTarget);
     }
 }
