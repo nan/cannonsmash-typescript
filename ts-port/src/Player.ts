@@ -274,7 +274,7 @@ export class Player {
             // C++ code has a complex calculation for level based on swing error.
             // We'll use a fixed value for now.
             const level = 0.9;
-            const velocity = ball.targetToVS(this.targetPosition, level, this.spin);
+            const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
             ball.hit(velocity, this.spin);
         }
     }
