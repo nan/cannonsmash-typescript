@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT } from './constants';
+import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FLOOR_E } from './constants';
 import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02;
@@ -54,6 +54,7 @@ export class Ball {
     }
 
     private checkCollision() {
+        // Table collision
         const halfTableW = TABLE_WIDTH / 2;
         const halfTableL = TABLE_LENGTH / 2;
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
@@ -76,6 +77,15 @@ export class Ball {
                     default: this.ballDead(); break;
                 }
             }
+            return; // A table collision precludes a floor collision
+        }
+
+        // Floor collision
+        if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
+            this.mesh.position.y = BALL_RADIUS;
+            this.velocity.y *= -FLOOR_E;
+            this.spin.x *= 0.8;
+            this.spin.y *= 0.8;
         }
     }
 
