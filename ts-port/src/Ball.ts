@@ -19,18 +19,19 @@ export class Ball {
 
     public update(deltaTime: number, game: Game) {
         if (this.status === 8) { return; }
+
+        // Handle the reset timer for a dead ball
         if (this.status < 0) {
             this.status--;
             if (this.status < -100) {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
                 this.reset(server);
-            }
-            // Allow one frame of movement after the ball becomes dead, to show the bounce.
-            if (this.status < -1) {
+                // Once reset, we skip the physics for this frame
                 return;
             }
         }
 
+        // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
         const oldVel = this.velocity.clone();
         const oldSpin = this.spin.clone();
