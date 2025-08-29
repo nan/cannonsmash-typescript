@@ -66,4 +66,3 @@ export const PHY = 0.02; // Air resistance coefficient
 export const GRAVITY = (spin: number) => 9.8 + spin * 5; // Gravity combined with Magnus effect
 export const TICK = 0.01; // Original fixed time step
 export const TABLE_E = 0.8; // Bounciness of the table
-export const FLOOR_E = 0.5; // Bounciness of the floor

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FLOOR_E } from './constants';
+import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT } from './constants';
 import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02;
@@ -83,9 +83,10 @@ export class Ball {
         // Floor collision
         if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
             this.mesh.position.y = BALL_RADIUS;
-            this.velocity.y *= -FLOOR_E;
+            this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.8;
             this.spin.y *= 0.8;
+            this.ballDead();
         }
     }
 
