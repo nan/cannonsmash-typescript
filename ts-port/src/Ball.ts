@@ -25,7 +25,10 @@ export class Ball {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
                 this.reset(server);
             }
-            return;
+            // Allow one frame of movement after the ball becomes dead, to show the bounce.
+            if (this.status < -1) {
+                return;
+            }
         }
 
         const oldPos = this.mesh.position.clone();
