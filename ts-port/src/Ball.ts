@@ -19,15 +19,19 @@ export class Ball {
 
     public update(deltaTime: number, game: Game) {
         if (this.status === 8) { return; }
+
+        // Handle the reset timer for a dead ball
         if (this.status < 0) {
             this.status--;
             if (this.status < -100) {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
                 this.reset(server);
+                // Once reset, we skip the physics for this frame
+                return;
             }
-            return;
         }
 
+        // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
         const oldVel = this.velocity.clone();
         const oldSpin = this.spin.clone();
@@ -54,6 +58,7 @@ export class Ball {
     }
 
     private checkCollision() {
+        // Table collision
         const halfTableW = TABLE_WIDTH / 2;
         const halfTableL = TABLE_LENGTH / 2;
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
@@ -76,6 +81,16 @@ export class Ball {
                     default: this.ballDead(); break;
                 }
             }
+            return; // A table collision precludes a floor collision
+        }
+
+        // Floor collision
+        if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
+            this.mesh.position.y = BALL_RADIUS;
+            this.velocity.y *= -TABLE_E;
+            this.spin.x *= 0.8;
+            this.spin.y *= 0.8;
+            this.ballDead();
         }
     }
 
