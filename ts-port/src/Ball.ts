@@ -276,14 +276,11 @@ export class Ball {
         }
 
         if (bestVelocity) {
-            console.log(`Found best velocity with distance ${minDistance.toFixed(3)} from target.`);
-            Ball.debugPath = bestPath;
             const finalVelocity = bestVelocity.clone();
             finalVelocity.multiplyScalar(level);
             return finalVelocity;
         }
 
-        console.warn("Could not find a valid serve velocity, using fallback.");
         const fallbackVel = new THREE.Vector3(0, 2.8, -4.5);
         if (side > 0) {
             fallbackVel.z *= -1;
