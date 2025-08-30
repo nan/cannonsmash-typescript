@@ -129,12 +129,9 @@ export class Ball {
     }
 
     public targetToVS(player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        console.log(`[Serve Calc] Start: level=${level}, spin=(${spin.x}, ${spin.y})`);
         const ballPos = this.mesh.position;
         const ballPosXZ = new THREE.Vector2(ballPos.x, ballPos.z);
         const relativeTargetXZ = target.clone().sub(ballPosXZ);
-        console.log(`[Serve Calc] BallPos=(x:${ballPos.x.toFixed(2)}, y:${ballPos.y.toFixed(2)}, z:${ballPos.z.toFixed(2)})`);
-        console.log(`[Serve Calc] RelativeTarget=(x:${relativeTargetXZ.x.toFixed(2)}, z:${relativeTargetXZ.y.toFixed(2)})`);
 
         let v_h_Min = 0.1;
         let v_h_Max = 30.0;
@@ -172,13 +169,11 @@ export class Ball {
             const heightChangeAtNet = this.calculateHeightAtTime(vy_initial, spin.y, t1);
             const absHeightAtNet = ballPos.y + heightChangeAtNet;
 
-            console.log(`[Serve Calc Iter ${i}] v_h_mid=${v_h_mid.toFixed(2)}, t2=${t2.toFixed(2)}, vy_initial=${vy_initial.toFixed(2)}, heightAtNet=${absHeightAtNet.toFixed(2)}`);
-
-            // This is the corrected logic. If the ball is too low, we need a higher arc, which means a *lower* horizontal speed.
+            // Corrected logic: If ball is too low, we need a higher arc, which means a *lower* horizontal speed.
             if (absHeightAtNet < TABLE_HEIGHT + NET_HEIGHT) {
                 v_h_Max = v_h_mid;
             } else {
-                // If it clears the net, it's a valid candidate. We can try a faster (flatter) shot.
+                // If it clears the net, it's a valid candidate. We can try a faster (flatter) shot to find the limit.
                 v_h_Min = v_h_mid;
             }
         }
@@ -195,8 +190,6 @@ export class Ball {
 
         const targetHeightFinal = TABLE_HEIGHT - ballPos.y;
         finalVelocity.y = this.getVy0ToReachTarget(targetHeightFinal, spin, tFinal);
-
-        console.log(`[Serve Calc] Result: optimal_v_h=${optimal_v_h.toFixed(2)}, tFinal=${tFinal.toFixed(2)}, finalVelocity=(x:${finalVelocity.x.toFixed(2)}, y:${finalVelocity.y.toFixed(2)}, z:${finalVelocity.z.toFixed(2)})`);
 
         return finalVelocity;
     }
