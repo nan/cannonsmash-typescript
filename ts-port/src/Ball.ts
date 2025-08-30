@@ -6,6 +6,7 @@ import type { Game } from './Game';
 const BALL_RADIUS = 0.02;
 
 export class Ball {
+    public static debugPath: THREE.Vector3[] = [];
     public mesh: THREE.Mesh;
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
@@ -19,19 +20,14 @@ export class Ball {
 
     public update(deltaTime: number, game: Game) {
         if (this.status === 8) { return; }
-
-        // Handle the reset timer for a dead ball
         if (this.status < 0) {
             this.status--;
             if (this.status < -100) {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
                 this.reset(server);
-                // Once reset, we skip the physics for this frame
                 return;
             }
         }
-
-        // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
         const oldVel = this.velocity.clone();
         const oldSpin = this.spin.clone();
@@ -58,7 +54,6 @@ export class Ball {
     }
 
     private checkCollision() {
-        // Table collision
         const halfTableW = TABLE_WIDTH / 2;
         const halfTableL = TABLE_LENGTH / 2;
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
@@ -81,10 +76,8 @@ export class Ball {
                     default: this.ballDead(); break;
                 }
             }
-            return; // A table collision precludes a floor collision
+            return;
         }
-
-        // Floor collision
         if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
             this.mesh.position.y = BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
@@ -128,163 +121,103 @@ export class Ball {
         this.status = 8;
     }
 
-    public static debugPath: THREE.Vector3[] = [];
-
-    /**
-     * Predicts the trajectory of the ball until the first bounce on a surface.
-     * This is a simulation function and does not affect the actual ball's state.
-     */
-    private predictSingleBounce(
-        initialPos: THREE.Vector3,
-        initialVel: THREE.Vector3,
-        initialSpin: THREE.Vector2,
-        maxSteps: number = 500
-    ): { position: THREE.Vector3; velocity: THREE.Vector3; spin: THREE.Vector2; path: THREE.Vector3[] } | null {
-        let position = initialPos.clone();
-        let velocity = initialVel.clone();
-        let spin = initialSpin.clone();
-        const path = [position.clone()];
-
+    private predictSingleBounce( initialPos: THREE.Vector3, initialVel: THREE.Vector3, initialSpin: THREE.Vector2, maxSteps: number = 500 ): { position: THREE.Vector3; velocity: THREE.Vector3; spin: THREE.Vector2; path: THREE.Vector3[] } | null {
+        let position = initialPos.clone(); let velocity = initialVel.clone(); let spin = initialSpin.clone(); const path = [position.clone()];
         for (let i = 0; i < maxSteps; i++) {
-            const oldPos = position.clone();
-            const oldVel = velocity.clone();
-            const oldSpin = spin.clone();
-            const time = TICK;
-            const exp_phy_t = Math.exp(-PHY * time);
-            const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
-
-            velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t;
-            velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
-            velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
-
-            if (Math.abs(oldSpin.x) < 0.001) {
-                position.x = oldPos.x + oldVel.x / PHY - oldVel.x / PHY * exp_phy_t;
-                position.z = oldPos.z + oldVel.z / PHY - oldVel.z / PHY * exp_phy_t;
-            } else {
-                const theta = rot;
-                const r = new THREE.Vector2(oldVel.z / oldSpin.x, -oldVel.x / oldSpin.x);
-                position.x = r.x * Math.cos(theta) - r.y * Math.sin(theta) + oldPos.x - r.x;
-                position.z = r.x * Math.sin(theta) + r.y * Math.cos(theta) + oldPos.z - r.y;
-            }
-            position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
-            spin.x = oldSpin.x * exp_phy_t;
-            path.push(position.clone());
-
-            const halfTableW = TABLE_WIDTH / 2;
-            const halfTableL = TABLE_LENGTH / 2;
-            if (position.y < TABLE_HEIGHT + BALL_RADIUS && velocity.y < 0 &&
-                position.x > -halfTableW && position.x < halfTableW &&
-                position.z > -halfTableL && position.z < halfTableL) {
-                return { position, velocity, spin, path };
-            }
-
-            if (position.y < BALL_RADIUS && velocity.y < 0) {
-                return null;
-            }
+            const oldPos = position.clone(); const oldVel = velocity.clone(); const oldSpin = spin.clone(); const time = TICK; const exp_phy_t = Math.exp(-PHY * time); const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
+            velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t; velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t; velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
+            if (Math.abs(oldSpin.x) < 0.001) { position.x = oldPos.x + oldVel.x / PHY - oldVel.x / PHY * exp_phy_t; position.z = oldPos.z + oldVel.z / PHY - oldVel.z / PHY * exp_phy_t;
+            } else { const theta = rot; const r = new THREE.Vector2(oldVel.z / oldSpin.x, -oldVel.x / oldSpin.x); position.x = r.x * Math.cos(theta) - r.y * Math.sin(theta) + oldPos.x - r.x; position.z = r.x * Math.sin(theta) + r.y * Math.cos(theta) + oldPos.z - r.y; }
+            position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y; spin.x = oldSpin.x * exp_phy_t; path.push(position.clone());
+            const halfTableW = TABLE_WIDTH / 2; const halfTableL = TABLE_LENGTH / 2;
+            if (position.y < TABLE_HEIGHT + BALL_RADIUS && velocity.y < 0 && position.x > -halfTableW && position.x < halfTableW && position.z > -halfTableL && position.z < halfTableL) { return { position, velocity, spin, path }; }
+            if (position.y < BALL_RADIUS && velocity.y < 0) { return null; }
         }
         return null;
     }
 
-    /**
-     * Predicts the locations of the first two bounces for a given initial velocity.
-     */
-    private predictTwoBounces(
-        initialPos: THREE.Vector3,
-        initialVel: THREE.Vector3,
-        initialSpin: THREE.Vector2
-    ): { firstBounce: THREE.Vector3, secondBounce: THREE.Vector3, path: THREE.Vector3[] } | null {
-        const firstBounceResult = this.predictSingleBounce(initialPos, initialVel, initialSpin);
-        if (!firstBounceResult) return null;
-
+    private predictTwoBounces( initialPos: THREE.Vector3, initialVel: THREE.Vector3, initialSpin: THREE.Vector2 ): { firstBounce: THREE.Vector3, secondBounce: THREE.Vector3, path: THREE.Vector3[] } | null {
+        const firstBounceResult = this.predictSingleBounce(initialPos, initialVel, initialSpin); if (!firstBounceResult) return null;
         let { position: posAfter1st, velocity: velAfter1st, spin: spinAfter1st, path: path1 } = firstBounceResult;
-
-        // Post-bounce physics. This must EXACTLY match the physics in `checkCollision`.
-        velAfter1st.y *= -TABLE_E;
-        spinAfter1st.x *= 0.95;
-        spinAfter1st.y *= 0.8;
-
-        const secondBounceResult = this.predictSingleBounce(posAfter1st, velAfter1st, spinAfter1st);
-        if (!secondBounceResult) return null;
-
+        velAfter1st.y *= -TABLE_E; spinAfter1st.x *= 0.95; spinAfter1st.y *= 0.8;
+        const secondBounceResult = this.predictSingleBounce(posAfter1st, velAfter1st, spinAfter1st); if (!secondBounceResult) return null;
         const fullPath = path1.concat(secondBounceResult.path);
-
-        return {
-            firstBounce: firstBounceResult.position,
-            secondBounce: secondBounceResult.position,
-            path: fullPath
-        };
+        return { firstBounce: firstBounceResult.position, secondBounce: secondBounceResult.position, path: fullPath };
     }
 
     public targetToVS(initialPos: THREE.Vector3, player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
         const side = player.side;
-
         console.log(`[Serve Calc] Start. Player Z: ${initialPos.z.toFixed(2)}, Target: {x:${target.x.toFixed(2)}, z:${target.y.toFixed(2)}}, Spin: {x:${spin.x.toFixed(2)}, y:${spin.y.toFixed(2)}}`);
 
         let bestVelocity: THREE.Vector3 | null = null;
         let minDistance = Infinity;
         let bestPath: THREE.Vector3[] = [];
-        let candidatesFound = 0;
 
-        // Widen the search space to handle serves from different positions
-        const vz_start = -2.0 * side;
-        const vz_end = -10.0 * side;
-        const vz_step = -0.2 * side;
-        const vy_start = 1.0;
-        const vy_end = 6.0;
-        const vy_step = 0.2;
-        const vx_start = -2.0;
-        const vx_end = 2.0;
+        const vz = (target.y - initialPos.z) / -1.5; // Heuristic for initial Z velocity
         const vx_step = 0.2;
 
-        for (let vy = vy_start; vy < vy_end; vy += vy_step) {
-            for (let vz = vz_start; (side > 0 ? vz >= vz_end : vz <= vz_end); vz += vz_step) {
-                for (let vx = vx_start; vx < vx_end; vx += vx_step) {
-                    const testVel = new THREE.Vector3(vx, vy, vz);
-                    const twoBounceResult = this.predictTwoBounces(initialPos, testVel, spin);
+        for (let vx = -2.0; vx < 2.0; vx += vx_step) {
+            let low_vy = 0.5;
+            let high_vy = 8.0;
+            let final_vy = -1;
 
-                    if (twoBounceResult) {
-                        const { firstBounce, secondBounce, path } = twoBounceResult;
-
-                        const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
-                        const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
-
-                        if (isFirstBounceValid && isSecondBounceValid) {
-                            let clearsNet = false;
-                            for (let i = 0; i < path.length - 1; i++) {
-                                const p1 = path[i];
-                                const p2 = path[i + 1];
-                                if (Math.sign(p1.z) !== Math.sign(p2.z)) {
-                                    const z_dist = Math.abs(p1.z) + Math.abs(p2.z);
-                                    if (z_dist > 1e-6) {
-                                        const weight = Math.abs(p1.z) / z_dist;
-                                        const heightAtNet = p1.y + (p2.y - p1.y) * weight;
-                                        if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
-                                            clearsNet = true;
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-
-                            if (clearsNet) {
-                                const target3D = new THREE.Vector2(secondBounce.x, secondBounce.z);
-                                const distance = target3D.distanceTo(target);
-                                candidatesFound++;
-
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    bestVelocity = testVel;
-                                    bestPath = path;
-                                }
-                            }
-                        }
+            // Binary search for the correct vertical velocity (vy)
+            for (let i = 0; i < 10; i++) { // 10 iterations for precision
+                const mid_vy = (low_vy + high_vy) / 2;
+                const testVel = new THREE.Vector3(vx, mid_vy, vz);
+                const result = this.predictTwoBounces(initialPos, testVel, spin);
+                if (result) {
+                    const { firstBounce, secondBounce } = result;
+                    const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
+                    const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
+                    if(isFirstBounceValid && isSecondBounceValid) {
+                        const heightError = secondBounce.y - TABLE_HEIGHT;
+                        if (heightError > 0) high_vy = mid_vy;
+                        else low_vy = mid_vy;
+                    } else {
+                        low_vy = mid_vy; // If trajectory is invalid, it's probably too weak
                     }
+                } else {
+                    low_vy = mid_vy; // If it doesn't bounce twice, it's too weak
+                }
+            }
+            final_vy = (low_vy + high_vy) / 2;
+
+            // Check if this is a valid solution that clears the net
+            const finalVel = new THREE.Vector3(vx, final_vy, vz);
+            const finalResult = this.predictTwoBounces(initialPos, finalVel, spin);
+            if (finalResult) {
+                const { firstBounce, secondBounce, path } = finalResult;
+                const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
+                const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
+                if(isFirstBounceValid && isSecondBounceValid) {
+                     let clearsNet = false;
+                     for (let i = 0; i < path.length - 1; i++) {
+                         const p1 = path[i]; const p2 = path[i + 1];
+                         if (Math.sign(p1.z) !== Math.sign(p2.z)) {
+                             const z_dist = Math.abs(p1.z) + Math.abs(p2.z);
+                             if (z_dist > 1e-6) {
+                                 const weight = Math.abs(p1.z) / z_dist;
+                                 const heightAtNet = p1.y + (p2.y - p1.y) * weight;
+                                 if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) clearsNet = true;
+                             }
+                             break;
+                         }
+                     }
+                     if(clearsNet) {
+                        const distance = new THREE.Vector2(secondBounce.x, secondBounce.z).distanceTo(target);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestVelocity = finalVel;
+                            bestPath = path;
+                        }
+                     }
                 }
             }
         }
 
         if (bestVelocity) {
-            console.log(`[Serve Calc] End. Found best velocity after checking ${candidatesFound} candidates. Vel: {x:${bestVelocity.x.toFixed(2)}, y:${bestVelocity.y.toFixed(2)}, z:${bestVelocity.z.toFixed(2)}}, Dist: ${minDistance.toFixed(3)}`);
+            console.log(`[Serve Calc] End. Found best velocity. Vel: {x:${bestVelocity.x.toFixed(2)}, y:${bestVelocity.y.toFixed(2)}, z:${bestVelocity.z.toFixed(2)}}, Dist: ${minDistance.toFixed(3)}`);
             Ball.debugPath = bestPath;
             const finalVelocity = bestVelocity.clone();
             finalVelocity.multiplyScalar(level);
