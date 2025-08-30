@@ -13,7 +13,10 @@ class InputManager {
         this.mouseButtons = new Set();
         this.previousMouseButtons = new Set();
 
-        window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()));
+        window.addEventListener('keydown', (e) => {
+            console.log(`[InputManager] Key down: ${e.key}`);
+            this.keys.add(e.key.toLowerCase());
+        });
         window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
 
         window.addEventListener('mousemove', (e) => {
