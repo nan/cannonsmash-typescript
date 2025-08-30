@@ -128,6 +128,8 @@ export class Ball {
         this.status = 8;
     }
 
+    public static debugPath: THREE.Vector3[] = [];
+
     /**
      * Predicts the trajectory of the ball until the first bounce on a surface.
      * This is a simulation function and does not affect the actual ball's state.
@@ -200,8 +202,6 @@ export class Ball {
         velAfter1st.y *= -TABLE_E;
         spinAfter1st.x *= 0.95;
         spinAfter1st.y *= 0.8;
-        // The "kick" logic is removed, as it was only in the prediction and not in the
-        // actual game simulation, causing a mismatch.
 
         const secondBounceResult = this.predictSingleBounce(posAfter1st, velAfter1st, spinAfter1st);
         if (!secondBounceResult) return null;
@@ -219,8 +219,11 @@ export class Ball {
         const initialPos = this.mesh.position;
         const side = player.side;
 
+        console.log(`[Serve Calc] Start. Player Z: ${initialPos.z.toFixed(2)}, Target: {x:${target.x.toFixed(2)}, z:${target.y.toFixed(2)}}, Spin: {x:${spin.x.toFixed(2)}, y:${spin.y.toFixed(2)}}`);
+
         let bestVelocity: THREE.Vector3 | null = null;
         let minDistance = Infinity;
+        let bestPath: THREE.Vector3[] = [];
         let candidatesFound = 0;
 
         // Widen the search space to handle serves from different positions
@@ -268,11 +271,11 @@ export class Ball {
                                 const target3D = new THREE.Vector2(secondBounce.x, secondBounce.z);
                                 const distance = target3D.distanceTo(target);
                                 candidatesFound++;
-                                // console.log(`[Serve Calc] Candidate #${candidatesFound} found. Dist: ${distance.toFixed(3)}`);
 
                                 if (distance < minDistance) {
                                     minDistance = distance;
                                     bestVelocity = testVel;
+                                    bestPath = path;
                                 }
                             }
                         }
@@ -282,10 +285,14 @@ export class Ball {
         }
 
         if (bestVelocity) {
+            console.log(`[Serve Calc] End. Found best velocity after checking ${candidatesFound} candidates. Vel: {x:${bestVelocity.x.toFixed(2)}, y:${bestVelocity.y.toFixed(2)}, z:${bestVelocity.z.toFixed(2)}}, Dist: ${minDistance.toFixed(3)}`);
+            Ball.debugPath = bestPath;
             const finalVelocity = bestVelocity.clone();
             finalVelocity.multiplyScalar(level);
             return finalVelocity;
         }
+
+        console.warn("[Serve Calc] End. Could not find a valid serve velocity, using fallback.");
         const fallbackVel = new THREE.Vector3(0, 2.8, -4.5);
         if (side > 0) {
             fallbackVel.z *= -1;
