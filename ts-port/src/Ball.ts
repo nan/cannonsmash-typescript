@@ -153,65 +153,67 @@ export class Ball {
         let minDistance = Infinity;
         let bestPath: THREE.Vector3[] = [];
 
-        const vz = (target.y - initialPos.z) / -1.5; // Heuristic for initial Z velocity
         const vx_step = 0.2;
+        const vz_step = -0.2 * side;
 
-        for (let vx = -2.0; vx < 2.0; vx += vx_step) {
-            let low_vy = 0.5;
-            let high_vy = 8.0;
-            let final_vy = -1;
+        // Grid search for horizontal velocities (vx, vz)
+        for (let vx = -2.0; vx <= 2.0; vx += vx_step) {
+            const vz_start = -2.0 * side;
+            const vz_end = -10.0 * side;
+            for (let vz = vz_start; (side > 0 ? vz >= vz_end : vz <= vz_end); vz += vz_step) {
 
-            // Binary search for the correct vertical velocity (vy)
-            for (let i = 0; i < 10; i++) { // 10 iterations for precision
-                const mid_vy = (low_vy + high_vy) / 2;
-                const testVel = new THREE.Vector3(vx, mid_vy, vz);
-                const result = this.predictTwoBounces(initialPos, testVel, spin);
-                if (result) {
-                    const { firstBounce, secondBounce } = result;
-                    const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
-                    const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
-                    if(isFirstBounceValid && isSecondBounceValid) {
-                        const heightError = secondBounce.y - TABLE_HEIGHT;
+                // For each horizontal velocity pair, binary search for the required vertical velocity (vy)
+                let low_vy = 0.5;
+                let high_vy = 8.0;
+                let final_vy = -1;
+
+                for (let i = 0; i < 10; i++) { // 10 iterations for precision
+                    const mid_vy = (low_vy + high_vy) / 2;
+                    const testVel = new THREE.Vector3(vx, mid_vy, vz);
+                    const result = this.predictTwoBounces(initialPos, testVel, spin);
+
+                    if (result && result.secondBounce) {
+                        const heightError = result.secondBounce.y - (TABLE_HEIGHT + BALL_RADIUS);
                         if (heightError > 0) high_vy = mid_vy;
                         else low_vy = mid_vy;
                     } else {
                         low_vy = mid_vy; // If trajectory is invalid, it's probably too weak
                     }
-                } else {
-                    low_vy = mid_vy; // If it doesn't bounce twice, it's too weak
                 }
-            }
-            final_vy = (low_vy + high_vy) / 2;
+                final_vy = (low_vy + high_vy) / 2;
 
-            // Check if this is a valid solution that clears the net
-            const finalVel = new THREE.Vector3(vx, final_vy, vz);
-            const finalResult = this.predictTwoBounces(initialPos, finalVel, spin);
-            if (finalResult) {
-                const { firstBounce, secondBounce, path } = finalResult;
-                const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
-                const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
-                if(isFirstBounceValid && isSecondBounceValid) {
-                     let clearsNet = false;
-                     for (let i = 0; i < path.length - 1; i++) {
-                         const p1 = path[i]; const p2 = path[i + 1];
-                         if (Math.sign(p1.z) !== Math.sign(p2.z)) {
-                             const z_dist = Math.abs(p1.z) + Math.abs(p2.z);
-                             if (z_dist > 1e-6) {
-                                 const weight = Math.abs(p1.z) / z_dist;
-                                 const heightAtNet = p1.y + (p2.y - p1.y) * weight;
-                                 if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) clearsNet = true;
+                // Check if this vy creates a valid trajectory
+                const finalVel = new THREE.Vector3(vx, final_vy, vz);
+                const finalResult = this.predictTwoBounces(initialPos, finalVel, spin);
+
+                if (finalResult) {
+                    const { firstBounce, secondBounce, path } = finalResult;
+                    const isFirstBounceValid = Math.sign(side) === Math.sign(firstBounce.z) && Math.abs(firstBounce.z) < TABLE_LENGTH / 2;
+                    const isSecondBounceValid = Math.sign(side) !== Math.sign(secondBounce.z) && Math.abs(secondBounce.z) < TABLE_LENGTH / 2;
+
+                    if(isFirstBounceValid && isSecondBounceValid) {
+                         let clearsNet = false;
+                         for (let i = 0; i < path.length - 1; i++) {
+                             const p1 = path[i]; const p2 = path[i + 1];
+                             if (Math.sign(p1.z) !== Math.sign(p2.z)) {
+                                 const z_dist = Math.abs(p1.z) + Math.abs(p2.z);
+                                 if (z_dist > 1e-6) {
+                                     const weight = Math.abs(p1.z) / z_dist;
+                                     const heightAtNet = p1.y + (p2.y - p1.y) * weight;
+                                     if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) clearsNet = true;
+                                 }
+                                 break;
                              }
-                             break;
                          }
-                     }
-                     if(clearsNet) {
-                        const distance = new THREE.Vector2(secondBounce.x, secondBounce.z).distanceTo(target);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            bestVelocity = finalVel;
-                            bestPath = path;
-                        }
-                     }
+                         if(clearsNet) {
+                            const distance = new THREE.Vector2(secondBounce.x, secondBounce.z).distanceTo(target);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                bestVelocity = finalVel;
+                                bestPath = path;
+                            }
+                         }
+                    }
                 }
             }
         }
