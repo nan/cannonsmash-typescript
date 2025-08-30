@@ -196,10 +196,21 @@ export class Ball {
 
         let { position: posAfter1st, velocity: velAfter1st, spin: spinAfter1st, path: path1 } = firstBounceResult;
 
+        // Post-bounce physics
         velAfter1st.y *= -TABLE_E;
         spinAfter1st.x *= 0.95;
         spinAfter1st.y *= 0.8;
-        velAfter1st.z += spinAfter1st.y * 0.05;
+
+        // Replicate the original C++ bounce physics more faithfully.
+        // This adds a "kick" based on topspin, proportional to the current velocity vector.
+        const vHorizontal = new THREE.Vector2(velAfter1st.x, velAfter1st.z);
+        const mag = vHorizontal.length();
+        if (mag > 0) {
+            // The 0.8 factor is from the original C++ code (m_spin[1]*0.8)
+            const kickFactor = spinAfter1st.y * 0.8;
+            velAfter1st.x += (velAfter1st.x / mag) * kickFactor;
+            velAfter1st.z += (velAfter1st.z / mag) * kickFactor;
+        }
 
         const secondBounceResult = this.predictSingleBounce(posAfter1st, velAfter1st, spinAfter1st);
         if (!secondBounceResult) return null;
@@ -220,15 +231,16 @@ export class Ball {
         let bestVelocity: THREE.Vector3 | null = null;
         let minDistance = Infinity;
 
-        const vz_start = -2.5 * side;
-        const vz_end = -7.0 * side;
-        const vz_step = -0.1 * side;
-        const vy_start = 1.5;
-        const vy_end = 4.5;
-        const vy_step = 0.1;
-        const vx_start = -1.0;
-        const vx_end = 1.0;
-        const vx_step = 0.1;
+        // Widen the search space to handle serves from different positions
+        const vz_start = -2.0 * side;
+        const vz_end = -10.0 * side;
+        const vz_step = -0.2 * side;
+        const vy_start = 1.0;
+        const vy_end = 6.0;
+        const vy_step = 0.2;
+        const vx_start = -2.0;
+        const vx_end = 2.0;
+        const vx_step = 0.2;
 
         for (let vy = vy_start; vy < vy_end; vy += vy_step) {
             for (let vz = vz_start; (side > 0 ? vz >= vz_end : vz <= vz_end); vz += vz_step) {
@@ -280,7 +292,6 @@ export class Ball {
             finalVelocity.multiplyScalar(level);
             return finalVelocity;
         }
-
         const fallbackVel = new THREE.Vector3(0, 2.8, -4.5);
         if (side > 0) {
             fallbackVel.z *= -1;
