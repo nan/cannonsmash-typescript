@@ -129,55 +129,56 @@ export class Ball {
     }
 
     public targetToVS(player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
+        console.log(`[Serve Calc] Start: level=${level}, spin=(${spin.x}, ${spin.y})`);
         const ballPos = this.mesh.position;
         const ballPosXZ = new THREE.Vector2(ballPos.x, ballPos.z);
-
-        // Target position relative to the ball's horizontal position
         const relativeTargetXZ = target.clone().sub(ballPosXZ);
+        console.log(`[Serve Calc] BallPos=(x:${ballPos.x.toFixed(2)}, y:${ballPos.y.toFixed(2)}, z:${ballPos.z.toFixed(2)})`);
+        console.log(`[Serve Calc] RelativeTarget=(x:${relativeTargetXZ.x.toFixed(2)}, z:${relativeTargetXZ.y.toFixed(2)})`);
 
         let v_h_Min = 0.1;
         let v_h_Max = 30.0;
         const finalVelocity = new THREE.Vector3();
 
-        // Binary search for a base horizontal speed. The level is applied inside the loop.
-        for (let i = 0; i < 15; i++) { // Loop for a fixed number of iterations for stability
+        // Binary search for the optimal horizontal velocity
+        for (let i = 0; i < 15; i++) {
             const v_h_mid = (v_h_Min + v_h_Max) / 2;
             if (v_h_mid === v_h_Min || v_h_mid === v_h_Max) break;
 
             const v_h_Current = v_h_mid * level;
-
             const t2 = this.getTimeToReachTarget(relativeTargetXZ, v_h_Current, spin, finalVelocity);
 
             if (t2 > 9999) {
-                // This speed is too low to reach the target, try a higher base speed
                 v_h_Min = v_h_mid;
                 continue;
             }
 
-            // Calculate the required initial vertical velocity to land on the table at the target
             const targetHeight = TABLE_HEIGHT - ballPos.y;
-            finalVelocity.y = this.getVy0ToReachTarget(targetHeight, spin, t2);
+            const vy_initial = this.getVy0ToReachTarget(targetHeight, spin, t2);
 
-            // --- Net-clearing check ---
             const distToNetZ = -ballPos.z;
-            const totalDistZ = relativeTargetXZ.y; // .y because target is Vector2(x,z)
+            const totalDistZ = relativeTargetXZ.y;
             if (totalDistZ <= 1e-6) {
-                v_h_Max = v_h_mid; // Target is behind or at the same Z, invalid
+                v_h_Max = v_h_mid;
                 continue;
             }
             const t1 = t2 * (distToNetZ / totalDistZ);
 
             if (t1 < 0 || t1 > t2) {
-                v_h_Max = v_h_mid; // Invalid time to net, treat as failure
+                v_h_Max = v_h_mid;
                 continue;
             }
 
-            const heightChangeAtNet = this.calculateHeightAtTime(finalVelocity.y, spin.y, t1);
+            const heightChangeAtNet = this.calculateHeightAtTime(vy_initial, spin.y, t1);
             const absHeightAtNet = ballPos.y + heightChangeAtNet;
 
+            console.log(`[Serve Calc Iter ${i}] v_h_mid=${v_h_mid.toFixed(2)}, t2=${t2.toFixed(2)}, vy_initial=${vy_initial.toFixed(2)}, heightAtNet=${absHeightAtNet.toFixed(2)}`);
+
+            // This is the corrected logic. If the ball is too low, we need a higher arc, which means a *lower* horizontal speed.
             if (absHeightAtNet < TABLE_HEIGHT + NET_HEIGHT) {
                 v_h_Max = v_h_mid;
             } else {
+                // If it clears the net, it's a valid candidate. We can try a faster (flatter) shot.
                 v_h_Min = v_h_mid;
             }
         }
@@ -194,6 +195,8 @@ export class Ball {
 
         const targetHeightFinal = TABLE_HEIGHT - ballPos.y;
         finalVelocity.y = this.getVy0ToReachTarget(targetHeightFinal, spin, tFinal);
+
+        console.log(`[Serve Calc] Result: optimal_v_h=${optimal_v_h.toFixed(2)}, tFinal=${tFinal.toFixed(2)}, finalVelocity=(x:${finalVelocity.x.toFixed(2)}, y:${finalVelocity.y.toFixed(2)}, z:${finalVelocity.z.toFixed(2)})`);
 
         return finalVelocity;
     }
@@ -214,8 +217,9 @@ export class Ball {
             v.x = target.x / targetLen * velocity;
             v.z = target.y / targetLen * velocity;
 
+            if (velocity === 0) return 100000;
             const timeToReach = 1 - PHY * targetLen / velocity;
-            if (timeToReach <= 0 || velocity === 0) {
+            if (timeToReach <= 0) {
                 return 100000;
             }
             return -Math.log(timeToReach) / PHY;
@@ -237,6 +241,7 @@ export class Ball {
             v.x = (target_norm_x * cos_m_theta - target_norm_z * sin_m_theta) * velocity;
             v.z = (target_norm_x * sin_m_theta + target_norm_z * cos_m_theta) * velocity;
 
+            if (spin.x === 0) return 100000;
             const timeToReach = 1 - 2 * PHY / spin.x * theta;
             if (timeToReach <= 0) {
                 return 100000;
@@ -249,9 +254,10 @@ export class Ball {
         if (t > 1e-6) {
             const gravityEffect = GRAVITY(spin.y);
             const exp_phy_t = Math.exp(-PHY * t);
+            if (Math.abs(1 - exp_phy_t) < 1e-9) return 100000; // Avoid division by zero
             return (PHY * targetHeight + gravityEffect * t) / (1 - exp_phy_t) - gravityEffect / PHY;
         } else {
-            return -targetHeight;
+            return 100000;
         }
     }
 }
