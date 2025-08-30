@@ -147,6 +147,13 @@ export class Game {
         this.player1.update(deltaTime, this.ball);
         this.player2.update(deltaTime, this.ball);
         this.ball.update(deltaTime, this);
+
+        // Log the actual ball's position every frame while it's in play
+        if (this.ball.status >= 0 && this.ball.status < 8) {
+            const pos = this.ball.mesh.position;
+            console.log(`[Actual Ball] x:${pos.x.toFixed(3)}, y:${pos.y.toFixed(3)}, z:${pos.z.toFixed(3)}`);
+        }
+
         this.cameraManager.update();
 
         // Update target indicator position
