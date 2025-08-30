@@ -215,8 +215,7 @@ export class Ball {
         };
     }
 
-    public targetToVS(player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        const initialPos = this.mesh.position;
+    public targetToVS(initialPos: THREE.Vector3, player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
         const side = player.side;
 
         console.log(`[Serve Calc] Start. Player Z: ${initialPos.z.toFixed(2)}, Target: {x:${target.x.toFixed(2)}, z:${target.y.toFixed(2)}}, Spin: {x:${spin.x.toFixed(2)}, y:${spin.y.toFixed(2)}}`);

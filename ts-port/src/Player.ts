@@ -271,10 +271,22 @@ export class Player {
      */
     public hitBall(ball: Ball) {
         if (this.canServe(ball)) {
-            // C++ code has a complex calculation for level based on swing error.
-            // We'll use a fixed value for now.
             const level = 0.9;
-            const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
+
+            // Calculate the absolute 3D position where the racket will contact the ball.
+            // This is crucial for an accurate trajectory prediction.
+            const serveParams = stype.get(this.swingType);
+            if (!serveParams) return;
+
+            const hitPos = this.mesh.position.clone();
+            // The hit position is relative to the player's mesh.
+            // Note: The side factor for X might need adjustment depending on how animations are oriented.
+            hitPos.x += serveParams.hitX * this.side;
+            hitPos.z += serveParams.hitY; // This seems to be an absolute Z offset in the animation data
+            hitPos.y = TABLE_HEIGHT + serveParams.hitZ; // hitZ is height above the table.
+
+            // Pass the calculated hit position to the trajectory calculator.
+            const velocity = ball.targetToVS(hitPos, this, this.targetPosition, level, this.spin);
             ball.hit(velocity, this.spin);
         }
     }
