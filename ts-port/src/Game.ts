@@ -18,6 +18,7 @@ export class Game {
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
+    private debugLine: THREE.Line | null = null;
 
     // Game state properties
     private score1 = 0;
@@ -151,6 +152,19 @@ export class Game {
         // Update target indicator position
         this.field.targetIndicator.position.x = this.player1.targetPosition.x;
         this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+
+        // --- Debug Path Drawing ---
+        if (Ball.debugPath.length > 0) {
+            if (this.debugLine) {
+                this.scene.remove(this.debugLine);
+                this.debugLine.geometry.dispose();
+            }
+            const material = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 2 });
+            const geometry = new THREE.BufferGeometry().setFromPoints(Ball.debugPath);
+            this.debugLine = new THREE.Line(geometry, material);
+            this.scene.add(this.debugLine);
+            Ball.debugPath = []; // Clear it after drawing so it's only drawn once
+        }
 
         // This must be the last thing in the update loop
         inputManager.update();
