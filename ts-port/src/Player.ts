@@ -246,6 +246,7 @@ export class Player {
      * @param spinCategory The category of spin/power (1, 2, or 3) based on mouse button.
      */
     public startServe(spinCategory: number) {
+        console.log(`[Player] startServe called with category ${spinCategory}`);
         if (this.swing > 0) return false;
 
         this.swing = 1; // Start the swing animation
