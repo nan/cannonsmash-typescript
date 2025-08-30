@@ -301,6 +301,7 @@ export class Ball {
             let vMin = 0.1;
             let vMax = 30.0;
             let finalHeight = 0; // Height at the final target position
+            let finalBoundX = 0; // Store the result of the inner x-search
 
             for(let v_iter = 0; v_iter < 20; v_iter++) { // Safety break for binary search
                 if (vMax - vMin < 0.001) break;
@@ -310,7 +311,6 @@ export class Ball {
                 let xMin = -TABLE_WIDTH / 2;
                 let xMax = TABLE_WIDTH / 2;
                 let boundX = 0;
-                let finalTargetX = 0;
 
                 for (let x_iter = 0; x_iter < 20; x_iter++) { // Safety break
                     if (xMax - xMin < 0.001) break;
@@ -339,7 +339,7 @@ export class Ball {
 
                     // Now find where this trajectory lands
                     const result = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounce);
-                    finalTargetX = result.targetX;
+                    const finalTargetX = result.targetX;
 
                     if (finalTargetX < target.x) {
                         xMin = boundX;
@@ -347,10 +347,11 @@ export class Ball {
                         xMax = boundX;
                     }
                 }
+                finalBoundX = (xMin + xMax) / 2; // Store result of x-search
 
-                // Now we have a candidate bounce point (boundX, boundZ) and horizontal speed vXY.
+                // Now we have a candidate bounce point (finalBoundX, boundZ) and horizontal speed vXY.
                 // Let's calculate the full 3D trajectory.
-                const boundPoint = new THREE.Vector2(boundX, boundZ);
+                const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
                 const initialVelocity = new THREE.Vector3();
                 const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
 
@@ -394,7 +395,7 @@ export class Ball {
                 continue; // This bounce Z didn't produce a solution.
             }
 
-            const boundPoint = new THREE.Vector2(xMin, boundZ); // Use the result from binary search
+            const boundPoint = new THREE.Vector2(finalBoundX, boundZ); // Use the result from binary search
             const initialVelocity = new THREE.Vector3();
             const vXY = (vMin + vMax) / 2;
             const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
