@@ -195,15 +195,11 @@ export class Ball {
      * @returns The required initial vertical velocity (Vy).
      */
     private _getVz0ToReachTarget(targetHeight: number, spin: THREE.Vector2, t: number): number {
-        console.log(`_getVz0ToReachTarget called with t: ${t.toFixed(4)}`);
         if (t > 0.001) {
-            // Note: In C++, spin[1] is top/back spin. In our Vector2, this is spin.y
             const g = GRAVITY(spin.y);
             const result = (PHY * targetHeight + g * t) / (1 - Math.exp(-PHY * t)) - g / PHY;
-            console.log(`_getVz0ToReachTarget result: ${result.toFixed(4)}`);
             return result;
         } else {
-            // As per C++ code, return -targetHeight for invalid time.
             return -targetHeight;
         }
     }
@@ -241,19 +237,14 @@ export class Ball {
             const dzSq = (targetZ - center.y) * (targetZ - center.y);
 
             if (radiusSq < dzSq) {
-                // Cannot reach this Z, no real solution for X
                 return { time: 100000, targetX: 0 };
             }
 
             const dx = Math.sqrt(radiusSq - dzSq);
 
-            // Two possible intersection points on the circular path. We need to pick the one "in front".
             const target1 = new THREE.Vector2(center.x + dx, targetZ);
             const target2 = new THREE.Vector2(center.x - dx, targetZ);
 
-            // This logic replicates the C++ version for choosing the correct intersection point.
-            // It finds which of the two intersection points is "more forward" along the curved path
-            // by comparing the dot product of the vectors from the circle's center.
             const vec_to_start = currentPos.clone().sub(center);
             const vec_to_target1 = target1.clone().sub(center);
             const vec_to_target2 = target2.clone().sub(center);
@@ -279,29 +270,26 @@ export class Ball {
         let bestVelocity = new THREE.Vector3();
         let bestVelocityMagnitudeSq = -1;
 
-        // Outer loop: Iterate through possible Z coordinates for the first bounce on the server's side of the table.
-        const startZ = player.side * TABLE_LENGTH / 4; // Start search from quarter table
+        const startZ = player.side * TABLE_LENGTH / 4;
         const endZ = player.side * (TABLE_LENGTH / 2 - 0.05);
         const stepZ = player.side * 0.05;
 
         for (let boundZ = startZ; player.side > 0 ? boundZ < endZ : boundZ > endZ; boundZ += stepZ) {
 
-            // Inner loop 1: Binary search for the required horizontal velocity magnitude (vXY).
             let vMin = 0.1;
             let vMax = 30.0;
-            let finalHeight = 0; // Height at the final target position
-            let finalBoundX = 0; // Store the result of the inner x-search
+            let finalHeight = 0;
+            let finalBoundX = 0;
 
-            for(let v_iter = 0; v_iter < 20; v_iter++) { // Safety break for binary search
+            for(let v_iter = 0; v_iter < 20; v_iter++) {
                 if (vMax - vMin < 0.001) break;
                 const vXY = (vMin + vMax) / 2;
 
-                // Inner loop 2: Binary search for the required X coordinate of the first bounce.
                 let xMin = -TABLE_WIDTH / 2;
                 let xMax = TABLE_WIDTH / 2;
                 let boundX = 0;
 
-                for (let x_iter = 0; x_iter < 20; x_iter++) { // Safety break
+                for (let x_iter = 0; x_iter < 20; x_iter++) {
                     if (xMax - xMin < 0.001) break;
                     boundX = (xMin + xMax) / 2;
                     const boundPoint = new THREE.Vector2(boundX, boundZ);
@@ -309,7 +297,6 @@ export class Ball {
                     const initialVelocityGuess = new THREE.Vector3();
                     const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocityGuess);
 
-                    // Simulate the bounce to find the trajectory after the first bounce.
                     const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
 
                     const velAtBound = new THREE.Vector3();
@@ -326,7 +313,6 @@ export class Ball {
                         velAfterBounce.z += velAfterBounce.z / vCurrentXY * spinAtBound.y * 0.8;
                     }
 
-                    // Now find where this trajectory lands
                     const result = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounce);
                     const finalTargetX = result.targetX;
 
@@ -336,25 +322,31 @@ export class Ball {
                         xMax = boundX;
                     }
                 }
-                finalBoundX = (xMin + xMax) / 2; // Store result of x-search
+                finalBoundX = (xMin + xMax) / 2;
 
-                // Now we have a candidate bounce point (finalBoundX, boundZ) and horizontal speed vXY.
-                // Let's calculate the full 3D trajectory.
                 const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
                 const initialVelocity = new THREE.Vector3();
                 const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
 
-                console.log(`targetToVS loop: vXY: ${vXY.toFixed(2)}, boundX: ${boundPoint.x.toFixed(2)}, boundZ: ${boundPoint.y.toFixed(2)}, timeToBound: ${timeToBound.toFixed(4)}`);
                 initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
-                // Simulate vertical motion to get height at the final target
+                const debugDiv = document.getElementById('debug-log');
+                if(debugDiv) {
+                    let content = '';
+                    content += `vXY: ${vXY.toFixed(2)}\n`;
+                    content += `boundX: ${boundPoint.x.toFixed(2)}\n`;
+                    content += `boundZ: ${boundPoint.y.toFixed(2)}\n`;
+                    content += `timeToBound: ${timeToBound.toFixed(4)}\n`;
+                    content += `Vz: ${initialVelocity.y.toFixed(4)}`;
+                    debugDiv.innerText = content;
+                }
+
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
 
                 const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
                 const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
 
-                // Recalculate time from bounce to target Z with the full spin info
                 const velAtBound = new THREE.Vector3();
                 const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
                 velAtBound.x = (initialVelocity.x * Math.cos(rot) - initialVelocity.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
@@ -373,25 +365,23 @@ export class Ball {
                 finalHeight = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
 
-                if (finalHeight > TABLE_HEIGHT) { // Overshot (too high)
+                if (finalHeight > TABLE_HEIGHT) {
                     vMax = vXY;
-                } else { // Undershot (too low)
+                } else {
                     vMin = vXY;
                 }
             }
 
-            // After finding the best vXY for this boundZ, check if it's a valid, net-clearing shot.
             if (Math.abs(finalHeight - TABLE_HEIGHT) > 0.05) {
-                continue; // This bounce Z didn't produce a solution.
+                continue;
             }
 
-            const boundPoint = new THREE.Vector2(finalBoundX, boundZ); // Use the result from binary search
+            const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
             const initialVelocity = new THREE.Vector3();
             const vXY = (vMin + vMax) / 2;
             const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
             initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
-            // Check net clearance
             const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
             const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
             const velAtBound = new THREE.Vector3();
@@ -427,6 +417,10 @@ export class Ball {
         if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
+            const debugDiv = document.getElementById('debug-log');
+            if(debugDiv) {
+                debugDiv.innerText += `\nFINAL Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`;
+            }
             return finalVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
