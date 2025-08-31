@@ -388,9 +388,9 @@ export class Ball {
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
 
                 if (finalHeight > TABLE_HEIGHT) { // Overshot (too high)
-                    vMax = vXY;
+                    vMin = vXY; // Test hypothesis: Invert the search
                 } else { // Undershot (too low)
-                    vMin = vXY;
+                    vMax = vXY; // Test hypothesis: Invert the search
                 }
             }
 
