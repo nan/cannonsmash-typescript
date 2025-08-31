@@ -251,31 +251,17 @@ export class Ball {
             const target1 = new THREE.Vector2(center.x + dx, targetZ);
             const target2 = new THREE.Vector2(center.x - dx, targetZ);
 
-            const relPos = currentPos.clone().sub(center);
-            const relTarget1 = target1.clone().sub(center);
-            const relTarget2 = target2.clone().sub(center);
+            // This logic replicates the C++ version for choosing the correct intersection point.
+            // It finds which of the two intersection points is "more forward" along the curved path
+            // by comparing the dot product of the vectors from the circle's center.
+            const vec_to_start = currentPos.clone().sub(center);
+            const vec_to_target1 = target1.clone().sub(center);
+            const vec_to_target2 = target2.clone().sub(center);
 
-            // Use dot product to find which target is in the forward direction of travel.
-            const ip1 = relPos.dot(relTarget1);
-            const ip2 = relPos.dot(relTarget2);
+            const dot1 = vec_to_start.dot(vec_to_target1);
+            const dot2 = vec_to_start.dot(vec_to_target2);
 
-            const velDir = vHorizontal.clone().normalize();
-            const toTarget1 = target1.clone().sub(currentPos);
-            const toTarget2 = target2.clone().sub(currentPos);
-
-            if (toTarget1.dot(vHorizontal) < 0 && toTarget2.dot(vHorizontal) < 0) {
-              // Both are backwards, something is wrong.
-              return { time: 100000, targetX: 0 };
-            }
-
-            let chosenTarget: THREE.Vector2;
-            if (toTarget1.dot(vHorizontal) > 0 && toTarget2.dot(vHorizontal) > 0) {
-                // Both are forwards, pick the closer one
-                chosenTarget = toTarget1.lengthSq() < toTarget2.lengthSq() ? target1 : target2;
-            } else {
-                // Pick the one that is forwards
-                chosenTarget = toTarget1.dot(vHorizontal) > 0 ? target1 : target2;
-            }
+            const chosenTarget = (dot1 > dot2) ? target1 : target2;
 
             const time = this._getTimeToReachTarget(chosenTarget.clone().sub(currentPos), vHorizontal.length(), spin, new THREE.Vector3());
             return { time, targetX: chosenTarget.x };
@@ -388,9 +374,9 @@ export class Ball {
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
 
                 if (finalHeight > TABLE_HEIGHT) { // Overshot (too high)
-                    vMin = vXY; // Test hypothesis: Invert the search
+                    vMax = vXY;
                 } else { // Undershot (too low)
-                    vMax = vXY; // Test hypothesis: Invert the search
+                    vMin = vXY;
                 }
             }
 
