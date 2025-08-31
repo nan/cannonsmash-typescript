@@ -436,7 +436,11 @@ export class Ball {
 
         if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
-            return bestVelocity.multiplyScalar(level);
+            const finalVelocity = bestVelocity.multiplyScalar(level);
+            if (DEBUG_LOG_TRAJECTORY) {
+                console.log(`targetToVS: Found velocity. Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
+            }
+            return finalVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
             console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
