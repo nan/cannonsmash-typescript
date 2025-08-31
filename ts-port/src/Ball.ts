@@ -195,10 +195,13 @@ export class Ball {
      * @returns The required initial vertical velocity (Vy).
      */
     private _getVz0ToReachTarget(targetHeight: number, spin: THREE.Vector2, t: number): number {
+        console.log(`_getVz0ToReachTarget called with t: ${t.toFixed(4)}`);
         if (t > 0.001) {
             // Note: In C++, spin[1] is top/back spin. In our Vector2, this is spin.y
             const g = GRAVITY(spin.y);
-            return (PHY * targetHeight + g * t) / (1 - Math.exp(-PHY * t)) - g / PHY;
+            const result = (PHY * targetHeight + g * t) / (1 - Math.exp(-PHY * t)) - g / PHY;
+            console.log(`_getVz0ToReachTarget result: ${result.toFixed(4)}`);
+            return result;
         } else {
             // As per C++ code, return -targetHeight for invalid time.
             return -targetHeight;
@@ -355,6 +358,7 @@ export class Ball {
                 const initialVelocity = new THREE.Vector3();
                 const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
 
+                console.log(`targetToVS loop: vXY: ${vXY.toFixed(2)}, boundX: ${boundPoint.x.toFixed(2)}, boundZ: ${boundPoint.y.toFixed(2)}, timeToBound: ${timeToBound.toFixed(4)}`);
                 initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
                 // Simulate vertical motion to get height at the final target
@@ -437,8 +441,6 @@ export class Ball {
         if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
-            // DIAGNOSTIC: Clamp vertical velocity to see if it fixes the "high toss" issue
-            finalVelocity.y = Math.min(finalVelocity.y, 5.0);
             return finalVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
