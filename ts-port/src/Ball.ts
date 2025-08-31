@@ -437,6 +437,8 @@ export class Ball {
         if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
+            // DIAGNOSTIC: Clamp vertical velocity to see if it fixes the "high toss" issue
+            finalVelocity.y = Math.min(finalVelocity.y, 5.0);
             return finalVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
