@@ -64,6 +64,7 @@ export class Ball {
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
             this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
             this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
+            console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
@@ -330,17 +331,6 @@ export class Ball {
 
                 initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
-                const debugDiv = document.getElementById('debug-log');
-                if(debugDiv) {
-                    let content = '';
-                    content += `vXY: ${vXY.toFixed(2)}\n`;
-                    content += `boundX: ${boundPoint.x.toFixed(2)}\n`;
-                    content += `boundZ: ${boundPoint.y.toFixed(2)}\n`;
-                    content += `timeToBound: ${timeToBound.toFixed(4)}\n`;
-                    content += `Vz: ${initialVelocity.y.toFixed(4)}`;
-                    debugDiv.innerText = content;
-                }
-
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
 
@@ -417,10 +407,7 @@ export class Ball {
         if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
-            const debugDiv = document.getElementById('debug-log');
-            if(debugDiv) {
-                debugDiv.innerText += `\nFINAL Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`;
-            }
+            console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
             return finalVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
