@@ -76,9 +76,6 @@ export class Ball {
                     this.spin.x *= -0.8;
                     this.spin.y *= -0.8;
 
-                    // Set ball to dead
-                    this.ballDead();
-
                     // Set the ball's position directly to the point of impact to prevent visual pass-through.
                     this.mesh.position.set(collisionX, collisionY, 0);
 
