@@ -54,10 +54,40 @@ export class Ball {
         this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
         this.spin.x = oldSpin.x * exp_phy_t;
 
-        this.checkCollision();
+        this.checkCollision(oldPos);
     }
 
-    private checkCollision() {
+    private checkCollision(oldPos: THREE.Vector3) {
+        const currentPos = this.mesh.position;
+
+        // Net collision check
+        if (oldPos.z * currentPos.z <= 0 && this.velocity.z !== 0) {
+            const t = oldPos.z / (oldPos.z - currentPos.z);
+            if (t >= 0 && t <= 1) {
+                const collisionX = oldPos.x + (currentPos.x - oldPos.x) * t;
+                const collisionY = oldPos.y + (currentPos.y - oldPos.y) * t;
+
+                if (collisionX > -TABLE_WIDTH / 2 && collisionX < TABLE_WIDTH / 2 &&
+                    collisionY > 0 && collisionY < TABLE_HEIGHT + NET_HEIGHT) {
+
+                    // Apply physics
+                    this.velocity.x *= 0.5;
+                    this.velocity.z *= -0.2;
+                    this.spin.x *= -0.8;
+                    this.spin.y *= -0.8;
+
+                    // Set ball to dead
+                    this.ballDead();
+
+                    // Set the ball's position directly to the point of impact to prevent visual pass-through.
+                    this.mesh.position.set(collisionX, collisionY, 0);
+
+                    // Collision handled
+                    return;
+                }
+            }
+        }
+
         // Table collision
         const halfTableW = TABLE_WIDTH / 2;
         const halfTableL = TABLE_LENGTH / 2;
