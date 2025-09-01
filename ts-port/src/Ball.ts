@@ -10,13 +10,11 @@ export class Ball {
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
     public status = 8;
-    private prevZ = 0;
 
     constructor() {
         const geometry = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
         const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
         this.mesh = new THREE.Mesh(geometry, material);
-        this.prevZ = this.mesh.position.z;
     }
 
     public update(deltaTime: number, game: Game) {
@@ -55,12 +53,6 @@ export class Ball {
         }
         this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
         this.spin.x = oldSpin.x * exp_phy_t;
-
-        // Log ball position when it crosses the net
-        if (this.prevZ * this.mesh.position.z < 0) {
-            console.log(`Ball crossed net at position: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
-        }
-        this.prevZ = this.mesh.position.z;
 
         this.checkCollision();
     }
@@ -135,7 +127,6 @@ export class Ball {
         this.velocity.set(0, 0, 0);
         this.spin.set(0, 0);
         this.status = 8;
-        this.prevZ = this.mesh.position.z;
     }
 
     // =================================================================================
