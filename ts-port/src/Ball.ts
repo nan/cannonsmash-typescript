@@ -60,12 +60,15 @@ export class Ball {
     private checkCollision(oldPos: THREE.Vector3) {
         const currentPos = this.mesh.position;
 
-        // Net collision check
+        // Net crossing and collision check
         if (oldPos.z * currentPos.z <= 0 && this.velocity.z !== 0) {
             const t = oldPos.z / (oldPos.z - currentPos.z);
             if (t >= 0 && t <= 1) {
                 const collisionX = oldPos.x + (currentPos.x - oldPos.x) * t;
                 const collisionY = oldPos.y + (currentPos.y - oldPos.y) * t;
+
+                // Log the actual crossing event regardless of collision
+                console.log(`[Actual] Ball crossed net plane at height: ${collisionY.toFixed(3)}. Position: { x: ${collisionX.toFixed(2)}, y: ${collisionY.toFixed(2)}, z: 0.00 }`);
 
                 if (collisionX > -TABLE_WIDTH / 2 && collisionX < TABLE_WIDTH / 2 &&
                     collisionY > 0 && collisionY < TABLE_HEIGHT + NET_HEIGHT) {
@@ -424,6 +427,7 @@ export class Ball {
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
 
                 if (heightAtNet > NET_HEIGHT) {
+                    console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
                     const magSq = initialVelocity.lengthSq();
                     if (magSq > bestVelocityMagnitudeSq) {
                         bestVelocityMagnitudeSq = magSq;
