@@ -10,11 +10,13 @@ export class Ball {
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
     public status = 8;
+    private prevZ = 0;
 
     constructor() {
         const geometry = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
         const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
         this.mesh = new THREE.Mesh(geometry, material);
+        this.prevZ = this.mesh.position.z;
     }
 
     public update(deltaTime: number, game: Game) {
@@ -53,6 +55,12 @@ export class Ball {
         }
         this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
         this.spin.x = oldSpin.x * exp_phy_t;
+
+        // Log ball position when it crosses the net
+        if (this.prevZ * this.mesh.position.z < 0) {
+            console.log(`Ball crossed net at position: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
+        }
+        this.prevZ = this.mesh.position.z;
 
         this.checkCollision();
     }
@@ -127,6 +135,7 @@ export class Ball {
         this.velocity.set(0, 0, 0);
         this.spin.set(0, 0);
         this.status = 8;
+        this.prevZ = this.mesh.position.z;
     }
 
     // =================================================================================
@@ -269,7 +278,7 @@ export class Ball {
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
         let bestVelocity = new THREE.Vector3();
-        let bestHorizontalSpeedSq = -1;
+        let bestVelocityMagnitudeSq = -1;
 
         const startZ = player.side * TABLE_LENGTH / 4;
         const endZ = player.side * (TABLE_LENGTH / 2 - 0.05);
@@ -395,16 +404,16 @@ export class Ball {
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
 
                 if (heightAtNet > NET_HEIGHT) {
-                    const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
-                    if (horizontalSpeedSq > bestHorizontalSpeedSq) {
-                        bestHorizontalSpeedSq = horizontalSpeedSq;
+                    const magSq = initialVelocity.lengthSq();
+                    if (magSq > bestVelocityMagnitudeSq) {
+                        bestVelocityMagnitudeSq = magSq;
                         bestVelocity.copy(initialVelocity);
                     }
                 }
             }
         }
 
-        if (bestHorizontalSpeedSq > 0) {
+        if (bestVelocityMagnitudeSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
             console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
