@@ -269,7 +269,7 @@ export class Ball {
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
         let bestVelocity = new THREE.Vector3();
-        let bestVelocityMagnitudeSq = -1;
+        let bestHorizontalSpeedSq = -1;
 
         const startZ = player.side * TABLE_LENGTH / 4;
         const endZ = player.side * (TABLE_LENGTH / 2 - 0.05);
@@ -395,16 +395,16 @@ export class Ball {
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
 
                 if (heightAtNet > NET_HEIGHT) {
-                    const magSq = initialVelocity.lengthSq();
-                    if (magSq > bestVelocityMagnitudeSq) {
-                        bestVelocityMagnitudeSq = magSq;
+                    const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
+                    if (horizontalSpeedSq > bestHorizontalSpeedSq) {
+                        bestHorizontalSpeedSq = horizontalSpeedSq;
                         bestVelocity.copy(initialVelocity);
                     }
                 }
             }
         }
 
-        if (bestVelocityMagnitudeSq > 0) {
+        if (bestHorizontalSpeedSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
             console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
