@@ -426,7 +426,7 @@ export class Ball {
                 const heightAtNet = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
 
-                if (heightAtNet > NET_HEIGHT) {
+                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
                     console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
                     const magSq = initialVelocity.lengthSq();
                     if (magSq > bestVelocityMagnitudeSq) {
