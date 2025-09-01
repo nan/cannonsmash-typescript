@@ -76,8 +76,10 @@ export class Ball {
                     this.spin.x *= -0.8;
                     this.spin.y *= -0.8;
 
-                    // Set the ball's position directly to the point of impact to prevent visual pass-through.
-                    this.mesh.position.set(collisionX, collisionY, 0);
+                    // Set the ball's position directly to the point of impact, plus a small epsilon
+                    // to push it off the net plane and prevent an infinite collision loop.
+                    const epsilon = Math.sign(this.velocity.z) * 0.001;
+                    this.mesh.position.set(collisionX, collisionY, epsilon);
 
                     // Collision handled
                     return;
