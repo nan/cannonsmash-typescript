@@ -302,7 +302,7 @@ export class Ball {
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
         let bestVelocity = new THREE.Vector3();
-        let bestVelocityMagnitudeSq = -1;
+        let bestHorizontalSpeedSq = -1;
 
         // The loop for the Z-coordinate of the first bounce.
         // It iterates over the entire half of the table, with a step of TICK, to find the optimal bounce point.
@@ -326,8 +326,8 @@ export class Ball {
                     console.log(`[t2vs_debug] v_iter loop break: vMax-vMin < 0.001`);
                     break;
                 };
-                const vXY = (vMin + vMax) / 2;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: vXY = ${vXY.toFixed(3)} (min: ${vMin.toFixed(3)}, max: ${vMax.toFixed(3)})`);
+                const vHorizontal = (vMin + vMax) / 2;
+                console.log(`[t2vs_debug] v_iter #${v_iter}: vHorizontal = ${vHorizontal.toFixed(3)} (min: ${vMin.toFixed(3)}, max: ${vMax.toFixed(3)})`);
 
                 let xMin = -TABLE_WIDTH / 2;
                 let xMax = TABLE_WIDTH / 2;
@@ -342,7 +342,7 @@ export class Ball {
                     const boundPoint = new THREE.Vector2(boundX, boundZ);
 
                     const initialVelocityGuess = new THREE.Vector3();
-                    const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocityGuess);
+                    const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocityGuess);
 
                     if (timeToBound > 99999) {
                         // This path is impossible, short-circuit
@@ -378,7 +378,7 @@ export class Ball {
 
                 const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
                 const initialVelocity = new THREE.Vector3();
-                const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
+                const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
                 initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
@@ -399,12 +399,12 @@ export class Ball {
                 const exp_phy_t1 = Math.exp(-PHY * timeBounceToTarget);
                 finalHeight = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: vXY=${vXY.toFixed(3)} -> finalHeight=${finalHeight.toFixed(3)}`);
+                console.log(`[t2vs_debug] v_iter #${v_iter}: vHorizontal=${vHorizontal.toFixed(3)} -> finalHeight=${finalHeight.toFixed(3)}`);
 
                 if (finalHeight > TABLE_HEIGHT) {
-                    vMax = vXY;
+                    vMax = vHorizontal;
                 } else {
-                    vMin = vXY;
+                    vMin = vHorizontal;
                 }
             }
 
@@ -415,8 +415,8 @@ export class Ball {
 
             const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
             const initialVelocity = new THREE.Vector3();
-            const vXY = (vMin + vMax) / 2;
-            const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vXY, spin, initialVelocity);
+            const vHorizontal = (vMin + vMax) / 2;
+            const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
             initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
             const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
@@ -444,16 +444,16 @@ export class Ball {
 
                 if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
                     console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
-                    const magSq = initialVelocity.lengthSq();
-                    if (magSq > bestVelocityMagnitudeSq) {
-                        bestVelocityMagnitudeSq = magSq;
+                    const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
+                    if (horizontalSpeedSq > bestHorizontalSpeedSq) {
+                        bestHorizontalSpeedSq = horizontalSpeedSq;
                         bestVelocity.copy(initialVelocity);
                     }
                 }
             }
         }
 
-        if (bestVelocityMagnitudeSq > 0) {
+        if (bestHorizontalSpeedSq > 0) {
             // We found a solution. Apply level and return.
             const finalVelocity = bestVelocity.multiplyScalar(level);
             console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
