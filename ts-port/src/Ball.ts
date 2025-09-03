@@ -304,11 +304,16 @@ export class Ball {
         let bestVelocity = new THREE.Vector3();
         let bestVelocityMagnitudeSq = -1;
 
-        const startZ = player.side * TABLE_LENGTH / 4;
-        const endZ = player.side * (TABLE_LENGTH / 2 - 0.05);
-        const stepZ = player.side * 0.05;
+        // The loop for the Z-coordinate of the first bounce.
+        // It iterates over the entire half of the table, with a step of TICK, to find the optimal bounce point.
+        // This logic is ported from the original C++ implementation.
+        const halfTableL = TABLE_LENGTH / 2;
+        for (let boundZ = -halfTableL; boundZ < halfTableL; boundZ += TICK) {
+            // This condition ensures we only check for bounces on the server's side of the table.
+            if (boundZ * player.side <= 0) {
+                continue;
+            }
 
-        for (let boundZ = startZ; player.side > 0 ? boundZ < endZ : boundZ > endZ; boundZ += stepZ) {
             console.log(`[t2vs_debug] Outer loop: boundZ = ${boundZ.toFixed(3)}`);
 
             let vMin = 0.1;
