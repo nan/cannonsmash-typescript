@@ -458,15 +458,13 @@ export class Ball {
         }
 
         if (bestHorizontalSpeedSq > 0) {
-            // We found a solution. Apply level and return.
-            const finalVelocity = bestVelocity.multiplyScalar(level);
-            console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${finalVelocity.x.toFixed(2)}, y: ${finalVelocity.y.toFixed(2)}, z: ${finalVelocity.z.toFixed(2)}}`);
-            return finalVelocity;
+            // We found a solution. Return it.
+            console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${bestVelocity.x.toFixed(2)}, y: ${bestVelocity.y.toFixed(2)}, z: ${bestVelocity.z.toFixed(2)}}`);
+            return bestVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
             console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
             const fallbackVelocity = new THREE.Vector3(0, 2.8, player.side * -4.5);
-            fallbackVelocity.multiplyScalar(level);
             return fallbackVelocity;
         }
     }
