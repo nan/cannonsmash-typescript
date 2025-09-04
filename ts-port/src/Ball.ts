@@ -296,8 +296,6 @@ export class Ball {
     public targetToVS(player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
         // This is a port of the complex serve calculation from the original C++ code (Ball::TargetToVS).
         // It iteratively searches for an initial velocity that makes the ball land at the target.
-        console.log(`[t2vs_debug] Starting targetToVS. Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Spin: {x: ${spin.x.toFixed(2)}, y: ${spin.y.toFixed(2)}}`);
-
         const initialBallPos = this.mesh.position;
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
@@ -314,8 +312,6 @@ export class Ball {
                 continue;
             }
 
-            console.log(`[t2vs_debug] Outer loop: boundZ = ${boundZ.toFixed(3)}`);
-
             let vMin = 0.1;
             let vMax = 30.0;
             let finalHeight = 0;
@@ -323,11 +319,9 @@ export class Ball {
 
             for(let v_iter = 0; v_iter < 20; v_iter++) {
                 if (vMax - vMin < 0.001) {
-                    console.log(`[t2vs_debug] v_iter loop break: vMax-vMin < 0.001`);
                     break;
                 };
                 const vHorizontal = (vMin + vMax) / 2;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: vHorizontal = ${vHorizontal.toFixed(3)} (min: ${vMin.toFixed(3)}, max: ${vMax.toFixed(3)})`);
 
                 let xMin = -TABLE_WIDTH / 2;
                 let xMax = TABLE_WIDTH / 2;
@@ -335,7 +329,6 @@ export class Ball {
 
                 for (let x_iter = 0; x_iter < 20; x_iter++) {
                     if (xMax - xMin < 0.001) {
-                        console.log(`[t2vs_debug] x_iter loop break: xMax-xMin < 0.001`);
                         break;
                     }
                     boundX = (xMin + xMax) / 2;
@@ -365,7 +358,6 @@ export class Ball {
 
                     const result = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounce);
                     const finalTargetX = result.targetX;
-                    console.log(`[t2vs_debug] x_iter #${x_iter}: boundX=${boundX.toFixed(3)}, finalTargetX=${finalTargetX.toFixed(3)}`);
 
                     if (finalTargetX < target.x) {
                         xMin = boundX;
@@ -374,16 +366,13 @@ export class Ball {
                     }
                 }
                 finalBoundX = (xMin + xMax) / 2;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: finalBoundX = ${finalBoundX.toFixed(3)}`);
 
                 const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
                 const initialVelocity = new THREE.Vector3();
                 const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
-                console.log(`[t2vs_debug] v_iter #${v_iter}: timeToBound = ${timeToBound.toFixed(3)}`);
                 initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: velAfterBounceY = ${velAfterBounceY.toFixed(3)}`);
                 const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
                 const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
                 const velAtBound = new THREE.Vector3();
@@ -397,12 +386,10 @@ export class Ball {
                     velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY * spinAtBound.y * 0.8;
                  }
                 const timeBounceToTarget = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounceXZ).time;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: timeBounceToTarget = ${timeBounceToTarget.toFixed(3)}`);
                 const gAfterBounce = GRAVITY(spinAfterBounce.y);
                 const exp_phy_t1 = Math.exp(-PHY * timeBounceToTarget);
                 finalHeight = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
-                console.log(`[t2vs_debug] v_iter #${v_iter}: vHorizontal=${vHorizontal.toFixed(3)} -> finalHeight=${finalHeight.toFixed(3)}`);
 
                 if (finalHeight > TABLE_HEIGHT) {
                     vMax = vHorizontal;
@@ -412,7 +399,6 @@ export class Ball {
             }
 
             if (Math.abs(finalHeight - TABLE_HEIGHT) > 0.05) {
-                console.log(`[t2vs_debug] Skipping boundZ=${boundZ.toFixed(3)} due to finalHeight mismatch: ${finalHeight.toFixed(3)}`);
                 continue;
             }
 
@@ -444,7 +430,6 @@ export class Ball {
                 const heightAtNet = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
                 const requiredHeight = (TABLE_HEIGHT + NET_HEIGHT) + (1.0 - level) * 0.1;
-                console.log(`[t2vs_debug] Checking final trajectory. Predicted heightAtNet: ${heightAtNet.toFixed(3)} vs Required: ${requiredHeight.toFixed(3)} (level: ${level})`);
 
                 if (heightAtNet > requiredHeight) {
                     console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
