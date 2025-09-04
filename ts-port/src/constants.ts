@@ -62,7 +62,7 @@ export const SERVEPARAM: number[][] = [
 ];
 
 // Physics constants from ttinc.h
-export const PHY = 0.02; // Air resistance coefficient
+export const PHY = 0.15; // Air resistance coefficient
 export const GRAVITY = (spin: number) => 9.8 + spin * 5; // Gravity combined with Magnus effect
 export const TICK = 0.01; // Original fixed time step
 export const TABLE_E = 0.8; // Bounciness of the table
