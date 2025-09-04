@@ -210,6 +210,28 @@ export class Player {
     }
 
     /**
+     * Initiates a return swing motion for the AI.
+     * @param ball The predicted ball state at the time of impact.
+     */
+    public startSwing(ball: Ball) {
+        if (this.swing > 0) return false;
+
+        this.swing = 1; // Start the swing animation
+        this.swingType = SWING_DRIVE;
+
+        // For now, AI aims for the middle of the opponent's court
+        this.targetPosition.set(0, -this.side * TABLE_LENGTH / 4);
+
+        // Give it a bit of topspin
+        this.spin.set(0, 0.2);
+
+        // TODO: Choose animation based on forehand/backhand
+        this.playAnimation('Fdrive', false);
+        return true;
+    }
+
+
+    /**
      * Cycles through the available serve types.
      * Called when the user presses the space bar.
      */
@@ -271,10 +293,25 @@ export class Player {
      */
     public hitBall(ball: Ball) {
         if (this.canServe(ball)) {
-            // C++ code has a complex calculation for level based on swing error.
-            // We'll use a fixed value for now.
-            const level = 0.9;
+            // SERVE logic
+            const level = 0.9; // Use a fixed difficulty for serves for now
             const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
+            ball.hit(velocity, this.spin);
+        } else {
+            // RETURN SHOT logic
+            // This is a simplified calculation for a return shot.
+            // A more advanced implementation would use a method similar to targetToVS.
+            const target = new THREE.Vector3(this.targetPosition.x, TABLE_HEIGHT, this.targetPosition.y);
+            const ballPos = ball.mesh.position;
+
+            // Calculate a velocity vector to get the ball to the target
+            const direction = target.clone().sub(ballPos).normalize();
+            const speed = 10; // A reasonable speed for a return drive
+            const velocity = direction.multiplyScalar(speed);
+
+            // Give it some upward velocity to ensure it clears the net
+            velocity.y = 2.5;
+
             ball.hit(velocity, this.spin);
         }
     }
@@ -345,7 +382,36 @@ export class Player {
                 this.mesh.position.z = AREAYSIZE;
             }
         } else {
-            // AI-controlled movement
+            // --- AI LOGIC ---
+
+            // 1. AI Predictive Swing Logic (Auto Backswing)
+            // Check if AI is idle and ball is approaching
+            const isBallApproaching = ball.velocity.z * this.side > 0;
+            if (this.swing === 0 && isBallApproaching) {
+                const predictedBall = ball.clone();
+
+                for (let i = 0; i < 30; i++) { // Predict up to 30 frames ahead
+                    predictedBall.predictiveUpdate();
+
+                    const isHittableByP1 = predictedBall.status === 1 && this.side === 1;
+                    const isHittableByP2 = predictedBall.status === 3 && this.side === -1;
+
+                    if (isHittableByP1 || isHittableByP2) {
+                        // Check if ball is in a hittable zone (Z-axis)
+                        const zDiff = this.mesh.position.z - predictedBall.mesh.position.z;
+                        if (zDiff * this.side < 0.3 && zDiff * this.side > -0.05) {
+                            this.startSwing(predictedBall);
+                            break; // Exit prediction loop once a swing is decided
+                        }
+                    }
+                    if (predictedBall.status < 0) {
+                        break; // Stop predicting if the ball is dead
+                    }
+                }
+            }
+
+
+            // 2. AI Movement Logic
             // Simple AI: follow the ball's x position
             const targetX = ball.mesh.position.x;
             const currentX = this.mesh.position.x;

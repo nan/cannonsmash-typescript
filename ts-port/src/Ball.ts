@@ -161,6 +161,117 @@ export class Ball {
         this.status = 8;
     }
 
+    /**
+     * Creates a deep copy of the ball's state for prediction.
+     * The mesh is not copied as it's not needed for simulation.
+     */
+    public clone(): Ball {
+        const newBall = new Ball();
+        newBall.mesh.position.copy(this.mesh.position);
+        newBall.velocity.copy(this.velocity);
+        newBall.spin.copy(this.spin);
+        newBall.status = this.status;
+        return newBall;
+    }
+
+    /**
+     * A self-contained physics update for predictive simulation.
+     * It does not depend on the Game object and does not handle the dead-ball timer.
+     */
+    public predictiveUpdate(): void {
+        if (this.status === 8) { return; }
+
+        // Store old state for collision detection
+        const oldPos = this.mesh.position.clone();
+        const oldVel = this.velocity.clone();
+        const oldSpin = this.spin.clone();
+
+        // Simplified physics calculation from update()
+        const time = TICK;
+        const exp_phy_t = Math.exp(-PHY * time);
+        const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
+        this.velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t;
+        this.velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
+        this.velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
+
+        if (Math.abs(oldSpin.x) < 0.001) {
+            this.mesh.position.x = oldPos.x + oldVel.x / PHY - oldVel.x / PHY * exp_phy_t;
+            this.mesh.position.z = oldPos.z + oldVel.z / PHY - oldVel.z / PHY * exp_phy_t;
+        } else {
+            const theta = rot;
+            const r = new THREE.Vector2(oldVel.z / oldSpin.x, -oldVel.x / oldSpin.x);
+            this.mesh.position.x = r.x * Math.cos(theta) - r.y * Math.sin(theta) + oldPos.x - r.x;
+            this.mesh.position.z = r.x * Math.sin(theta) + r.y * Math.cos(theta) + oldPos.z - r.y;
+        }
+        this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
+        this.spin.x = oldSpin.x * exp_phy_t;
+
+        // Call a predictive version of collision check
+        this.predictiveCheckCollision(oldPos);
+    }
+
+    /**
+     * A self-contained collision check for predictive simulation.
+     */
+    private predictiveCheckCollision(oldPos: THREE.Vector3): void {
+        const currentPos = this.mesh.position;
+
+        // Net collision
+        if (oldPos.z * currentPos.z <= 0 && this.velocity.z !== 0) {
+            const t = oldPos.z / (oldPos.z - currentPos.z);
+            if (t >= 0 && t <= 1) {
+                const collisionX = oldPos.x + (currentPos.x - oldPos.x) * t;
+                const collisionY = oldPos.y + (currentPos.y - oldPos.y) * t;
+                if (collisionX > -TABLE_WIDTH / 2 && collisionX < TABLE_WIDTH / 2 &&
+                    collisionY > 0 && collisionY < TABLE_HEIGHT + NET_HEIGHT) {
+                    this.velocity.x *= 0.5;
+                    this.velocity.z *= -0.2;
+                    this.spin.x *= -0.8;
+                    this.spin.y *= -0.8;
+                    const epsilon = Math.sign(this.velocity.z) * 0.001;
+                    this.mesh.position.set(collisionX, collisionY, epsilon);
+                    return;
+                }
+            }
+        }
+
+        // Table collision
+        const halfTableW = TABLE_WIDTH / 2;
+        const halfTableL = TABLE_LENGTH / 2;
+        if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
+            this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
+            this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
+            this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
+            this.velocity.y *= -TABLE_E;
+            this.spin.x *= 0.95;
+            this.spin.y *= 0.8;
+            if (this.mesh.position.z > 0) { // Player 2's side
+                switch(this.status) {
+                    case 2: this.status = 3; break; // Hittable by P2
+                    case 4: this.status = 0; break;
+                    default: if (this.status >= 0) this.status = -1; break; // Dead
+                }
+            } else { // Player 1's side
+                switch(this.status) {
+                    case 0: this.status = 1; break; // Hittable by P1
+                    case 5: this.status = 2; break;
+                    default: if (this.status >= 0) this.status = -1; break; // Dead
+                }
+            }
+            return;
+        }
+
+        // Floor collision
+        if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
+            this.mesh.position.y = BALL_RADIUS;
+            this.velocity.y *= -TABLE_E;
+            this.spin.x *= 0.8;
+            this.spin.y *= 0.8;
+            if (this.status >= 0) this.status = -1; // Dead
+        }
+    }
+
+
     // =================================================================================
     // NEW METHODS PORTED FROM C++ for advanced serve calculation
     // =================================================================================
