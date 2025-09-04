@@ -443,9 +443,10 @@ export class Ball {
                 const exp_phy_t_net = Math.exp(-PHY * timeToNet);
                 const heightAtNet = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
-                console.log(`[t2vs_debug] Checking final trajectory. Predicted heightAtNet: ${heightAtNet.toFixed(3)} vs Required: ${(TABLE_HEIGHT + NET_HEIGHT).toFixed(3)}`);
+                const requiredHeight = (TABLE_HEIGHT + NET_HEIGHT) + (1.0 - level) * 0.1;
+                console.log(`[t2vs_debug] Checking final trajectory. Predicted heightAtNet: ${heightAtNet.toFixed(3)} vs Required: ${requiredHeight.toFixed(3)} (level: ${level})`);
 
-                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
+                if (heightAtNet > requiredHeight) {
                     console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
                     const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
                     if (horizontalSpeedSq > bestHorizontalSpeedSq) {
