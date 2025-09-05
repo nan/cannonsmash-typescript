@@ -18,6 +18,9 @@ export class Ball {
     }
 
     public update(deltaTime: number, game: Game) {
+        // Log current state at the beginning of the tick
+        console.log(`[TRACE] pos: {x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)}}, vel: {x: ${this.velocity.x.toFixed(3)}, y: ${this.velocity.y.toFixed(3)}, z: ${this.velocity.z.toFixed(3)}}, spin: {x: ${this.spin.x.toFixed(3)}, y: ${this.spin.y.toFixed(3)}}, status: ${this.status}`);
+
         if (this.status === 8) { return; }
 
         if (this.status < 0) {
@@ -333,6 +336,7 @@ export class Ball {
         }
 
         if (bestHorizontalSpeedSq > 0) {
+            console.log(`[PREDICTION] Found best velocity:`, bestVelocity);
             return bestVelocity;
         } else {
             console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
