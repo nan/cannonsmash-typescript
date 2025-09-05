@@ -18,9 +18,6 @@ export class Ball {
     }
 
     public update(deltaTime: number, game: Game) {
-        // Log current state at the beginning of the tick
-        console.log(`[TRACE] pos: {x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)}}, vel: {x: ${this.velocity.x.toFixed(3)}, y: ${this.velocity.y.toFixed(3)}, z: ${this.velocity.z.toFixed(3)}}, spin: {x: ${this.spin.x.toFixed(3)}, y: ${this.spin.y.toFixed(3)}}, status: ${this.status}`);
-
         if (this.status === 8) { return; }
 
         if (this.status < 0) {
@@ -207,16 +204,16 @@ export class Ball {
         let bestVelocity = new THREE.Vector3();
         let bestHorizontalSpeedSq = -1;
 
-        for (let boundZ = -TABLE_LENGTH / 2; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 5) {
+        for (let boundZ = -TABLE_LENGTH / 2; boundZ < TABLE_LENGTH / 2; boundZ += TICK * 4) { // Finer search grid
             if (boundZ * initialBallPos.z <= 0) continue;
 
-            let vMin = 0.1, vMax = 30.0, finalHeight = 0, finalBoundX = 0;
-            for (let v_iter = 0; v_iter < 20; v_iter++) {
+            let vMin = 0.1, vMax = 40.0, finalHeight = 0, finalBoundX = 0; // Wider velocity range
+            for (let v_iter = 0; v_iter < 30; v_iter++) { // More iterations
                 if (vMax - vMin < 0.001) break;
                 const vHorizontal = (vMin + vMax) / 2;
                 let xMin = -TABLE_WIDTH / 2, xMax = TABLE_WIDTH / 2;
 
-                for (let x_iter = 0; x_iter < 20; x_iter++) {
+                for (let x_iter = 0; x_iter < 30; x_iter++) { // More iterations
                     if (xMax - xMin < 0.001) break;
                     const boundX = (xMin + xMax) / 2;
                     const boundPoint = new THREE.Vector2(boundX, boundZ);
@@ -322,21 +319,12 @@ export class Ball {
                     if (horizontalSpeedSq > bestHorizontalSpeedSq) {
                         bestHorizontalSpeedSq = horizontalSpeedSq;
                         bestVelocity.copy(initialVelocity);
-
-                        // Log the details of this successful prediction
-                        console.log(`[PREDICTION_DETAILS]`, {
-                            boundPoint: { x: boundPoint.x, z: boundPoint.y },
-                            timeToBounce: timeToBound,
-                            velAtBounce: { x: velAtBound.x, y: velAtBoundY, z: velAtBound.z },
-                            velAfterBounce: { x: velAfterBounceXZ.x, y: velAfterBounceY, z: velAfterBounceXZ.z }
-                        });
                     }
                 }
             }
         }
 
         if (bestHorizontalSpeedSq > 0) {
-            console.log(`[PREDICTION] Found best velocity:`, bestVelocity);
             return bestVelocity;
         } else {
             console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
