@@ -17,6 +17,23 @@ export class Ball {
         this.mesh = new THREE.Mesh(geometry, material);
     }
 
+    /**
+     * Creates a deep copy of this ball instance for simulation.
+     * The mesh is not copied as it's not needed for physics simulation.
+     */
+    public clone(): Ball {
+        const newBall = new Ball();
+        newBall.mesh.position.copy(this.mesh.position);
+        newBall.velocity.copy(this.velocity);
+        newBall.spin.copy(this.spin);
+        newBall.status = this.status;
+        return newBall;
+    }
+
+    /**
+     * Updates the ball's state for the game loop.
+     * This includes physics, collision, and game state logic.
+     */
     public update(deltaTime: number, game: Game) {
         if (this.status === 8) { return; }
 
@@ -33,11 +50,23 @@ export class Ball {
 
         // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
+        this._updatePhysics(TICK);
+        this.checkCollision(oldPos);
+    }
+
+    /**
+     * Updates only the physics of the ball for a given time step.
+     * Used for both the main game loop and AI simulation.
+     * @param time The time step for the physics update (typically TICK).
+     */
+    public _updatePhysics(time: number) {
+        const oldPos = this.mesh.position.clone();
         const oldVel = this.velocity.clone();
         const oldSpin = this.spin.clone();
-        const time = TICK;
+
         const exp_phy_t = Math.exp(-PHY * time);
         const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
+
         this.velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t;
         this.velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
         this.velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
@@ -53,11 +82,9 @@ export class Ball {
         }
         this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
         this.spin.x = oldSpin.x * exp_phy_t;
-
-        this.checkCollision(oldPos);
     }
 
-    private checkCollision(oldPos: THREE.Vector3) {
+    public checkCollision(oldPos: THREE.Vector3) {
         const currentPos = this.mesh.position;
 
         // Net crossing and collision check

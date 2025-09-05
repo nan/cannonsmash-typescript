@@ -3,6 +3,7 @@ import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL } from './constants';
 import { Ball } from './Ball';
+import { AIController } from './AIController';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -15,6 +16,7 @@ export class Player {
     public targetPosition = new THREE.Vector2();
     public isAi: boolean;
     public side: number;
+    public aiController?: AIController;
 
     // Serve-related properties
     public swingType: number = SWING_NORMAL;
@@ -266,15 +268,61 @@ export class Player {
     }
 
     /**
-     * Executes the logic for hitting the ball during a serve.
+     * Initiates a regular (non-serve) swing.
+     * @param spinCategory The category of spin/power (1 for backhand, 3 for forehand).
+     */
+    public startSwing(spinCategory: number) {
+        if (this.swing > 0) return false;
+
+        // In C++, SwingType is determined by a complex function.
+        // For now, we'll just use a generic drive.
+        this.swingType = SWING_NORMAL; // Or SWING_DRIVE, etc.
+        this.swing = 1; // Start the swing animation
+
+        // A real implementation would calculate spin based on many factors.
+        // Here we'll use a placeholder.
+        this.spin.set(0, 5); // Simple topspin
+
+        // TODO: Choose animation based on forehand/backhand (spinCategory)
+        this.playAnimation('Fdrive', false);
+        return true;
+    }
+
+    /**
+     * Checks if the player is in a state where they can legally hit the ball.
+     * @param ball The ball object.
+     * @returns True if the ball can be hit.
+     */
+    public canHitBall(ball: Ball): boolean {
+        if ((ball.status === 3 && this.side === 1) || (ball.status === 1 && this.side === -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Executes the logic for hitting the ball.
      * @param ball The ball object.
      */
     public hitBall(ball: Ball) {
         if (this.canServe(ball)) {
-            // C++ code has a complex calculation for level based on swing error.
-            // We'll use a fixed value for now.
+            // --- SERVE ---
             const level = 0.9;
             const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
+            ball.hit(velocity, this.spin);
+        } else if (this.canHitBall(ball)) {
+            // --- RALLY HIT ---
+            // This is a simplified version of the C++ logic.
+            // A full implementation would use TargetToV and calculate level/diff.
+            const target = this.targetPosition;
+            const level = 0.9; // Placeholder
+            // TODO: Implement TargetToV in Ball.ts
+            // const velocity = ball.targetToV(target, level, this.spin);
+            const velocity = new THREE.Vector3(
+                (target.x - ball.mesh.position.x) * 1.5,
+                2,
+                this.side * -10 // Hit it back towards the opponent
+            );
             ball.hit(velocity, this.spin);
         }
     }
@@ -291,13 +339,10 @@ export class Player {
                         this.swing++;
                     }
                 } else {
-                    // Ball is not yet tossed. Check if it's time to toss.
-                    if (swingParams.toss > 0 && this.swing === swingParams.toss) {
-                        ball.toss(this, swingParams.tossV);
-                    }
+                    // For a rally swing, we don't toss the ball.
+                    // We just check if we are in the hitting part of the animation.
                     this.swing++;
                 }
-
 
                 // Impact
                 if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
@@ -324,20 +369,13 @@ export class Player {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
 
-            // Map mouse X to player X position
-            // Mouse X from 0 to screenWidth -> Player X from -AREAXSIZE/2 to AREAXSIZE/2
             const targetX = (mousePos.x / screenWidth - 0.5) * AREAXSIZE;
-
-            // Map mouse Y to player Z position
-            // Mouse Y from 0 (top) to screenHeight (bottom) -> Player Z from TABLE_LENGTH/2 (near) to AREAYSIZE (far)
             const targetZ = (TABLE_LENGTH / 2) + (mousePos.y / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
 
-            // Smoothly move the player towards the target position using linear interpolation (lerp)
             const lerpFactor = 0.2;
             this.mesh.position.x += (targetX - this.mesh.position.x) * lerpFactor;
             this.mesh.position.z += (targetZ - this.mesh.position.z) * lerpFactor;
 
-            // Boundary for z (still useful as a safeguard)
             if (this.mesh.position.z < TABLE_LENGTH / 2) {
                 this.mesh.position.z = TABLE_LENGTH / 2;
             }
@@ -345,18 +383,12 @@ export class Player {
                 this.mesh.position.z = AREAYSIZE;
             }
         } else {
-            // AI-controlled movement
-            // Simple AI: follow the ball's x position
-            const targetX = ball.mesh.position.x;
-            const currentX = this.mesh.position.x;
-            const speed = 2; // AI movement speed
-
-            if (Math.abs(targetX - currentX) > 0.1) {
-                this.velocity.x = Math.sign(targetX - currentX) * speed;
-            } else {
-                this.velocity.x = 0;
+            // AI movement is driven by its controller
+            if (this.aiController) {
+                this.aiController.update(deltaTime);
             }
-            this.mesh.position.x += this.velocity.x * deltaTime;
+            // The controller sets the velocity, and we apply it here.
+            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
         }
 
         // Common logic for both human and AI
@@ -364,9 +396,11 @@ export class Player {
         const halfArena = AREAXSIZE / 2;
         if (this.mesh.position.x < -halfArena) {
             this.mesh.position.x = -halfArena;
+            this.velocity.x = 0;
         }
         if (this.mesh.position.x > halfArena) {
             this.mesh.position.x = halfArena;
+            this.velocity.x = 0;
         }
 
         this.mixer.update(deltaTime);
