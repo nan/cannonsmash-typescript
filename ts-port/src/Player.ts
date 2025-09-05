@@ -339,8 +339,11 @@ export class Player {
                         this.swing++;
                     }
                 } else {
-                    // For a rally swing, we don't toss the ball.
-                    // We just check if we are in the hitting part of the animation.
+                    // This block handles both serves (before the ball is tossed) and rally swings.
+                    // We need to check if a toss is required for the current swing type.
+                    if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
+                        ball.toss(this, swingParams.tossV);
+                    }
                     this.swing++;
                 }
 
