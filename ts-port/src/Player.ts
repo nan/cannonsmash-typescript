@@ -385,9 +385,9 @@ export class Player {
             // --- AI LOGIC ---
 
             // 1. AI Predictive Swing Logic (Auto Backswing)
-            // Check if AI is idle and ball is approaching
-            const isBallApproaching = ball.velocity.z * this.side > 0;
-            if (this.swing === 0 && isBallApproaching) {
+            // The AI should attempt to predict a return if it's idle and the ball is in play.
+            // The flawed `isBallApproaching` check is removed in favor of this more general condition.
+            if (this.swing === 0 && ball.status >= 0 && ball.status !== 8) {
                 const predictedBall = ball.clone();
 
                 for (let i = 0; i < 30; i++) { // Predict up to 30 frames ahead
