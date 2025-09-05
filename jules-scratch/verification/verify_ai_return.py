@@ -32,14 +32,14 @@ def run_verification(page: Page):
     print("Clicking canvas to serve...")
     canvas.click(button='middle', position={'x': 400, 'y': 300})
 
-    # 5. Wait for the AI to attempt the return.
-    print("Waiting for AI to act...")
-    time.sleep(5)
+    # 5. Wait longer to see if the AI can successfully return the ball.
+    print("Waiting for AI to return the ball...")
+    time.sleep(8)
 
     # 6. Take a screenshot for visual verification.
     print("Taking screenshot...")
-    page.screenshot(path="jules-scratch/verification/ai_return_attempt.png")
-    print("Screenshot saved to jules-scratch/verification/ai_return_attempt.png")
+    page.screenshot(path="jules-scratch/verification/ai_rally_attempt.png")
+    print("Screenshot saved to jules-scratch/verification/ai_rally_attempt.png")
 
 def main():
     with sync_playwright() as p:

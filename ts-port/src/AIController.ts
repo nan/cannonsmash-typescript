@@ -90,6 +90,9 @@ export class AIController {
         // C++: if ( fabs( theBall.GetX()[1]+theBall.GetV()[1]*0.1 - _hitX[1] ) < 0.2 ...
         if (Math.abs(ballPos.z + ballVel.z * 0.1 - this.predictedHitPosition.y) < 0.2 && this.player.swing === 0) {
             if (this.player.canHitBall(this.ball)) {
+                // 返球の目標地点を設定
+                this.setTarget();
+
                 // フォアかバックかを判断
                 const swingSide = (playerPos.x - ballPos.x) * this.player.side < 0; // true:フォア, false:バック
                 const spinCategory = swingSide ? 3 : 1;
@@ -175,5 +178,22 @@ export class AIController {
             }
         }
         return { maxHeight, position: peakPosition };
+    }
+
+    /**
+     * C++版の SetTargetX に相当。
+     * AIの返球先となる目標座標を相手コートに設定する。
+     */
+    private setTarget() {
+        // 相手コートのX座標をランダムに決定
+        // TABLE_WIDTH / 2 * 0.9 とすることで、少し内側を狙う
+        const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.9);
+
+        // 相手コートのZ座標をランダムに決定
+        // sideが-1なら、相手コートは正のZ方向。0からTABLE_LENGTH/2の間。
+        // 0.25から0.75を掛けることで、ネット際やエンドライン際を避ける。
+        const targetZ = (TABLE_LENGTH / 2) * (0.25 + Math.random() * 0.5) * -this.player.side;
+
+        this.player.targetPosition.set(targetX, targetZ);
     }
 }
