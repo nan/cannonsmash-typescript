@@ -400,8 +400,8 @@ export class Player {
                         (predictedBall.status === 3 && this.side === -1);
 
                     const isServeReturnHittable =
-                        (predictedBall.status === 2 && this.side === 1 && predictedBall.mesh.position.z * this.side > 0) ||
-                        (predictedBall.status === 0 && this.side === -1 && predictedBall.mesh.position.z * this.side > 0);
+                        (predictedBall.status === 2 && this.side === 1 && predictedBall.mesh.position.z * this.side < 0) ||
+                        (predictedBall.status === 0 && this.side === -1 && predictedBall.mesh.position.z * this.side < 0);
 
                     if (isRallyHittable || isServeReturnHittable) {
                         // Check if ball is in a hittable zone (Z-axis)
