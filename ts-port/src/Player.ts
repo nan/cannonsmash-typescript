@@ -406,6 +406,19 @@ export class Player {
             this.velocity.x = 0;
         }
 
+        // Boundary checks for z (depth)
+        if (this.isAi) {
+            // AI player boundary
+            if (this.mesh.position.z > -TABLE_LENGTH / 2) {
+                this.mesh.position.z = -TABLE_LENGTH / 2;
+                this.velocity.z = 0;
+            }
+            if (this.mesh.position.z < -AREAYSIZE / 2) {
+                this.mesh.position.z = -AREAYSIZE / 2;
+                this.velocity.z = 0;
+            }
+        }
+
         this.mixer.update(deltaTime);
     }
 }
