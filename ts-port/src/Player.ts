@@ -393,10 +393,17 @@ export class Player {
                 for (let i = 0; i < 30; i++) { // Predict up to 30 frames ahead
                     predictedBall.predictiveUpdate();
 
-                    const isHittableByP1 = predictedBall.status === 1 && this.side === 1;
-                    const isHittableByP2 = predictedBall.status === 3 && this.side === -1;
+                    // A ball is hittable if it's in a rally (status 1 or 3)
+                    // OR if it's a serve return (status 0 or 2) and still on the AI's side.
+                    const isRallyHittable =
+                        (predictedBall.status === 1 && this.side === 1) ||
+                        (predictedBall.status === 3 && this.side === -1);
 
-                    if (isHittableByP1 || isHittableByP2) {
+                    const isServeReturnHittable =
+                        (predictedBall.status === 2 && this.side === 1 && predictedBall.mesh.position.z * this.side > 0) ||
+                        (predictedBall.status === 0 && this.side === -1 && predictedBall.mesh.position.z * this.side > 0);
+
+                    if (isRallyHittable || isServeReturnHittable) {
                         // Check if ball is in a hittable zone (Z-axis)
                         const zDiff = this.mesh.position.z - predictedBall.mesh.position.z;
                         if (zDiff * this.side < 0.3 && zDiff * this.side > -0.05) {
