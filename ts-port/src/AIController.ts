@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_LENGTH } from './constants';
+import { TABLE_LENGTH, TABLE_WIDTH } from './constants';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
