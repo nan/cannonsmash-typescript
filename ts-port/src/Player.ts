@@ -337,6 +337,10 @@ export class Player {
             // Make the arc higher for longer shots to ensure it clears the net.
             velocity.y = 1.0 + distance * 0.8;
 
+            if (this.isAi) {
+                console.log(`[AI HIT] Player Pos: ${JSON.stringify(this.mesh.position)}, Ball Pos: ${JSON.stringify(ball.mesh.position)}, Target: ${JSON.stringify(this.targetPosition)}, Velocity: ${JSON.stringify(velocity)}`);
+            }
+
             // Hit the ball with the calculated velocity and player's spin.
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;

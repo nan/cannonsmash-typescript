@@ -124,8 +124,14 @@ export class Ball {
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
             this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
             this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
-            console.log("TABLE COLLISION CONDITION MET");
-            console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
+
+            if (this.justHitBySide === -1) {
+                console.log(`[AI BOUNCE] Position: ${JSON.stringify(this.mesh.position)}`);
+            } else {
+                console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
+            }
+            this.justHitBySide = 0; // Reset after first bounce
+
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
@@ -138,8 +144,13 @@ export class Ball {
                 }
             } else {
                 switch(this.status) {
-                    case 0: this.status = 1; break;
-                    case 5: this.status = 2; break;
+                    case 0:
+                        this.status = 1;
+                        console.log(`[STATUS CHANGE] Ball status changed to ${this.status} on AI side bounce.`);
+                        break;
+                    case 5:
+                        this.status = 2;
+                        break;
                     default: this.ballDead(); break;
                 }
             }
