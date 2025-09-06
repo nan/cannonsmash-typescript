@@ -10,6 +10,7 @@ export class Ball {
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
     public status = 8;
+    public justHitBySide: number = 0; // 0: none, 1: player1, -1: player2 (AI)
 
     constructor() {
         const geometry = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
@@ -123,6 +124,7 @@ export class Ball {
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
             this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
             this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
+            console.log("TABLE COLLISION CONDITION MET");
             console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;

@@ -87,9 +87,14 @@ export class AIController {
         }
 
         // スイング開始の判断
-        // C++: if ( fabs( theBall.GetX()[1]+theBall.GetV()[1]*0.1 - _hitX[1] ) < 0.2 ...
-        if (Math.abs(ballPos.z + ballVel.z * 0.1 - this.predictedHitPosition.y) < 0.2 && this.player.swing === 0) {
-            if (this.player.canHitBall(this.ball)) {
+        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
+            // ボールが打てる状態になったので、予測打点に近いか確認
+            const distToHitPoint = new THREE.Vector2(
+                ballPos.x - this.predictedHitPosition.x,
+                ballPos.z - this.predictedHitPosition.y
+            ).length();
+
+            if (distToHitPoint < 0.3) { // 30cm以内ならスイング
                 // 返球の目標地点を設定
                 this.setTarget();
 

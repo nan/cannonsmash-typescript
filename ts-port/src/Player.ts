@@ -310,6 +310,7 @@ export class Player {
             const level = 0.9;
             const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
             ball.hit(velocity, this.spin);
+            ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
             // --- RALLY HIT ---
             const target = this.targetPosition;
@@ -338,6 +339,7 @@ export class Player {
 
             // Hit the ball with the calculated velocity and player's spin.
             ball.hit(velocity, this.spin);
+            ball.justHitBySide = this.side;
         }
     }
 

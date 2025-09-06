@@ -8,7 +8,6 @@ def run_verification(page: Page):
     """
     # Define a handler for console messages
     def log_console_message(msg):
-        # Corrected: .type and .text are properties, not methods
         print(f"Browser console: {msg.type} '{msg.text}'")
 
     # Listen for all console events
@@ -32,9 +31,9 @@ def run_verification(page: Page):
     print("Clicking canvas to serve...")
     canvas.click(button='middle', position={'x': 400, 'y': 300})
 
-    # 5. Wait longer to see if the AI can successfully return the ball.
-    print("Waiting for AI to return the ball...")
-    time.sleep(8)
+    # 5. Wait just a moment for the action to register.
+    print("Waiting for serve to start...")
+    time.sleep(2)
 
     # 6. Take a screenshot for visual verification.
     print("Taking screenshot...")

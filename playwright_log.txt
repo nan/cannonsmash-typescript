@@ -1,0 +1,19 @@
+Navigating to http://localhost:5173/...
+Browser console: debug '[vite] connecting...'
+Browser console: debug '[vite] connected.'
+Browser console: log 'Loading assets...'
+Browser console: log 'AssetManager: Starting asset loading...'
+Waiting for game to load...
+Looking for canvas...
+Browser console: warning '[GroupMarkerNotSet(crbug.com/242999)!:A0F021001C130000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.'
+Browser console: warning '[.WebGL-0x39b4005ea900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels'
+Browser console: log 'AssetManager: All assets loaded.'
+Browser console: log 'Assets loaded!'
+Browser console: warning '[.WebGL-0x39b4005ea900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels'
+Browser console: warning '[.WebGL-0x39b4005ea900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels'
+Browser console: warning '[.WebGL-0x39b4005ea900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)'
+Canvas found.
+Clicking canvas to serve...
+Waiting for serve to start...
+Taking screenshot...
+Screenshot saved to jules-scratch/verification/ai_rally_attempt.png
