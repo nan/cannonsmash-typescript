@@ -86,24 +86,62 @@ export class AIController {
             playerVel.normalize().multiplyScalar(maxSpeed);
         }
 
-        // スイング開始の判断
+        // スイング開始の判断 (C++版ロジック)
         if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
-            // ボールが打てる状態になったので、予測打点に近いか確認
-            const distToHitPoint = new THREE.Vector2(
-                ballPos.x - this.predictedHitPosition.x,
-                ballPos.z - this.predictedHitPosition.y
-            ).length();
+            this.trySwing();
+        }
+    }
 
-            if (distToHitPoint < 0.3) { // 30cm以内ならスイング
-                // 返球の目標地点を設定
-                this.setTarget();
+    /**
+     * C++版のComPenAttackController::Think()内のスイング判断ロジックを移植したもの。
+     * 未来予測を行い、適切なタイミングでスイングを開始する。
+     */
+    private trySwing() {
+        const playerPos = this.player.mesh.position;
+        const playerVel = this.player.velocity;
 
-                // フォアかバックかを判断
-                const swingSide = (playerPos.x - ballPos.x) * this.player.side < 0; // true:フォア, false:バック
-                const spinCategory = swingSide ? 3 : 1;
+        // C++: if ( fabs( theBall.GetX()[1]+theBall.GetV()[1]*0.1 - _hitX[1] ) < 0.2 ...
+        // 0.1秒後のボールのZ座標が、予測打点のZ座標から0.2m以内にあるかチェック
+        const ballFutureZ = this.ball.mesh.position.z + this.ball.velocity.z * 0.1;
+        if (Math.abs(ballFutureZ - this.predictedHitPosition.y) >= 0.2) {
+            return;
+        }
 
-                this.player.startSwing(spinCategory);
-            }
+        // C++: tmpBall = new Ball(&theBall); for ( int i = 0 ; i < 9 ; i++ ) tmpBall->Move();
+        // 9フレーム(0.09秒)後のボールの状態をシミュレート
+        const simBall = this.ball.clone();
+        for (let i = 0; i < 9; i++) {
+            // C++のMove()は物理演算と衝突判定の両方を含むため、両方を呼び出す
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(0.01); // 1フレーム(0.01s)分進める
+            simBall.checkCollision(oldPos);
+        }
+
+        // C++: tmpX[0] = m_parent->GetX()[0]+m_parent->GetV()[0]*0.08;
+        // 8フレーム(0.08秒)後のプレイヤーのXY(XZ)座標を予測
+        const simPlayerPos = new THREE.Vector2(
+            playerPos.x + playerVel.x * 0.08,
+            playerPos.z + playerVel.z * 0.08,
+        );
+
+        // C++: (tmpX[1]-tmpBall->GetX()[1])*m_parent->GetSide() < 0.3
+        // 予測したプレイヤーとボールのZ座標の差をチェック
+        const futurePlayerBallZDiff = (simPlayerPos.y - simBall.mesh.position.z) * this.player.side;
+
+        // C++の条件を移植
+        if (this.player.canHitBall(simBall) &&
+            futurePlayerBallZDiff < 0.3 &&
+            futurePlayerBallZDiff > -0.6) {
+
+            // 返球の目標地点を設定
+            this.setTarget();
+
+            // C++: if ( (m_parent->GetX()[0]-tmpBallX[0])*m_parent->GetSide() < 0 )
+            // フォアかバックかを判断 (シミュレートしたボール位置を使う)
+            const swingSide = (playerPos.x - simBall.mesh.position.x) * this.player.side < 0; // true:フォア, false:バック
+            const spinCategory = swingSide ? 3 : 1;
+
+            this.player.startSwing(spinCategory);
         }
     }
 
