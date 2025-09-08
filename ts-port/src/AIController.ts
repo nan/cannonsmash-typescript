@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_LENGTH, TABLE_WIDTH } from './constants';
+import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK } from './constants';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -97,50 +97,57 @@ export class AIController {
      * 未来予測を行い、適切なタイミングでスイングを開始する。
      */
     private trySwing() {
-        const playerPos = this.player.mesh.position;
-        const playerVel = this.player.velocity;
+        // 1. スイングタイプを決定する (現在はノーマルスイングに固定)
+        // TODO: 将来的には、ボールの高さや位置に応じてスマッシュやカットを動的に選択する
+        const swingType = SWING_NORMAL;
+        const swingParams = stype.get(swingType);
+        if (!swingParams) return;
 
-        // C++: if ( fabs( theBall.GetX()[1]+theBall.GetV()[1]*0.1 - _hitX[1] ) < 0.2 ...
-        // 0.1秒後のボールのZ座標が、予測打点のZ座標から0.2m以内にあるかチェック
-        const ballFutureZ = this.ball.mesh.position.z + this.ball.velocity.z * 0.1;
-        if (Math.abs(ballFutureZ - this.predictedHitPosition.y) >= 0.2) {
-            return;
-        }
+        const hitFrames = swingParams.hitStart;
+        if (hitFrames <= 1) return; // アニメーションディレイがない場合はこのロジックは使えない
 
-        // C++: tmpBall = new Ball(&theBall); for ( int i = 0 ; i < 9 ; i++ ) tmpBall->Move();
-        // 9フレーム(0.09秒)後のボールの状態をシミュレート
+        // 2. 'hitStart'フレーム後のボールの状態をシミュレート
         const simBall = this.ball.clone();
-        for (let i = 0; i < 9; i++) {
-            // C++のMove()は物理演算と衝突判定の両方を含むため、両方を呼び出す
+        for (let i = 0; i < hitFrames - 1; i++) {
             const oldPos = simBall.mesh.position.clone();
-            simBall._updatePhysics(0.01); // 1フレーム(0.01s)分進める
+            simBall._updatePhysics(TICK);
             simBall.checkCollision(oldPos);
         }
 
-        // C++: tmpX[0] = m_parent->GetX()[0]+m_parent->GetV()[0]*0.08;
-        // 8フレーム(0.08秒)後のプレイヤーのXY(XZ)座標を予測
+        // 3. 'hitStart'フレーム後のプレイヤーの位置を予測
+        const playerPos = this.player.mesh.position;
+        const playerVel = this.player.velocity;
         const simPlayerPos = new THREE.Vector2(
-            playerPos.x + playerVel.x * 0.08,
-            playerPos.z + playerVel.z * 0.08,
+            playerPos.x + playerVel.x * (hitFrames - 1) * TICK,
+            playerPos.z + playerVel.z * (hitFrames - 1) * TICK,
         );
 
-        // C++: (tmpX[1]-tmpBall->GetX()[1])*m_parent->GetSide() < 0.3
-        // 予測したプレイヤーとボールのZ座標の差をチェック
+        // 4. 予測された未来において、ボールが「ヒッタブルゾーン」にあるか確認
         const futurePlayerBallZDiff = (simPlayerPos.y - simBall.mesh.position.z) * this.player.side;
+        if (this.player.canHitBall(simBall) && futurePlayerBallZDiff < 0.3 && futurePlayerBallZDiff > -0.6) {
+            // 5. 【微調整】1フレーム先を読んで、そちらの方がより良い位置関係か確認する
+            const simBallNextFrame = simBall.clone();
+            const oldPos = simBallNextFrame.mesh.position.clone();
+            simBallNextFrame._updatePhysics(TICK);
+            simBallNextFrame.checkCollision(oldPos);
 
-        // C++の条件を移植
-        if (this.player.canHitBall(simBall) &&
-            futurePlayerBallZDiff < 0.3 &&
-            futurePlayerBallZDiff > -0.6) {
+            const simPlayerPosNextFrame = new THREE.Vector2(
+                playerPos.x + playerVel.x * hitFrames * TICK,
+                playerPos.z + playerVel.z * hitFrames * TICK,
+            );
+            const zDiffNextFrame = (simPlayerPosNextFrame.y - simBallNextFrame.mesh.position.z) * this.player.side;
 
-            // 返球の目標地点を設定
+            // 次のフレームの方がZ座標の差の絶対値が小さい（＝より中心に近い）場合、
+            // かつその差が一定以上ある場合（デッドゾーンを避ける）、スイングを1フレーム待つ
+            const LEVEL_MARGIN = 0.01; // C++のLEVELMARGINの代わり
+            if (Math.abs(zDiffNextFrame) < Math.abs(futurePlayerBallZDiff) - LEVEL_MARGIN) {
+                return; // Wait for a better time
+            }
+
+            // 6. スイングを開始する
             this.setTarget();
-
-            // C++: if ( (m_parent->GetX()[0]-tmpBallX[0])*m_parent->GetSide() < 0 )
-            // フォアかバックかを判断 (シミュレートしたボール位置を使う)
             const swingSide = (playerPos.x - simBall.mesh.position.x) * this.player.side < 0; // true:フォア, false:バック
             const spinCategory = swingSide ? 3 : 1;
-
             this.player.startSwing(spinCategory);
         }
     }
