@@ -10,6 +10,7 @@ export class Ball {
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
     public status = 8;
+    public justHitBySide: number = 0; // 0: none, 1: player1, -1: player2 (AI)
 
     constructor() {
         const geometry = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
@@ -17,6 +18,23 @@ export class Ball {
         this.mesh = new THREE.Mesh(geometry, material);
     }
 
+    /**
+     * Creates a deep copy of this ball instance for simulation.
+     * The mesh is not copied as it's not needed for physics simulation.
+     */
+    public clone(): Ball {
+        const newBall = new Ball();
+        newBall.mesh.position.copy(this.mesh.position);
+        newBall.velocity.copy(this.velocity);
+        newBall.spin.copy(this.spin);
+        newBall.status = this.status;
+        return newBall;
+    }
+
+    /**
+     * Updates the ball's state for the game loop.
+     * This includes physics, collision, and game state logic.
+     */
     public update(deltaTime: number, game: Game) {
         if (this.status === 8) { return; }
 
@@ -33,11 +51,23 @@ export class Ball {
 
         // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
+        this._updatePhysics(TICK);
+        this.checkCollision(oldPos);
+    }
+
+    /**
+     * Updates only the physics of the ball for a given time step.
+     * Used for both the main game loop and AI simulation.
+     * @param time The time step for the physics update (typically TICK).
+     */
+    public _updatePhysics(time: number) {
+        const oldPos = this.mesh.position.clone();
         const oldVel = this.velocity.clone();
         const oldSpin = this.spin.clone();
-        const time = TICK;
+
         const exp_phy_t = Math.exp(-PHY * time);
         const rot = oldSpin.x / PHY - oldSpin.x / PHY * exp_phy_t;
+
         this.velocity.x = (oldVel.x * Math.cos(rot) - oldVel.z * Math.sin(rot)) * exp_phy_t;
         this.velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
         this.velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
@@ -53,11 +83,9 @@ export class Ball {
         }
         this.mesh.position.y = (PHY * oldVel.y + GRAVITY(oldSpin.y)) / (PHY * PHY) * (1 - exp_phy_t) - GRAVITY(oldSpin.y) / PHY * time + oldPos.y;
         this.spin.x = oldSpin.x * exp_phy_t;
-
-        this.checkCollision(oldPos);
     }
 
-    private checkCollision(oldPos: THREE.Vector3) {
+    public checkCollision(oldPos: THREE.Vector3) {
         const currentPos = this.mesh.position;
 
         // Net crossing and collision check
@@ -96,7 +124,14 @@ export class Ball {
         if (this.mesh.position.y < TABLE_HEIGHT + BALL_RADIUS && this.velocity.y < 0 &&
             this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
             this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
-            console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
+
+            if (this.justHitBySide === -1) {
+                console.log(`[AI BOUNCE] Position: ${JSON.stringify(this.mesh.position)}`);
+            } else {
+                console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
+            }
+            this.justHitBySide = 0; // Reset after first bounce
+
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
@@ -109,8 +144,13 @@ export class Ball {
                 }
             } else {
                 switch(this.status) {
-                    case 0: this.status = 1; break;
-                    case 5: this.status = 2; break;
+                    case 0:
+                        this.status = 1;
+                        console.log(`[STATUS CHANGE] Ball status changed to ${this.status} on AI side bounce.`);
+                        break;
+                    case 5:
+                        this.status = 2;
+                        break;
                     default: this.ballDead(); break;
                 }
             }

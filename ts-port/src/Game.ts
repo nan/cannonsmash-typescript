@@ -3,6 +3,7 @@ import type { GameAssets } from './AssetManager';
 import { Player } from './Player';
 import { Ball } from './Ball';
 import { Field } from './Field';
+import { AIController } from './AIController';
 import { inputManager } from './InputManager';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL } from './constants';
 import { CameraManager } from './CameraManager';
@@ -45,6 +46,9 @@ export class Game {
         this.scene.add(this.player2.mesh);
 
         this.ball = new Ball();
+
+        // Now that both players and the ball exist, create the AI controller for player2
+        this.player2.aiController = new AIController(this.player2, this.ball, this.player1);
         this.scene.add(this.ball.mesh);
 
         // Position them based on C++ code
