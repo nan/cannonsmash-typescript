@@ -100,10 +100,19 @@ export class AIController {
             }
         }
 
-        // 速度制限
-        const maxSpeed = 5.0;
-        if (playerVel.length() > maxSpeed) {
-            playerVel.normalize().multiplyScalar(maxSpeed);
+        // 速度制限 (C++版の動的制限ロジック)
+        if (this.isOpponentHit()) {
+            // ラリー中は速いスピード
+            const maxSpeed = 5.0;
+            if (playerVel.lengthSq() > maxSpeed * maxSpeed) {
+                playerVel.normalize().multiplyScalar(maxSpeed);
+            }
+        } else {
+            // サーブ待ちなど、位置調整中は低速にする
+            const maxSpeed = 1.0;
+            if (playerVel.lengthSq() > maxSpeed * maxSpeed) {
+                playerVel.normalize().multiplyScalar(maxSpeed);
+            }
         }
 
         // スイング開始の判断 (C++版ロジック)
