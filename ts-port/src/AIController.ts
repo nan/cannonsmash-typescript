@@ -67,16 +67,36 @@ export class AIController {
         if (this.player.swing > 10 && this.player.swing <= 20) {
             // スイング中は移動ロジックを適用しない
         } else {
+            const ACCELERATION = 0.1;
             if (hitT > 0.0) {
-                let vx = (this.predictedHitPosition.x - idealRacketX) / hitT;
-                playerVel.x = THREE.MathUtils.damp(playerVel.x, vx, 0.1, deltaTime);
+                // 加速/減速ロジック (C++版)
+                const targetVx = (this.predictedHitPosition.x - idealRacketX) / hitT;
+                if (targetVx > playerVel.x + ACCELERATION) {
+                    playerVel.x += ACCELERATION;
+                } else if (targetVx < playerVel.x - ACCELERATION) {
+                    playerVel.x -= ACCELERATION;
+                } else {
+                    playerVel.x = targetVx;
+                }
 
-                let vz = (this.predictedHitPosition.y - playerPos.z) / hitT;
-                playerVel.z = THREE.MathUtils.damp(playerVel.z, vz, 0.1, deltaTime);
+                const targetVz = (this.predictedHitPosition.y - playerPos.z) / hitT;
+                if (targetVz > playerVel.z + ACCELERATION) {
+                    playerVel.z += ACCELERATION;
+                } else if (targetVz < playerVel.z - ACCELERATION) {
+                    playerVel.z -= ACCELERATION;
+                } else {
+                    playerVel.z = targetVz;
+                }
             } else {
                 // ボールが通り過ぎた場合など、単純に目標に向かう
-                let vx = (this.predictedHitPosition.x - idealRacketX > 0) ? 1 : -1;
-                playerVel.x = THREE.MathUtils.damp(playerVel.x, vx, 0.1, deltaTime);
+                const targetVx = (this.predictedHitPosition.x - idealRacketX > 0) ? 2.0 : -2.0;
+                 if (targetVx > playerVel.x + ACCELERATION) {
+                    playerVel.x += ACCELERATION;
+                } else if (targetVx < playerVel.x - ACCELERATION) {
+                    playerVel.x -= ACCELERATION;
+                } else {
+                    playerVel.x = targetVx;
+                }
             }
         }
 
