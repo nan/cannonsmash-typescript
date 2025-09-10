@@ -503,7 +503,8 @@ export class Ball {
         const distance = relativeTarget.length();
 
         // Iterate through different horizontal speeds to find a valid trajectory
-        for (let speed = 5.0; speed < 30.0; speed += 1.0) {
+        // By starting from the highest speed and going down, we prioritize the fastest, flattest shot.
+        for (let speed = 30.0; speed > 5.0; speed -= 1.0) {
             const initialVelocityGuess = new THREE.Vector3();
             // Note: _getTimeToReachTarget populates initialVelocityGuess with the required horizontal velocity components
             const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
