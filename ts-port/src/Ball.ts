@@ -5,6 +5,12 @@ import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02;
 
+// Constants for the rally hit calculation
+const RALLY_HIT_MAX_SPEED = 30.0;
+const RALLY_HIT_MIN_SPEED = 5.0;
+const RALLY_HIT_SPEED_STEP = 1.0;
+const NET_CLEARANCE_MARGIN = 0.05;
+
 export class Ball {
     public mesh: THREE.Mesh;
     public velocity = new THREE.Vector3();
@@ -492,5 +498,59 @@ export class Ball {
             const fallbackVelocity = new THREE.Vector3(0, 2.8, player.side * -4.5);
             return fallbackVelocity;
         }
+    }
+
+    private _calculateSimpleFallbackVelocity(relativeTarget: THREE.Vector2, distance: number): THREE.Vector3 {
+        console.warn("calculateRallyHitVelocity: Could not find a valid trajectory. Using simple fallback.");
+        const direction = new THREE.Vector3(relativeTarget.x, 0, relativeTarget.y).normalize();
+        const fallbackSpeed = 7 + distance * 3;
+        const fallbackVelocity = direction.multiplyScalar(fallbackSpeed);
+        fallbackVelocity.y = 1.0 + distance * 0.8;
+        return fallbackVelocity;
+    }
+
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+        const initialBallPos = this.mesh.position.clone();
+        const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
+
+        const relativeTarget = target.clone().sub(initialBallPos2D);
+        const distance = relativeTarget.length();
+
+        // By starting from the highest speed and going down, we prioritize the fastest, flattest shot.
+        for (let speed = RALLY_HIT_MAX_SPEED; speed > RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
+            const initialVelocityGuess = new THREE.Vector3();
+            // Use the PASSED IN spin parameter
+            const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
+
+            if (timeToTarget > 99999) {
+                continue; // This speed is not enough to reach the target
+            }
+
+            // Use the PASSED IN spin parameter
+            const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
+
+            // Let's create the full initial velocity vector
+            const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
+
+            // Use the PASSED IN spin parameter
+            const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
+
+            // Check if the ball reaches the net before the target
+            if (timeToNet < timeToTarget) {
+                // Use the PASSED IN spin parameter
+                const g = GRAVITY(spin.y);
+                const exp_phy_t_net = Math.exp(-PHY * timeToNet);
+                const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
+
+                // Does it clear the net by a small margin?
+                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN) {
+                    // This is a valid trajectory! Return this velocity.
+                    console.log(`[Rally Calc] Found valid trajectory. Speed: ${speed.toFixed(2)}, Height at net: ${heightAtNet.toFixed(3)}`);
+                    return v0;
+                }
+            }
+        }
+
+        return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
     }
 }
