@@ -88,14 +88,20 @@ export class AIController {
                     playerVel.z = targetVz;
                 }
             } else {
-                // ボールが通り過ぎた場合など、単純に目標に向かう
-                const targetVx = (this.predictedHitPosition.x - idealRacketX > 0) ? 2.0 : -2.0;
-                 if (targetVx > playerVel.x + ACCELERATION) {
+                // C++版のカスタムブレーキロジックを移植
+                // hitTが無効な場合（ボールが通り過ぎた後など）のポジショニングに使用
+                const distanceX = this.predictedHitPosition.x - idealRacketX;
+                if (playerVel.x * Math.abs(playerVel.x * ACCELERATION) / 2 < distanceX) {
                     playerVel.x += ACCELERATION;
-                } else if (targetVx < playerVel.x - ACCELERATION) {
-                    playerVel.x -= ACCELERATION;
                 } else {
-                    playerVel.x = targetVx;
+                    playerVel.x -= ACCELERATION;
+                }
+
+                const distanceZ = this.predictedHitPosition.y - playerPos.z;
+                if (playerVel.z * Math.abs(playerVel.z * ACCELERATION) / 2 < distanceZ) {
+                    playerVel.z += ACCELERATION;
+                } else {
+                    playerVel.z -= ACCELERATION;
                 }
             }
         }
