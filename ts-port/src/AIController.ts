@@ -17,9 +17,18 @@ export class AIController {
     // C++版の _hitX に相当。予測したボールの打点（2Dベクトル）。
     private predictedHitPosition = new THREE.Vector2();
 
-    // AIのホームポジション（待機位置）
+    // AIの挙動を制御する定数
     private readonly HOME_POSITION_X = 0.0;
     private readonly HOME_POSITION_Y = -(TABLE_LENGTH / 2 + 0.5);
+    private readonly RACKET_OFFSET_X = 0.3;
+    private readonly MOVEMENT_ACCELERATION = 0.1;
+    private readonly PLANTED_SWING_START_FRAME = 11;
+    private readonly PLANTED_SWING_END_FRAME = 20;
+    private readonly RALLY_MAX_SPEED = 5.0;
+    private readonly POSITIONING_MAX_SPEED = 1.0;
+    private readonly HITTING_ZONE_FAR_BOUNDARY = 0.3;
+    private readonly HITTING_ZONE_NEAR_BOUNDARY = -0.6;
+    private readonly WAIT_FOR_BETTER_SHOT_MARGIN = 0.01;
 
     constructor(player: Player, ball: Ball, opponent: Player) {
         this.player = player;
@@ -43,87 +52,87 @@ export class AIController {
             this.prevBallStatus = this.ball.status;
         }
 
-        // 2. 移動 (Movement) & 3. スイング (Swing)
-        const ballPos = this.ball.mesh.position;
-        const ballVel = this.ball.velocity;
+        // 2. 移動とスイングの判断
+        this._updateMovement();
+
+        // 3. スイング開始の判断
+        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
+            this.trySwing();
+        }
+    }
+
+    /**
+     * AIプレイヤーの移動速度を計算し、プレイヤーオブジェクトの速度を更新する。
+     * このメソッドは `update` から毎フレーム呼び出される。
+     */
+    private _updateMovement() {
         const playerPos = this.player.mesh.position;
         const playerVel = this.player.velocity;
 
-        // C++: hitT = (_hitX[1] - theBall.GetX()[1])/theBall.GetV()[1]-TICK;
-        // 2Dのyは3Dのzに対応
-        let hitT = -1.0;
-        if (ballVel.z !== 0.0) {
-            hitT = (this.predictedHitPosition.y - ballPos.z) / ballVel.z - 0.02;
+        // ボールが返球されるまでのおおよその時間を計算 (C++: hitT)
+        let timeToHit = -1.0;
+        if (this.ball.velocity.z !== 0.0) {
+            timeToHit = (this.predictedHitPosition.y - this.ball.mesh.position.z) / this.ball.velocity.z - 0.02;
         }
 
-        // C++: mx = m_parent->GetX()[0]+m_parent->GetSide()*0.3; (or -0.3)
-        // 理想的なラケットのX座標
-        const racketOffsetX = 0.3 * this.player.side;
+        // AIがラケットでボールを捉えるための、理想的なX座標を計算 (C++: mx)
+        const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
         const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
         const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
         const idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
 
-
-        if (this.player.swing > 10 && this.player.swing <= 20) {
-            // スイング中は移動ロジックを適用しない
+        // スイングの特定フレームでは、移動計算を停止して体を安定させる
+        if (this.player.swing > this.PLANTED_SWING_START_FRAME && this.player.swing <= this.PLANTED_SWING_END_FRAME) {
+            // no-op
         } else {
-            const ACCELERATION = 0.1;
-            if (hitT > 0.0) {
-                // 加速/減速ロジック (C++版)
-                const targetVx = (this.predictedHitPosition.x - idealRacketX) / hitT;
-                if (targetVx > playerVel.x + ACCELERATION) {
-                    playerVel.x += ACCELERATION;
-                } else if (targetVx < playerVel.x - ACCELERATION) {
-                    playerVel.x -= ACCELERATION;
+            if (timeToHit > 0.0) {
+                // 【ラリー中の移動】予測時間に基づいて目標速度を計算し、そこに向けて加速する
+                const targetVx = (this.predictedHitPosition.x - idealRacketX) / timeToHit;
+                if (targetVx > playerVel.x + this.MOVEMENT_ACCELERATION) {
+                    playerVel.x += this.MOVEMENT_ACCELERATION;
+                } else if (targetVx < playerVel.x - this.MOVEMENT_ACCELERATION) {
+                    playerVel.x -= this.MOVEMENT_ACCELERATION;
                 } else {
                     playerVel.x = targetVx;
                 }
 
-                const targetVz = (this.predictedHitPosition.y - playerPos.z) / hitT;
-                if (targetVz > playerVel.z + ACCELERATION) {
-                    playerVel.z += ACCELERATION;
-                } else if (targetVz < playerVel.z - ACCELERATION) {
-                    playerVel.z -= ACCELERATION;
+                const targetVz = (this.predictedHitPosition.y - playerPos.z) / timeToHit;
+                if (targetVz > playerVel.z + this.MOVEMENT_ACCELERATION) {
+                    playerVel.z += this.MOVEMENT_ACCELERATION;
+                } else if (targetVz < playerVel.z - this.MOVEMENT_ACCELERATION) {
+                    playerVel.z -= this.MOVEMENT_ACCELERATION;
                 } else {
                     playerVel.z = targetVz;
                 }
             } else {
-                // C++版のカスタムブレーキロジックを移植
-                // hitTが無効な場合（ボールが通り過ぎた後など）のポジショニングに使用
+                // 【ポジショニング中の移動】カスタムブレーキロジックを用いて目標地点へ移動
                 const distanceX = this.predictedHitPosition.x - idealRacketX;
-                if (playerVel.x * Math.abs(playerVel.x * ACCELERATION) / 2 < distanceX) {
-                    playerVel.x += ACCELERATION;
+                if (playerVel.x * Math.abs(playerVel.x * this.MOVEMENT_ACCELERATION) / 2 < distanceX) {
+                    playerVel.x += this.MOVEMENT_ACCELERATION;
                 } else {
-                    playerVel.x -= ACCELERATION;
+                    playerVel.x -= this.MOVEMENT_ACCELERATION;
                 }
 
                 const distanceZ = this.predictedHitPosition.y - playerPos.z;
-                if (playerVel.z * Math.abs(playerVel.z * ACCELERATION) / 2 < distanceZ) {
-                    playerVel.z += ACCELERATION;
+                if (playerVel.z * Math.abs(playerVel.z * this.MOVEMENT_ACCELERATION) / 2 < distanceZ) {
+                    playerVel.z += this.MOVEMENT_ACCELERATION;
                 } else {
-                    playerVel.z -= ACCELERATION;
+                    playerVel.z -= this.MOVEMENT_ACCELERATION;
                 }
             }
         }
 
-        // 速度制限 (C++版の動的制限ロジック)
+        // 【動的な速度制限】状況に応じて最大速度を切り替える
         if (this.isOpponentHit()) {
-            // ラリー中は速いスピード
-            const maxSpeed = 5.0;
-            if (playerVel.lengthSq() > maxSpeed * maxSpeed) {
-                playerVel.normalize().multiplyScalar(maxSpeed);
+            // ラリー中は素早く動く
+            if (playerVel.lengthSq() > this.RALLY_MAX_SPEED * this.RALLY_MAX_SPEED) {
+                playerVel.normalize().multiplyScalar(this.RALLY_MAX_SPEED);
             }
         } else {
-            // サーブ待ちなど、位置調整中は低速にする
-            const maxSpeed = 1.0;
-            if (playerVel.lengthSq() > maxSpeed * maxSpeed) {
-                playerVel.normalize().multiplyScalar(maxSpeed);
+            // サーブ待ちなどの位置調整中は、振動を防ぐために低速にする
+            if (playerVel.lengthSq() > this.POSITIONING_MAX_SPEED * this.POSITIONING_MAX_SPEED) {
+                playerVel.normalize().multiplyScalar(this.POSITIONING_MAX_SPEED);
             }
-        }
-
-        // スイング開始の判断 (C++版ロジック)
-        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
-            this.trySwing();
         }
     }
 
@@ -133,7 +142,7 @@ export class AIController {
      */
     private trySwing() {
         // 1. スイングタイプを決定する (現在はノーマルスイングに固定)
-        // TODO: 将来的には、ボールの高さや位置に応じてスマッシュやカットを動的に選択する
+        // TODO: 将来的には、ボールの高さや位置に応じてスマッシュやカットなどを動的に選択するように拡張できる
         const swingType = SWING_NORMAL;
         const swingParams = stype.get(swingType);
         if (!swingParams) return;
@@ -159,7 +168,9 @@ export class AIController {
 
         // 4. 予測された未来において、ボールが「ヒッタブルゾーン」にあるか確認
         const futurePlayerBallZDiff = (simPlayerPos.y - simBall.mesh.position.z) * this.player.side;
-        if (this.player.canHitBall(simBall) && futurePlayerBallZDiff < 0.3 && futurePlayerBallZDiff > -0.6) {
+        if (this.player.canHitBall(simBall) &&
+            futurePlayerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
+            futurePlayerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
             // 5. 【微調整】1フレーム先を読んで、そちらの方がより良い位置関係か確認する
             const simBallNextFrame = simBall.clone();
             const oldPos = simBallNextFrame.mesh.position.clone();
@@ -174,8 +185,7 @@ export class AIController {
 
             // 次のフレームの方がZ座標の差の絶対値が小さい（＝より中心に近い）場合、
             // かつその差が一定以上ある場合（デッドゾーンを避ける）、スイングを1フレーム待つ
-            const LEVEL_MARGIN = 0.01; // C++のLEVELMARGINの代わり
-            if (Math.abs(zDiffNextFrame) < Math.abs(futurePlayerBallZDiff) - LEVEL_MARGIN) {
+            if (Math.abs(zDiffNextFrame) < Math.abs(futurePlayerBallZDiff) - this.WAIT_FOR_BETTER_SHOT_MARGIN) {
                 return; // Wait for a better time
             }
 
