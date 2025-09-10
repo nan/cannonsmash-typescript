@@ -10,7 +10,7 @@ async function main() {
   const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
   const clock = new THREE.Clock();
 
-  const fov = 75;
+  const fov = 45;
   const aspect = window.innerWidth / window.innerHeight;
   const near = 0.1;
   const far = 100;

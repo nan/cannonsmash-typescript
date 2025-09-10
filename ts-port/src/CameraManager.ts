@@ -36,9 +36,9 @@ export class CameraManager {
         // A simplified version of the "is ball going out of view" check
         // The original C++ code is more complex. This captures the spirit.
         if (angle > (Math.PI / 180 * 25) && ballPos.z < playerPos.z) {
-             this.lookAtTarget.lerp(ballPos, 0.1);
+             this.lookAtTarget.lerp(ballPos, 0.02);
         } else {
-             this.lookAtTarget.lerp(tx, 0.1);
+             this.lookAtTarget.lerp(tx, 0.02);
         }
         // --- End of Player::MoveLookAt logic ---
 
