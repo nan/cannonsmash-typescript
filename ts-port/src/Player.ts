@@ -313,29 +313,8 @@ export class Player {
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
             // --- RALLY HIT ---
-            const target = this.targetPosition;
-
-            // Create a 3D target vector on the table surface.
-            const target3D = new THREE.Vector3(target.x, TABLE_HEIGHT, target.y);
-
-            // Calculate the direction vector from the ball to the target.
-            const direction = new THREE.Vector3().subVectors(target3D, ball.mesh.position);
-
-            // Calculate distance to target to scale speed and arc.
-            const distance = direction.length();
-
-            // Normalize the direction vector to get a unit vector.
-            direction.normalize();
-
-            // Set a base speed and add a component proportional to distance.
-            const speed = 7 + distance * 3;
-
-            // Calculate initial velocity.
-            const velocity = direction.multiplyScalar(speed);
-
-            // Add an upward component to the velocity to create an arc over the net.
-            // Make the arc higher for longer shots to ensure it clears the net.
-            velocity.y = 1.0 + distance * 0.8;
+            // Use the new, more accurate calculation method.
+            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
 
             if (this.isAi) {
                 console.log(`[AI HIT] Player Pos: ${JSON.stringify(this.mesh.position)}, Ball Pos: ${JSON.stringify(ball.mesh.position)}, Target: ${JSON.stringify(this.targetPosition)}, Velocity: ${JSON.stringify(velocity)}`);

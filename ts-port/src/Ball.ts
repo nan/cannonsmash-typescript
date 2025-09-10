@@ -493,4 +493,56 @@ export class Ball {
             return fallbackVelocity;
         }
     }
+
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+        const initialBallPos = this.mesh.position.clone();
+        const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
+        const targetPos2D = target;
+
+        const relativeTarget = targetPos2D.clone().sub(initialBallPos2D);
+        const distance = relativeTarget.length();
+
+        // Iterate through different horizontal speeds to find a valid trajectory
+        for (let speed = 5.0; speed < 30.0; speed += 1.0) {
+            const initialVelocityGuess = new THREE.Vector3();
+            // Note: _getTimeToReachTarget populates initialVelocityGuess with the required horizontal velocity components
+            const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
+
+            if (timeToTarget > 99999) {
+                continue; // This speed is not enough to reach the target
+            }
+
+            // We have a horizontal velocity (in initialVelocityGuess) and a time to target.
+            // Now find the vertical velocity needed to arrive at table height at the destination.
+            const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
+
+            // Let's create the full initial velocity vector
+            const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
+
+            // Now, we must check if this trajectory clears the net.
+            const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
+
+            // Check if the ball reaches the net before the target
+            if (timeToNet < timeToTarget) {
+                const g = GRAVITY(spin.y);
+                const exp_phy_t_net = Math.exp(-PHY * timeToNet);
+                const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
+
+                // Does it clear the net by a small margin?
+                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + 0.05) {
+                    // This is a valid trajectory! Return this velocity.
+                    console.log(`[Rally Calc] Found valid trajectory. Speed: ${speed.toFixed(2)}, Height at net: ${heightAtNet.toFixed(3)}`);
+                    return v0;
+                }
+            }
+        }
+
+        // If no solution was found after checking all speeds, use the old fallback.
+        console.warn("calculateRallyHitVelocity: Could not find a valid trajectory. Using simple fallback.");
+        const direction = new THREE.Vector3(relativeTarget.x, 0, relativeTarget.y).normalize();
+        const fallbackSpeed = 7 + distance * 3;
+        const fallbackVelocity = direction.multiplyScalar(fallbackSpeed);
+        fallbackVelocity.y = 1.0 + distance * 0.8;
+        return fallbackVelocity;
+    }
 }
