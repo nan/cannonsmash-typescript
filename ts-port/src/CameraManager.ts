@@ -1,15 +1,14 @@
 import * as THREE from 'three';
 import { Player } from './Player';
 import { Ball } from './Ball';
-import { TABLE_LENGTH, TABLE_HEIGHT } from './constants';
+import { TABLE_LENGTH, TABLE_HEIGHT, CAMERA_EYE_OFFSET } from './constants';
 
 export class CameraManager {
     private camera: THREE.PerspectiveCamera;
     private player: Player;
     private ball: Ball;
 
-    // From Player.h
-    private eyeOffset = new THREE.Vector3(0.0, 0.2, -1.0); // Correctly mapped from C++
+    private eyeOffset = CAMERA_EYE_OFFSET.clone();
     private lookAtTarget = new THREE.Vector3();
 
     constructor(camera: THREE.PerspectiveCamera, player: Player, ball: Ball) {
@@ -36,9 +35,9 @@ export class CameraManager {
         // A simplified version of the "is ball going out of view" check
         // The original C++ code is more complex. This captures the spirit.
         if (angle > (Math.PI / 180 * 25) && ballPos.z < playerPos.z) {
-             this.lookAtTarget.lerp(ballPos, 0.1);
+             this.lookAtTarget.lerp(ballPos, 0.02);
         } else {
-             this.lookAtTarget.lerp(tx, 0.1);
+             this.lookAtTarget.lerp(tx, 0.02);
         }
         // --- End of Player::MoveLookAt logic ---
 
