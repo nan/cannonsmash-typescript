@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
+import { CAMERA_FOV } from './constants';
 
 async function main() {
   const canvas = document.querySelector('#c');
@@ -10,11 +11,10 @@ async function main() {
   const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
   const clock = new THREE.Clock();
 
-  const fov = 60;
   const aspect = window.innerWidth / window.innerHeight;
   const near = 0.1;
   const far = 100;
-  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, aspect, near, far);
   camera.position.set(0, 1.2, 2.5);
 
   const scene = new THREE.Scene();

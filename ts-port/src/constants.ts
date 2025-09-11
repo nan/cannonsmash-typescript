@@ -1,4 +1,9 @@
+import * as THREE from 'three';
+
 // Constants from ttinc.h
+export const CAMERA_FOV = 60;
+export const CAMERA_EYE_OFFSET = new THREE.Vector3(0.0, 0.6, 0.0);
+
 export const TABLE_LENGTH = 2.74;
 export const TABLE_WIDTH = 1.525;
 export const TABLE_HEIGHT = 0.76;

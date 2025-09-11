@@ -1,15 +1,14 @@
 import * as THREE from 'three';
 import { Player } from './Player';
 import { Ball } from './Ball';
-import { TABLE_LENGTH, TABLE_HEIGHT } from './constants';
+import { TABLE_LENGTH, TABLE_HEIGHT, CAMERA_EYE_OFFSET } from './constants';
 
 export class CameraManager {
     private camera: THREE.PerspectiveCamera;
     private player: Player;
     private ball: Ball;
 
-    // From Player.h
-    private eyeOffset = new THREE.Vector3(0.0, 0.6, 0.0); // Correctly mapped from C++
+    private eyeOffset = CAMERA_EYE_OFFSET.clone();
     private lookAtTarget = new THREE.Vector3();
 
     constructor(camera: THREE.PerspectiveCamera, player: Player, ball: Ball) {
