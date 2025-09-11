@@ -13,7 +13,7 @@ export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
     public velocity = new THREE.Vector3();
-    public targetPosition = new THREE.Vector2();
+    public targetPosition: THREE.Vector2;
     public isAi: boolean;
     public side: number;
     public aiController?: AIController;
@@ -35,6 +35,7 @@ export class Player {
         this.assets = assets;
         this.isAi = isAi;
         this.side = side;
+        this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
         this.mesh = new THREE.Group();
         this.rootBone = new THREE.Group();
         this.rootBone.name = 'root';
