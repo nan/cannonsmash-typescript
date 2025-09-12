@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK } from './constants';
+import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -141,9 +141,15 @@ export class AIController {
      * 未来予測を行い、適切なタイミングでスイングを開始する。
      */
     private trySwing() {
-        // 1. スイングタイプを決定する (現在はノーマルスイングに固定)
-        // TODO: 将来的には、ボールの高さや位置に応じてスマッシュやカットなどを動的に選択するように拡張できる
-        const swingType = SWING_NORMAL;
+        const playerPos = this.player.mesh.position;
+        const playerVel = this.player.velocity;
+
+        // 1. スイングタイプを決定する
+        // ボールの現在のX座標とプレイヤーのX座標を比較して、フォアハンドかバックハンドかを判断
+        const isForehand = (playerPos.x - this.ball.mesh.position.x) * this.player.side < 0;
+        const spinCategory = isForehand ? 3 : 1;
+        const swingType = isForehand ? SWING_DRIVE : SWING_CUT;
+
         const swingParams = stype.get(swingType);
         if (!swingParams) return;
 
@@ -159,8 +165,6 @@ export class AIController {
         }
 
         // 3. 'hitStart'フレーム後のプレイヤーの位置を予測
-        const playerPos = this.player.mesh.position;
-        const playerVel = this.player.velocity;
         const simPlayerPos = new THREE.Vector2(
             playerPos.x + playerVel.x * (hitFrames - 1) * TICK,
             playerPos.z + playerVel.z * (hitFrames - 1) * TICK,
@@ -191,8 +195,6 @@ export class AIController {
 
             // 6. スイングを開始する
             this.setTarget();
-            const swingSide = (playerPos.x - simBall.mesh.position.x) * this.player.side < 0; // true:フォア, false:バック
-            const spinCategory = swingSide ? 3 : 1;
             this.player.startSwing(spinCategory);
         }
     }
