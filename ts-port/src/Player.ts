@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH } from './constants';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
 
@@ -286,35 +286,35 @@ export class Player {
                 Math.abs(ballPos.z) < TABLE_LENGTH / 2 &&
                 (ballPos.y - TABLE_HEIGHT - NET_HEIGHT) / Math.abs(ballPos.z) < NET_HEIGHT / (TABLE_LENGTH / 2) * 0.5) {
                 if (ballSpinY < 0) { // backspin
-                    this.spin.y = -0.8;
+                    this.spin.y = SPIN_POKE;
                     return SWING_POKE;
                 } else {
-                    this.spin.y = 0.4;
+                    this.spin.y = SPIN_NORMAL;
                     return SWING_NORMAL;
                 }
             } else if (ballPos.y < TABLE_HEIGHT + NET_HEIGHT) { // under the net
                 if (isForehand) {
-                    this.spin.y = 0.8;
+                    this.spin.y = SPIN_DRIVE;
                     return SWING_DRIVE;
                 } else {
                     if (ballSpinY < 0) {
-                        this.spin.y = -0.8;
+                        this.spin.y = SPIN_POKE;
                         return SWING_POKE;
                     } else {
-                        this.spin.y = 0.4;
+                        this.spin.y = SPIN_NORMAL;
                         return SWING_NORMAL;
                     }
                 }
             } else if (Math.abs(ballPos.z) < TABLE_LENGTH / 2 + 1.0 &&
                 ballPos.y > TABLE_HEIGHT + NET_HEIGHT) {
-                this.spin.y = 0.2;
+                this.spin.y = SPIN_SMASH;
                 return SWING_SMASH;
             } else {
-                this.spin.y = 0.4;
+                this.spin.y = SPIN_NORMAL;
                 return SWING_NORMAL;
             }
         } else {
-            this.spin.y = 0.4;
+            this.spin.y = SPIN_NORMAL;
             return SWING_NORMAL;
         }
     }
