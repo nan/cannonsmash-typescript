@@ -21,6 +21,12 @@ export const SWING_DRIVE = 3;
 export const SWING_CUT = 4;
 export const SWING_BLOCK = 5;
 
+// Player spin constants
+export const SPIN_NORMAL = 0.4;
+export const SPIN_POKE = -0.8;
+export const SPIN_DRIVE = 0.8;
+export const SPIN_SMASH = 0.2;
+
 export const SERVE_MIN = 65536;
 export const SERVE_MAX = SERVE_MIN + 3;
 

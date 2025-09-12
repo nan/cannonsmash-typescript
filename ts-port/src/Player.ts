@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT } from './constants';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
 
@@ -269,23 +269,116 @@ export class Player {
     }
 
     /**
-     * Initiates a regular (non-serve) swing.
-     * @param spinCategory The category of spin/power (1 for backhand, 3 for forehand).
+     * Determines the best swing type based on the ball's position and spin.
+     * This is a port of the logic from PenAttack::SwingType in the C++ source.
+     * @param ball The ball to be hit.
+     * @param isForehand Whether the swing is forehand or backhand.
      */
-    public startSwing(spinCategory: number) {
+    private determineSwingType(ball: Ball, isForehand: boolean): number {
+        this.spin.x = 0.0; // Side spin is not implemented for these swings yet
+
+        if (this.canHitBall(ball)) {
+            const ballPos = ball.mesh.position;
+            const ballSpinY = ball.spin.y;
+
+            // low ball on the table
+            if (Math.abs(ballPos.x) < TABLE_WIDTH / 2 &&
+                Math.abs(ballPos.z) < TABLE_LENGTH / 2 &&
+                (ballPos.y - TABLE_HEIGHT - NET_HEIGHT) / Math.abs(ballPos.z) < NET_HEIGHT / (TABLE_LENGTH / 2) * 0.5) {
+                if (ballSpinY < 0) { // backspin
+                    this.spin.y = SPIN_POKE;
+                    return SWING_POKE;
+                } else {
+                    this.spin.y = SPIN_NORMAL;
+                    return SWING_NORMAL;
+                }
+            } else if (ballPos.y < TABLE_HEIGHT + NET_HEIGHT) { // under the net
+                if (isForehand) {
+                    this.spin.y = SPIN_DRIVE;
+                    return SWING_DRIVE;
+                } else {
+                    if (ballSpinY < 0) {
+                        this.spin.y = SPIN_POKE;
+                        return SWING_POKE;
+                    } else {
+                        this.spin.y = SPIN_NORMAL;
+                        return SWING_NORMAL;
+                    }
+                }
+            } else if (Math.abs(ballPos.z) < TABLE_LENGTH / 2 + 1.0 &&
+                ballPos.y > TABLE_HEIGHT + NET_HEIGHT) {
+                this.spin.y = SPIN_SMASH;
+                return SWING_SMASH;
+            } else {
+                this.spin.y = SPIN_NORMAL;
+                return SWING_NORMAL;
+            }
+        } else {
+            this.spin.y = SPIN_NORMAL;
+            return SWING_NORMAL;
+        }
+    }
+
+    /**
+     * Gets the predicted swing type and side for the AI to use in its simulation.
+     * @param ball The ball to check against.
+     * @returns An object containing the predicted swingType and spinCategory.
+     */
+    public getPredictedSwing(ball: Ball): { swingType: number, spinCategory: number } {
+        // Create a clone of the ball 20 frames into the future to decide swing side
+        const tmpBall = ball.clone();
+        for (let i = 0; i < 20; i++) {
+            const oldPos = tmpBall.mesh.position.clone();
+            tmpBall._updatePhysics(0.01); // Using TICK from constants
+            tmpBall.checkCollision(oldPos);
+        }
+
+        const isForehand = (this.mesh.position.x - tmpBall.mesh.position.x) * this.side < 0;
+        const spinCategory = isForehand ? 3 : 1;
+        const swingType = this.determineSwingType(tmpBall, isForehand);
+        return { swingType, spinCategory };
+    }
+
+    /**
+     * Initiates a regular (non-serve) swing.
+     * @param ball The ball instance.
+     * @param spinCategory The category of spin/power (1 for backhand, 3 for forehand), typically from user input.
+     */
+    public startSwing(ball: Ball, spinCategory: number) {
         if (this.swing > 0) return false;
 
-        // In C++, SwingType is determined by a complex function.
-        // For now, we'll just use a generic drive.
-        this.swingType = SWING_NORMAL; // Or SWING_DRIVE, etc.
+        const isForehand = spinCategory === 3;
+
+        // We simulate the ball a few frames into the future for a slightly better guess
+        const tmpBall = ball.clone();
+        for (let i = 0; i < 10; i++) {
+            const oldPos = tmpBall.mesh.position.clone();
+            tmpBall._updatePhysics(0.01);
+            tmpBall.checkCollision(oldPos);
+        }
+
+        this.swingType = this.determineSwingType(tmpBall, isForehand);
+
+        let animationName: string;
+        switch (this.swingType) {
+            case SWING_DRIVE:
+                animationName = 'Fdrive';
+                break;
+            case SWING_SMASH:
+                animationName = 'Fsmash';
+                break;
+            case SWING_CUT:
+            case SWING_POKE:
+                animationName = 'Bnormal';
+                break;
+            case SWING_NORMAL:
+            default:
+                animationName = isForehand ? 'Fnormal' : 'Bnormal';
+                break;
+        }
+
         this.swing = 1; // Start the swing animation
-
-        // A real implementation would calculate spin based on many factors.
-        // Here we'll use a placeholder.
-        this.spin.set(0, 5); // Simple topspin
-
-        // TODO: Choose animation based on forehand/backhand (spinCategory)
-        this.playAnimation('Fdrive', false);
+        this.playAnimation(animationName, false);
         return true;
     }
 

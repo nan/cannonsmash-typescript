@@ -78,6 +78,15 @@ export class Game {
             } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click
                 this.player1.startServe(3);
             }
+        } else {
+            // --- Rally hit controls ---
+            if (this.player1.canHitBall(this.ball)) {
+                if (inputManager.isMouseButtonJustPressed(0)) { // Left click for Forehand
+                    this.player1.startSwing(this.ball, 3);
+                } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click for Backhand
+                    this.player1.startSwing(this.ball, 1);
+                }
+            }
         }
 
 
