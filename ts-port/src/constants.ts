@@ -71,3 +71,6 @@ export const PHY = 0.15; // Air resistance coefficient
 export const GRAVITY = (spin: number) => 9.8 + spin * 5; // Gravity combined with Magnus effect
 export const TICK = 0.01; // Original fixed time step
 export const TABLE_E = 0.8; // Bounciness of the table
+
+// Fallback serve velocity if calculation fails
+export const FALLBACK_SERVE_VELOCITY = new THREE.Vector3(0, 2.8, -4.5);

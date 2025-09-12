@@ -13,6 +13,9 @@ vite.log
 dist-ssr
 *.local
 
+# Temporary files for verification
+jules-scratch/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
