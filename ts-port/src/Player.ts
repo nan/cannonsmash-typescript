@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT } from './constants';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
 
@@ -275,17 +275,20 @@ export class Player {
     public startSwing(spinCategory: number) {
         if (this.swing > 0) return false;
 
-        // In C++, SwingType is determined by a complex function.
-        // For now, we'll just use a generic drive.
-        this.swingType = SWING_NORMAL; // Or SWING_DRIVE, etc.
+        let animationName: string;
+
+        if (spinCategory === 1) { // Backhand
+            this.swingType = SWING_CUT; // Using CUT for backhand for now
+            this.spin.set(0, -5); // Simple backspin
+            animationName = 'Bnormal';
+        } else { // Forehand (default to 3)
+            this.swingType = SWING_DRIVE;
+            this.spin.set(0, 5); // Simple topspin
+            animationName = 'Fdrive';
+        }
+
         this.swing = 1; // Start the swing animation
-
-        // A real implementation would calculate spin based on many factors.
-        // Here we'll use a placeholder.
-        this.spin.set(0, 5); // Simple topspin
-
-        // TODO: Choose animation based on forehand/backhand (spinCategory)
-        this.playAnimation('Fdrive', false);
+        this.playAnimation(animationName, false);
         return true;
     }
 
