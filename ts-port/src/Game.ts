@@ -82,9 +82,9 @@ export class Game {
             // --- Rally hit controls ---
             if (this.player1.canHitBall(this.ball)) {
                 if (inputManager.isMouseButtonJustPressed(0)) { // Left click for Forehand
-                    this.player1.startSwing(3);
+                    this.player1.startSwing(this.ball, 3);
                 } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click for Backhand
-                    this.player1.startSwing(1);
+                    this.player1.startSwing(this.ball, 1);
                 }
             }
         }

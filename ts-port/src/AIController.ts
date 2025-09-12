@@ -141,22 +141,16 @@ export class AIController {
      * 未来予測を行い、適切なタイミングでスイングを開始する。
      */
     private trySwing() {
-        const playerPos = this.player.mesh.position;
-        const playerVel = this.player.velocity;
-
-        // 1. スイングタイプを決定する
-        // ボールの現在のX座標とプレイヤーのX座標を比較して、フォアハンドかバックハンドかを判断
-        const isForehand = (playerPos.x - this.ball.mesh.position.x) * this.player.side < 0;
-        const spinCategory = isForehand ? 3 : 1;
-        const swingType = isForehand ? SWING_DRIVE : SWING_CUT;
+        // 1. Ask the player object to predict the best swing for the situation.
+        const { swingType, spinCategory } = this.player.getPredictedSwing(this.ball);
 
         const swingParams = stype.get(swingType);
         if (!swingParams) return;
 
         const hitFrames = swingParams.hitStart;
-        if (hitFrames <= 1) return; // アニメーションディレイがない場合はこのロジックは使えない
+        if (hitFrames <= 1) return; // Animation delay is required for this logic.
 
-        // 2. 'hitStart'フレーム後のボールの状態をシミュレート
+        // 2. Simulate the ball's state 'hitFrames' into the future.
         const simBall = this.ball.clone();
         for (let i = 0; i < hitFrames - 1; i++) {
             const oldPos = simBall.mesh.position.clone();
@@ -164,18 +158,21 @@ export class AIController {
             simBall.checkCollision(oldPos);
         }
 
-        // 3. 'hitStart'フレーム後のプレイヤーの位置を予測
+        // 3. Predict the player's position 'hitFrames' into the future.
+        const playerPos = this.player.mesh.position;
+        const playerVel = this.player.velocity;
         const simPlayerPos = new THREE.Vector2(
             playerPos.x + playerVel.x * (hitFrames - 1) * TICK,
             playerPos.z + playerVel.z * (hitFrames - 1) * TICK,
         );
 
-        // 4. 予測された未来において、ボールが「ヒッタブルゾーン」にあるか確認
+        // 4. Check if the ball will be in a hittable zone in the future.
         const futurePlayerBallZDiff = (simPlayerPos.y - simBall.mesh.position.z) * this.player.side;
         if (this.player.canHitBall(simBall) &&
             futurePlayerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
             futurePlayerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
-            // 5. 【微調整】1フレーム先を読んで、そちらの方がより良い位置関係か確認する
+
+            // 5. Fine-tuning: check if waiting one more frame is better.
             const simBallNextFrame = simBall.clone();
             const oldPos = simBallNextFrame.mesh.position.clone();
             simBallNextFrame._updatePhysics(TICK);
@@ -187,15 +184,13 @@ export class AIController {
             );
             const zDiffNextFrame = (simPlayerPosNextFrame.y - simBallNextFrame.mesh.position.z) * this.player.side;
 
-            // 次のフレームの方がZ座標の差の絶対値が小さい（＝より中心に近い）場合、
-            // かつその差が一定以上ある場合（デッドゾーンを避ける）、スイングを1フレーム待つ
             if (Math.abs(zDiffNextFrame) < Math.abs(futurePlayerBallZDiff) - this.WAIT_FOR_BETTER_SHOT_MARGIN) {
-                return; // Wait for a better time
+                return; // Wait for a better time.
             }
 
-            // 6. スイングを開始する
+            // 6. Initiate the swing.
             this.setTarget();
-            this.player.startSwing(spinCategory);
+            this.player.startSwing(this.ball, spinCategory);
         }
     }
 
