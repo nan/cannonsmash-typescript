@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT } from './constants';
+import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FALLBACK_SERVE_VELOCITY } from './constants';
 import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02;
@@ -495,7 +495,8 @@ export class Ball {
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
             console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
-            const fallbackVelocity = new THREE.Vector3(0, 2.8, player.side * -4.5);
+            const fallbackVelocity = FALLBACK_SERVE_VELOCITY.clone();
+            fallbackVelocity.z *= player.side;
             return fallbackVelocity;
         }
     }

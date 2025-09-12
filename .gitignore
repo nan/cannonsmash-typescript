@@ -1,0 +1,22 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Optional lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Misc
+jules-scratch/
+npm_output.log
+cannonsmash-main.zip
+zip_contents.txt
