@@ -184,9 +184,12 @@ export class Ball {
     private ballDead() { if (this.status >= 0) { this.status = -1; } }
 
     public toss(player: Player, power: number) {
+        console.log("Ball: toss method called.");
         this.velocity.y = power;
         this.spin.set(0, 0);
-        this.status = player.side > 0 ? 6 : 7;
+        const newStatus = player.side > 0 ? 6 : 7;
+        console.log(`Tossing ball, status changing from ${this.status} to ${newStatus}`);
+        this.status = newStatus;
     }
 
     public reset(player: Player) {

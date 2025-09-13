@@ -98,7 +98,9 @@ export class Game {
 
         // Check if it's player 1's turn to serve
         if (this.ball.status === 8 && this.getService() === this.player1.side) {
+            console.log("Game: Player 1 has serve. Checking for mouse press...");
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
+                console.log("Game: Left mouse button just pressed. Calling startServe.");
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
                 this.player1.startServe(2);
@@ -172,6 +174,10 @@ export class Game {
     }
 
     public update(deltaTime: number) {
+        // This must be the first thing in the update loop
+        inputManager.update();
+        this.prevBallStatus = this.ball.status;
+
         this.handleInput();
 
         // --- Pre-serve logic ---
@@ -197,10 +203,6 @@ export class Game {
         // Update target indicator position
         this.field.targetIndicator.position.x = this.player1.targetPosition.x;
         this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
-
-        // This must be the last thing in the update loop
-        this.prevBallStatus = this.ball.status;
-        inputManager.update();
     }
 
     /**

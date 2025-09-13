@@ -250,6 +250,7 @@ export class Player {
      * @param spinCategory The category of spin/power (1, 2, or 3) based on mouse button.
      */
     public startServe(spinCategory: number) {
+        console.log("Player: startServe called.");
         if (this.swing > 0) return false;
 
         this.swingType = SERVE_NORMAL;
@@ -425,6 +426,7 @@ export class Player {
     public update(deltaTime: number, ball: Ball, game: Game) {
         // --- Swing and Serve Logic ---
         if (this.swing > 0) {
+            console.log(`Player.update: swing=${this.swing}, swingType=${this.swingType}`);
             const swingParams = stype.get(this.swingType);
             if (swingParams) {
                 // This logic mirrors the C++ code's Player::Move function
@@ -434,6 +436,7 @@ export class Player {
                         this.swing++;
                     }
                 } else {
+                    console.log(`Player.update: Ball not tossed yet. Checking if swing ${this.swing} === toss frame ${swingParams.toss}`);
                     // This block handles both serves (before the ball is tossed) and rally swings.
                     // We need to check if a toss is required for the current swing type.
                     if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
