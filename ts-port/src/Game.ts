@@ -211,13 +211,15 @@ export class Game {
         let ret = 0;
         switch (this.gameMode) {
             case '5PTS':
-                ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
+                // Inverted the logic to make Player 1 serve first.
+                ret = ((this.score1 + this.score2) % 2 === 0 ? -1 : 1);
                 break;
             case '11PTS':
                 if (this.score1 >= 10 && this.score2 >= 10) { // Deuce
                     ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
                 } else {
-                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 1) {
+                    // Inverted the logic to make Player 1 serve first.
+                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 0) {
                         ret = -1;
                     } else {
                         ret = 1;
@@ -228,7 +230,8 @@ export class Game {
                 if (this.score1 >= 20 && this.score2 >= 20) { // Deuce
                     ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
                 } else {
-                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 1) {
+                    // Inverted the logic to make Player 1 serve first.
+                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 0) {
                         ret = -1;
                     } else {
                         ret = 1;
