@@ -2,14 +2,12 @@ import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
 import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
-import type { Game } from './Game';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
  * C++版のComControllerおよびComPenAttackControllerのロジックを移植したものです。
  */
 export class AIController {
-    private game: Game;
     private player: Player;
     private ball: Ball;
     private opponent: Player;
@@ -32,8 +30,7 @@ export class AIController {
     private readonly HITTING_ZONE_NEAR_BOUNDARY = -0.6;
     private readonly WAIT_FOR_BETTER_SHOT_MARGIN = 0.01;
 
-    constructor(game: Game, player: Player, ball: Ball, opponent: Player) {
-        this.game = game;
+    constructor(player: Player, ball: Ball, opponent: Player) {
         this.player = player;
         this.ball = ball;
         this.opponent = opponent;
@@ -48,15 +45,7 @@ export class AIController {
      * C++版の Think() メソッドに相当します。
      * @param deltaTime フレーム間の経過時間
      */
-    public update(deltaTime: number, game: Game) { // game is passed here now
-        // --- Serve Logic ---
-        if (this.ball.status === 8 && game.getService() === this.player.side) {
-            // It's our turn to serve
-            this.player.startServe(Math.floor(Math.random() * 3) + 1); // Serve with random spin
-            return; // Don't do anything else this frame
-        }
-
-
+    public update(deltaTime: number) {
         // 1. 打点予測 (Hitarea)
         if (this.prevBallStatus !== this.ball.status && this.ball.status >= 0) {
             this.calculateHitArea();
@@ -216,11 +205,14 @@ export class AIController {
                 this.predictedHitPosition.copy(top.position);
             }
         } else if (this.ball.status === 8) {
-            // Ball is ready for serve, but it's not our turn. Move to ready position.
-            this.predictedHitPosition.x = this.HOME_POSITION_X;
-            this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
+            // サーブを待っている状態。相手がサーブ権を持っているなら、待機位置に移動。
+            // TODO: Gameクラスからサーブ権情報を取得する必要がある
+            // if (game.getService() !== this.player.side) {
+                 this.predictedHitPosition.x = this.HOME_POSITION_X;
+                 this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
+            // }
         } else if (this.ball.status < 6) {
-            // Rally is not in progress, return to home position.
+            // ラリーが続いていない場合、ホームポジションに戻る
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
         }

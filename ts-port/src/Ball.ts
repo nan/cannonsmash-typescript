@@ -118,7 +118,8 @@ export class Ball {
                     const epsilon = Math.sign(this.velocity.z) * 0.001;
                     this.mesh.position.set(collisionX, collisionY, epsilon);
 
-                    // Collision handled, but we don't return, so floor collision can still be checked.
+                    // Collision handled
+                    return;
                 }
             }
         }
@@ -184,12 +185,9 @@ export class Ball {
     private ballDead() { if (this.status >= 0) { this.status = -1; } }
 
     public toss(player: Player, power: number) {
-        console.log("Ball: toss method called.");
         this.velocity.y = power;
         this.spin.set(0, 0);
-        const newStatus = player.side > 0 ? 6 : 7;
-        console.log(`Tossing ball, status changing from ${this.status} to ${newStatus}`);
-        this.status = newStatus;
+        this.status = player.side > 0 ? 6 : 7;
     }
 
     public reset(player: Player) {

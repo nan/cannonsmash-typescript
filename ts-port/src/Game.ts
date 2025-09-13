@@ -19,8 +19,6 @@ export class Game {
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
-    private scoreboardElement: HTMLElement;
-    private prevBallStatus = 0;
 
     // Game state properties
     private score1 = 0;
@@ -34,32 +32,7 @@ export class Game {
         this.camera = camera;
         this.assets = assets;
 
-        this.scoreboardElement = document.getElementById('scoreboard')!;
-
         this.setupScene();
-    }
-
-    private updateScoreboard() {
-        this.scoreboardElement.innerText = `${this.score1} - ${this.score2}`;
-    }
-
-    private pointWonBy(playerSide: number) {
-        if (playerSide === 1) {
-            this.score1++;
-        } else {
-            this.score2++;
-        }
-        this.updateScoreboard();
-    }
-
-    private awardPoint() {
-        // This logic is ported directly from the original C++ source
-        if (this.prevBallStatus === 0 || this.prevBallStatus === 3 ||
-            this.prevBallStatus === 4 || this.prevBallStatus === 6) {
-            this.pointWonBy(-1); // AI scores
-        } else {
-            this.pointWonBy(1); // Player scores
-        }
     }
 
     private setupScene() {
@@ -75,7 +48,7 @@ export class Game {
         this.ball = new Ball();
 
         // Now that both players and the ball exist, create the AI controller for player2
-        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
+        this.player2.aiController = new AIController(this.player2, this.ball, this.player1);
         this.scene.add(this.ball.mesh);
 
         // Position them based on C++ code
@@ -98,9 +71,7 @@ export class Game {
 
         // Check if it's player 1's turn to serve
         if (this.ball.status === 8 && this.getService() === this.player1.side) {
-            console.log("Game: Player 1 has serve. Checking for mouse press...");
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
-                console.log("Game: Left mouse button just pressed. Calling startServe.");
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
                 this.player1.startServe(2);
@@ -174,10 +145,6 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        // This must be the first thing in the update loop
-        inputManager.update();
-        this.prevBallStatus = this.ball.status;
-
         this.handleInput();
 
         // --- Pre-serve logic ---
@@ -189,20 +156,17 @@ export class Game {
             }
         }
 
-        this.player1.update(deltaTime, this.ball, this);
-        this.player2.update(deltaTime, this.ball, this);
+        this.player1.update(deltaTime, this.ball);
+        this.player2.update(deltaTime, this.ball);
         this.ball.update(deltaTime, this);
         this.cameraManager.update();
-
-        // --- Scoring Logic ---
-        // Check if the ball just became dead in this frame
-        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
-            this.awardPoint();
-        }
 
         // Update target indicator position
         this.field.targetIndicator.position.x = this.player1.targetPosition.x;
         this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+
+        // This must be the last thing in the update loop
+        inputManager.update();
     }
 
     /**
@@ -213,15 +177,13 @@ export class Game {
         let ret = 0;
         switch (this.gameMode) {
             case '5PTS':
-                // Inverted the logic to make Player 1 serve first.
-                ret = ((this.score1 + this.score2) % 2 === 0 ? -1 : 1);
+                ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
                 break;
             case '11PTS':
                 if (this.score1 >= 10 && this.score2 >= 10) { // Deuce
                     ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
                 } else {
-                    // Inverted the logic to make Player 1 serve first.
-                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 0) {
+                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 1) {
                         ret = -1;
                     } else {
                         ret = 1;
@@ -232,8 +194,7 @@ export class Game {
                 if (this.score1 >= 20 && this.score2 >= 20) { // Deuce
                     ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
                 } else {
-                    // Inverted the logic to make Player 1 serve first.
-                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 0) {
+                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 1) {
                         ret = -1;
                     } else {
                         ret = 1;
@@ -250,6 +211,7 @@ export class Game {
         // Player 2 (com) is on the far side (y > 0), which corresponds to side -1.
         // The C++ GetService returns -1 for near side (player1) and 1 for far side (player2).
         // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
-        return -ret;
+        // However, for testing, we will temporarily NOT flip it, so the user always serves first.
+        return ret;
     }
 }
