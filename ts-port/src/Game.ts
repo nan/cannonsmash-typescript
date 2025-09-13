@@ -52,6 +52,16 @@ export class Game {
         this.updateScoreboard();
     }
 
+    private awardPoint() {
+        // This logic is ported directly from the original C++ source
+        if (this.prevBallStatus === 0 || this.prevBallStatus === 3 ||
+            this.prevBallStatus === 4 || this.prevBallStatus === 6) {
+            this.pointWonBy(-1); // AI scores
+        } else {
+            this.pointWonBy(1); // Player scores
+        }
+    }
+
     private setupScene() {
         this.field = new Field();
         this.scene.add(this.field.mesh);
@@ -181,18 +191,7 @@ export class Game {
         // --- Scoring Logic ---
         // Check if the ball just became dead in this frame
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
-            let pointWinnerSide: number;
-            if (this.ball.justHitBySide !== 0) {
-                // If the ball was in play, the player who last hit it made the fault.
-                // The point goes to the other player.
-                pointWinnerSide = -this.ball.justHitBySide;
-            } else {
-                // If no one has hit it (e.g., a serve fault), the server made the fault.
-                // The point goes to the receiver.
-                const serverSide = this.getService();
-                pointWinnerSide = -serverSide;
-            }
-            this.pointWonBy(pointWinnerSide);
+            this.awardPoint();
         }
 
         // Update target indicator position
