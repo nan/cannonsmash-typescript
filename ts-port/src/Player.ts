@@ -4,7 +4,6 @@ import { inputManager } from './InputManager';
 import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
-import type { Game } from './Game';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -250,10 +249,8 @@ export class Player {
      * @param spinCategory The category of spin/power (1, 2, or 3) based on mouse button.
      */
     public startServe(spinCategory: number) {
-        console.log("Player: startServe called.");
         if (this.swing > 0) return false;
 
-        this.swingType = SERVE_NORMAL;
         this.swing = 1; // Start the swing animation
 
         // Find the serve parameters from the constants table
@@ -423,10 +420,9 @@ export class Player {
         }
     }
 
-    public update(deltaTime: number, ball: Ball, game: Game) {
+    public update(deltaTime: number, ball: Ball) {
         // --- Swing and Serve Logic ---
         if (this.swing > 0) {
-            console.log(`Player.update: swing=${this.swing}, swingType=${this.swingType}`);
             const swingParams = stype.get(this.swingType);
             if (swingParams) {
                 // This logic mirrors the C++ code's Player::Move function
@@ -436,7 +432,6 @@ export class Player {
                         this.swing++;
                     }
                 } else {
-                    console.log(`Player.update: Ball not tossed yet. Checking if swing ${this.swing} === toss frame ${swingParams.toss}`);
                     // This block handles both serves (before the ball is tossed) and rally swings.
                     // We need to check if a toss is required for the current swing type.
                     if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
@@ -486,7 +481,7 @@ export class Player {
         } else {
             // AI movement is driven by its controller
             if (this.aiController) {
-                this.aiController.update(deltaTime, game);
+                this.aiController.update(deltaTime);
             }
             // The controller sets the velocity, and we apply it here.
             this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
