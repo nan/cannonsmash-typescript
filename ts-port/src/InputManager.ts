@@ -5,6 +5,7 @@ class InputManager {
     private mousePosition: { x: number, y: number };
     private mouseButtons: Set<number>;
     private previousMouseButtons: Set<number>;
+    private justPressedMouseButtons: Set<number>;
 
     private constructor() {
         this.keys = new Set();
@@ -12,18 +13,24 @@ class InputManager {
         this.mousePosition = { x: 0, y: 0 };
         this.mouseButtons = new Set();
         this.previousMouseButtons = new Set();
+        this.justPressedMouseButtons = new Set();
+    }
 
+    public init(canvas: HTMLCanvasElement) {
         window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()));
         window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
 
-        window.addEventListener('mousemove', (e) => {
+        canvas.addEventListener('mousemove', (e) => {
             this.mousePosition.x = e.clientX;
             this.mousePosition.y = e.clientY;
         });
-        window.addEventListener('mousedown', (e) => this.mouseButtons.add(e.button));
-        window.addEventListener('mouseup', (e) => this.mouseButtons.delete(e.button));
+        canvas.addEventListener('mousedown', (e) => {
+            this.mouseButtons.add(e.button);
+            this.justPressedMouseButtons.add(e.button);
+        });
+        canvas.addEventListener('mouseup', (e) => this.mouseButtons.delete(e.button));
         // Prevent context menu on right-click
-        window.addEventListener('contextmenu', (e) => e.preventDefault());
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     public static getInstance(): InputManager {
@@ -34,8 +41,10 @@ class InputManager {
     }
 
     public update() {
+        console.log("InputManager.update called");
         this.previousKeys = new Set(this.keys);
         this.previousMouseButtons = new Set(this.mouseButtons);
+        this.justPressedMouseButtons.clear();
     }
 
     public isKeyPressed(key: string): boolean {
@@ -55,7 +64,7 @@ class InputManager {
     }
 
     public isMouseButtonJustPressed(button: number): boolean {
-        return this.mouseButtons.has(button) && !this.previousMouseButtons.has(button);
+        return this.justPressedMouseButtons.has(button);
     }
 }
 

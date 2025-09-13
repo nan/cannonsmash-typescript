@@ -7,8 +7,9 @@
     <title>CannonSmash Port</title>
     <link rel="stylesheet" href="/src/style.css">
   </head>
-  <body>
-    <canvas id="c"></canvas>
+  <body onmousedown="console.log('Body mousedown')">
+    <div id="scoreboard">0 - 0</div>
+    <canvas id="c" onmousedown="console.log('Canvas mousedown')"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
