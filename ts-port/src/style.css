@@ -15,3 +15,14 @@ html, body {
     height: 100%;
     display: block;
 }
+
+#scoreboard {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-size: 48px;
+    font-family: sans-serif;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    z-index: 10;
+}

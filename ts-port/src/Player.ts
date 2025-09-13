@@ -4,6 +4,7 @@ import { inputManager } from './InputManager';
 import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
+import type { Game } from './Game';
 
 const FRAME_RATE = 50; // A guess from looking at animation lengths in C++ code
 
@@ -251,6 +252,7 @@ export class Player {
     public startServe(spinCategory: number) {
         if (this.swing > 0) return false;
 
+        this.swingType = SERVE_NORMAL;
         this.swing = 1; // Start the swing animation
 
         // Find the serve parameters from the constants table
@@ -420,7 +422,7 @@ export class Player {
         }
     }
 
-    public update(deltaTime: number, ball: Ball) {
+    public update(deltaTime: number, ball: Ball, game: Game) {
         // --- Swing and Serve Logic ---
         if (this.swing > 0) {
             const swingParams = stype.get(this.swingType);
@@ -481,7 +483,7 @@ export class Player {
         } else {
             // AI movement is driven by its controller
             if (this.aiController) {
-                this.aiController.update(deltaTime);
+                this.aiController.update(deltaTime, game);
             }
             // The controller sets the velocity, and we apply it here.
             this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));

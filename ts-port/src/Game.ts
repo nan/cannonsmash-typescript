@@ -19,6 +19,8 @@ export class Game {
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
+    private scoreboardElement: HTMLElement;
+    private prevBallStatus = 0;
 
     // Game state properties
     private score1 = 0;
@@ -32,7 +34,22 @@ export class Game {
         this.camera = camera;
         this.assets = assets;
 
+        this.scoreboardElement = document.getElementById('scoreboard')!;
+
         this.setupScene();
+    }
+
+    private updateScoreboard() {
+        this.scoreboardElement.innerText = `${this.score1} - ${this.score2}`;
+    }
+
+    private pointWonBy(playerSide: number) {
+        if (playerSide === 1) {
+            this.score1++;
+        } else {
+            this.score2++;
+        }
+        this.updateScoreboard();
     }
 
     private setupScene() {
@@ -48,7 +65,7 @@ export class Game {
         this.ball = new Ball();
 
         // Now that both players and the ball exist, create the AI controller for player2
-        this.player2.aiController = new AIController(this.player2, this.ball, this.player1);
+        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
         this.scene.add(this.ball.mesh);
 
         // Position them based on C++ code
@@ -156,16 +173,34 @@ export class Game {
             }
         }
 
-        this.player1.update(deltaTime, this.ball);
-        this.player2.update(deltaTime, this.ball);
+        this.player1.update(deltaTime, this.ball, this);
+        this.player2.update(deltaTime, this.ball, this);
         this.ball.update(deltaTime, this);
         this.cameraManager.update();
+
+        // --- Scoring Logic ---
+        // Check if the ball just became dead in this frame
+        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
+            let pointWinnerSide: number;
+            if (this.ball.justHitBySide !== 0) {
+                // If the ball was in play, the player who last hit it made the fault.
+                // The point goes to the other player.
+                pointWinnerSide = -this.ball.justHitBySide;
+            } else {
+                // If no one has hit it (e.g., a serve fault), the server made the fault.
+                // The point goes to the receiver.
+                const serverSide = this.getService();
+                pointWinnerSide = -serverSide;
+            }
+            this.pointWonBy(pointWinnerSide);
+        }
 
         // Update target indicator position
         this.field.targetIndicator.position.x = this.player1.targetPosition.x;
         this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
 
         // This must be the last thing in the update loop
+        this.prevBallStatus = this.ball.status;
         inputManager.update();
     }
 
@@ -211,7 +246,6 @@ export class Game {
         // Player 2 (com) is on the far side (y > 0), which corresponds to side -1.
         // The C++ GetService returns -1 for near side (player1) and 1 for far side (player2).
         // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
-        // However, for testing, we will temporarily NOT flip it, so the user always serves first.
-        return ret;
+        return -ret;
     }
 }

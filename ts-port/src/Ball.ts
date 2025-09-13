@@ -118,8 +118,7 @@ export class Ball {
                     const epsilon = Math.sign(this.velocity.z) * 0.001;
                     this.mesh.position.set(collisionX, collisionY, epsilon);
 
-                    // Collision handled
-                    return;
+                    // Collision handled, but we don't return, so floor collision can still be checked.
                 }
             }
         }
