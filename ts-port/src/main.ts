@@ -36,10 +36,15 @@ async function main() {
 
   const game = new Game(scene, camera, assets);
 
-  // Add a click event listener to the canvas to request pointer lock
-  canvas.addEventListener('click', () => {
-    (canvas as HTMLCanvasElement).requestPointerLock();
-  });
+  const demoScreen = document.getElementById('demo-screen');
+  if (demoScreen) {
+    demoScreen.addEventListener('click', () => {
+      game.isDemo = false;
+      demoScreen.classList.add('hidden');
+      (canvas as HTMLCanvasElement).requestPointerLock();
+    }, { once: true }); // Ensure the listener is only called once
+  }
+
 
   function resizeRendererToDisplaySize(renderer: THREE.WebGLRenderer) {
     const canvas = renderer.domElement;

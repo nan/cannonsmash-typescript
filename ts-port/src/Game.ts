@@ -26,6 +26,7 @@ export class Game {
     private game1 = 0;
     private game2 = 0;
     private gameMode: GameMode = '11PTS';
+    public isDemo = true;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -145,6 +146,11 @@ export class Game {
     }
 
     public update(deltaTime: number) {
+        // If in demo mode, do nothing. This will be expanded later for AI vs AI demo.
+        if (this.isDemo) {
+            return;
+        }
+
         this.handleInput();
 
         // --- Pre-serve logic ---
