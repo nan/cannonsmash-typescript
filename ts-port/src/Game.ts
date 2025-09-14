@@ -26,8 +26,8 @@ export class Game {
     private game1 = 0;
     private game2 = 0;
     private gameMode: GameMode = '11PTS';
-    public isDemo = true;
-    public isPaused = false;
+    private isDemo = true;
+    private isPaused = false;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -174,6 +174,35 @@ export class Game {
 
         // This must be the last thing in the update loop
         inputManager.update();
+    }
+
+    // --- State Management ---
+
+    public getIsDemo(): boolean {
+        return this.isDemo;
+    }
+
+    public getIsPaused(): boolean {
+        return this.isPaused;
+    }
+
+    public start(): void {
+        this.isDemo = false;
+    }
+
+    public pause(): void {
+        this.isPaused = true;
+    }
+
+    public resume(): void {
+        this.isPaused = false;
+    }
+
+    public returnToDemo(): void {
+        this.isDemo = true;
+        this.isPaused = false;
+        // NOTE: We might need to reset more game state here in the future,
+        // e.g., scores, ball position, etc.
     }
 
     /**

@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
+import { UIManager } from './UIManager';
 import { CAMERA_FOV } from './constants';
 
 async function main() {
+  // --- Basic Three.js setup ---
   const canvas = document.querySelector('#c');
-  if (!canvas) {
+  if (!(canvas instanceof HTMLCanvasElement)) {
     return;
   }
   const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
@@ -30,59 +32,60 @@ async function main() {
     scene.add(ambientLight);
   }
 
+  // --- Asset and Game Loading ---
   console.log("Loading assets...");
   const assets = await assetManager.loadAll();
   console.log("Assets loaded!");
 
   const game = new Game(scene, camera, assets);
 
+  // --- UI and Event Handling Setup ---
   const demoScreen = document.getElementById('demo-screen');
   const pauseScreen = document.getElementById('pause-screen');
 
-  if (demoScreen) {
-    demoScreen.addEventListener('click', () => {
-      game.isDemo = false;
-      demoScreen.classList.add('hidden');
-      (canvas as HTMLCanvasElement).requestPointerLock();
-    });
+  if (!demoScreen || !pauseScreen) {
+    console.error("UI elements not found!");
+    return;
   }
 
-  // Handle pointer lock changes
+  const uiManager = new UIManager(demoScreen, pauseScreen);
+
+  // --- Event Listeners ---
+
+  demoScreen.addEventListener('click', () => {
+    game.start();
+    uiManager.showGameScreen();
+    canvas.requestPointerLock();
+  });
+
+  pauseScreen.addEventListener('click', () => {
+    canvas.requestPointerLock();
+  });
+
   document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement === canvas) {
-      // Lock acquired
-      if (!game.isDemo) {
-        game.isPaused = false;
-        pauseScreen?.classList.add('hidden');
+      // Lock was acquired. If the game was paused, resume it.
+      if (game.getIsPaused()) {
+        game.resume();
       }
+      uiManager.showGameScreen();
     } else {
-      // Lock lost
-      if (!game.isDemo) {
-        game.isPaused = true;
-        pauseScreen?.classList.remove('hidden');
+      // Lock was lost
+      if (!game.getIsDemo()) {
+        game.pause();
+        uiManager.showPauseScreen();
       }
     }
   });
 
-  // Handle click on pause screen to resume
-  if (pauseScreen) {
-    pauseScreen.addEventListener('click', () => {
-      if (game.isPaused) {
-        (canvas as HTMLCanvasElement).requestPointerLock();
-      }
-    });
-  }
-
-  // Handle ESC key press during pause to return to demo
   document.addEventListener('keyup', (event) => {
-    if (event.key === 'Escape' && game.isPaused) {
-      game.isDemo = true;
-      game.isPaused = false;
-      pauseScreen?.classList.add('hidden');
-      demoScreen?.classList.remove('hidden');
+    if (event.key === 'Escape' && game.getIsPaused()) {
+      game.returnToDemo();
+      uiManager.showDemoScreen();
     }
   });
 
+  // --- Render Loop ---
 
   function resizeRendererToDisplaySize(renderer: THREE.WebGLRenderer) {
     const canvas = renderer.domElement;
