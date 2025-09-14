@@ -466,8 +466,8 @@ export class Player {
             if (inputManager.isPointerLocked) {
                 const movement = inputManager.getMouseMovement();
                 this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
-                // Invert Z movement because mouse Y up should move player "in" (positive Z)
-                this.mesh.position.z -= movement.y * PLAYER_MOVE_SENSITIVITY_Z;
+                // Mouse Y up (negative) should move player forward (Z position decreases).
+                this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
             }
 
             // Clamp player position
