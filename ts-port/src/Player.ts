@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH } from './constants';
+import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z } from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
@@ -462,22 +462,15 @@ export class Player {
         }
 
         if (!this.isAi) {
-            // Human-controlled movement based on mouse position (direct position control)
-            const mousePos = inputManager.getMousePosition();
-            const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
+            // Human-controlled movement based on Pointer Lock API (relative motion)
+            if (inputManager.isPointerLocked) {
+                const movement = inputManager.getMouseMovement();
+                this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
+                // Invert Z movement because mouse Y up should move player "in" (positive Z)
+                this.mesh.position.z -= movement.y * PLAYER_MOVE_SENSITIVITY_Z;
+            }
 
-            // To prevent issues in fullscreen where browser UI might block clicks at the very top edge (y=0),
-            // we treat the mouse y-position as being at least 1 pixel down from the top.
-            const effectiveY = Math.max(mousePos.y, 1);
-
-            const targetX = (mousePos.x / screenWidth - 0.5) * AREAXSIZE;
-            const targetZ = (TABLE_LENGTH / 2) + (effectiveY / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
-
-            const lerpFactor = 0.2;
-            this.mesh.position.x += (targetX - this.mesh.position.x) * lerpFactor;
-            this.mesh.position.z += (targetZ - this.mesh.position.z) * lerpFactor;
-
+            // Clamp player position
             if (this.mesh.position.z < TABLE_LENGTH / 2) {
                 this.mesh.position.z = TABLE_LENGTH / 2;
             }

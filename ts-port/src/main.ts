@@ -36,6 +36,11 @@ async function main() {
 
   const game = new Game(scene, camera, assets);
 
+  // Add a click event listener to the canvas to request pointer lock
+  canvas.addEventListener('click', () => {
+    (canvas as HTMLCanvasElement).requestPointerLock();
+  });
+
   function resizeRendererToDisplaySize(renderer: THREE.WebGLRenderer) {
     const canvas = renderer.domElement;
     const width = canvas.clientWidth;
