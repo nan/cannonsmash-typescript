@@ -23,25 +23,12 @@ async function main() {
   scene.background = new THREE.Color(0x333333);
 
   {
-    // Lighting setup based on original C++ source (in BaseView.cpp)
-
-    // Ambient light component
-    const ambientLight = new THREE.AmbientLight(0x333333, 1.0); // 0.2 * 255 = 51 = 0x33
+    // Lighting setup to approximate the original C++ source
+    const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
     scene.add(ambientLight);
 
-    // Point light for diffuse and specular
-    const pointLight = new THREE.PointLight(0xffffff, 1.0); // Start with white, intensity 1
-
-    // Position from original: { -TABLEWIDTH*2, TABLELENGTH/2, 3.0F, 1.0F }
-    // Note: C++ y-axis is our z-axis
-    pointLight.position.set(-TABLE_WIDTH * 2, 3.0, TABLE_LENGTH / 2);
-
-    // Attenuation from original: const=0.5, linear=0.0, quad=0.005
-    // In Three.js, decay=2 is the physically correct model. We can adjust
-    // intensity and distance to match the feel.
-    pointLight.decay = 2; // Physical decay
-    pointLight.distance = 0; // Infinite distance, decay handles falloff
-
+    const pointLight = new THREE.PointLight(0xFFFDE8, 2.5, 0, 2);
+    pointLight.position.set(-TABLE_WIDTH * 1.5, 3.0, TABLE_LENGTH / 2);
     scene.add(pointLight);
   }
 

@@ -69,14 +69,15 @@ export class Player {
     }
 
     private buildModel() {
-        let material: THREE.MeshNormalMaterial;
+        let material: THREE.MeshPhongMaterial;
 
         if (this.isAi) {
             // AI is fully opaque
-            material = new THREE.MeshNormalMaterial();
+            material = new THREE.MeshPhongMaterial({ color: 0xcccccc });
         } else {
             // Human player is semi-transparent
-            material = new THREE.MeshNormalMaterial({
+            material = new THREE.MeshPhongMaterial({
+                color: 0xcccccc,
                 transparent: true,
                 opacity: 0.5
             });
