@@ -198,12 +198,12 @@ export class Game {
         if (this.isDemo) {
             // --- Demo Mode ---
             // Circling camera logic
-            this.demoCameraAngle += deltaTime * 0.2; // Adjust speed as needed
+            this.demoCameraAngle += deltaTime * 0.218; // Match original speed
             const radius = 4;
             const x = Math.sin(this.demoCameraAngle) * radius;
             const z = Math.cos(this.demoCameraAngle) * radius;
             this.camera.position.set(x, 2.5, z);
-            this.camera.lookAt(0, 1, 0); // Look at the center of the table action
+            this.camera.lookAt(0, 0.76, 0); // Look at table height
 
             // Reset the ball if it's dead for too long, to keep the demo going
             if (this.ball.status < 0) {
