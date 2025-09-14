@@ -467,8 +467,12 @@ export class Player {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
 
+            // To prevent issues in fullscreen where browser UI might block clicks at the very top edge (y=0),
+            // we treat the mouse y-position as being at least 1 pixel down from the top.
+            const effectiveY = Math.max(mousePos.y, 1);
+
             const targetX = (mousePos.x / screenWidth - 0.5) * AREAXSIZE;
-            const targetZ = (TABLE_LENGTH / 2) + (mousePos.y / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
+            const targetZ = (TABLE_LENGTH / 2) + (effectiveY / screenHeight) * (AREAYSIZE - (TABLE_LENGTH / 2));
 
             const lerpFactor = 0.2;
             this.mesh.position.x += (targetX - this.mesh.position.x) * lerpFactor;
