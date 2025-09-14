@@ -30,6 +30,7 @@ export class Game {
     private gameMode: GameMode = '11PTS';
     private isDemo = true;
     private isPaused = false;
+    private demoCameraAngle = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -196,9 +197,13 @@ export class Game {
 
         if (this.isDemo) {
             // --- Demo Mode ---
-            // Use a fixed, wide-angle camera
-            this.camera.position.set(0, 2.5, 3.5);
-            this.camera.lookAt(0, 0, 0);
+            // Circling camera logic
+            this.demoCameraAngle += deltaTime * 0.2; // Adjust speed as needed
+            const radius = 4;
+            const x = Math.sin(this.demoCameraAngle) * radius;
+            const z = Math.cos(this.demoCameraAngle) * radius;
+            this.camera.position.set(x, 2.5, z);
+            this.camera.lookAt(0, 1, 0); // Look at the center of the table action
 
             // Reset the ball if it's dead for too long, to keep the demo going
             if (this.ball.status < 0) {
