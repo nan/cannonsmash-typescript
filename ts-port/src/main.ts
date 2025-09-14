@@ -37,13 +37,51 @@ async function main() {
   const game = new Game(scene, camera, assets);
 
   const demoScreen = document.getElementById('demo-screen');
+  const pauseScreen = document.getElementById('pause-screen');
+
   if (demoScreen) {
     demoScreen.addEventListener('click', () => {
       game.isDemo = false;
       demoScreen.classList.add('hidden');
       (canvas as HTMLCanvasElement).requestPointerLock();
-    }, { once: true }); // Ensure the listener is only called once
+    });
   }
+
+  // Handle pointer lock changes
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement === canvas) {
+      // Lock acquired
+      if (!game.isDemo) {
+        game.isPaused = false;
+        pauseScreen?.classList.add('hidden');
+      }
+    } else {
+      // Lock lost
+      if (!game.isDemo) {
+        game.isPaused = true;
+        pauseScreen?.classList.remove('hidden');
+      }
+    }
+  });
+
+  // Handle click on pause screen to resume
+  if (pauseScreen) {
+    pauseScreen.addEventListener('click', () => {
+      if (game.isPaused) {
+        (canvas as HTMLCanvasElement).requestPointerLock();
+      }
+    });
+  }
+
+  // Handle ESC key press during pause to return to demo
+  document.addEventListener('keyup', (event) => {
+    if (event.key === 'Escape' && game.isPaused) {
+      game.isDemo = true;
+      game.isPaused = false;
+      pauseScreen?.classList.add('hidden');
+      demoScreen?.classList.remove('hidden');
+    }
+  });
 
 
   function resizeRendererToDisplaySize(renderer: THREE.WebGLRenderer) {

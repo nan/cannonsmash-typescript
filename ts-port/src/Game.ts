@@ -27,6 +27,7 @@ export class Game {
     private game2 = 0;
     private gameMode: GameMode = '11PTS';
     public isDemo = true;
+    public isPaused = false;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -146,8 +147,8 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        // If in demo mode, do nothing. This will be expanded later for AI vs AI demo.
-        if (this.isDemo) {
+        // If in demo mode or paused, do nothing.
+        if (this.isDemo || this.isPaused) {
             return;
         }
 
