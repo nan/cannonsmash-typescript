@@ -23,12 +23,17 @@ async function main() {
   scene.background = new THREE.Color(0x333333);
 
   {
-    // Lighting setup to approximate the original C++ source
-    const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
-    scene.add(ambientLight);
+    // A more standard PBR-friendly lighting setup.
+    // Hemisphere light for soft, global illumination.
+    const skyColor = 0xB1E1FF;  // light blue
+    const groundColor = 0x404040; // dark gray
+    const hemisphereIntensity = 1.5;
+    const hemisphereLight = new THREE.HemisphereLight(skyColor, groundColor, hemisphereIntensity);
+    scene.add(hemisphereLight);
 
-    const pointLight = new THREE.PointLight(0xFFFDE8, 2.5, 0, 2);
-    pointLight.position.set(-TABLE_WIDTH * 1.5, 3.0, TABLE_LENGTH / 2);
+    // Point light for direct highlights and shadows.
+    const pointLight = new THREE.PointLight(0xffffff, 8, 0, 2); // color, intensity, distance, decay
+    pointLight.position.set(-TABLE_WIDTH, 3.0, TABLE_LENGTH / 2);
     scene.add(pointLight);
   }
 
