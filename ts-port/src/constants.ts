@@ -11,6 +11,10 @@ export const TABLE_THICK = 0.1;
 export const NET_HEIGHT = 0.1525;
 export const AREAXSIZE = 8.0;
 export const AREAYSIZE = 12.0;
+
+// Player movement sensitivity when using Pointer Lock
+export const PLAYER_MOVE_SENSITIVITY_X = 0.003;
+export const PLAYER_MOVE_SENSITIVITY_Z = 0.003;
 export const AREAZSIZE = 6.0;
 
 // Player swing types from Player.h
