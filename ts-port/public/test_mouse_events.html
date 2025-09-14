@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マウスイベント テスター</title>
+    <style>
+        body { font-family: monospace; font-size: 16px; margin: 0; padding: 20px; background-color: #f0f0f0; color: #333; }
+        #container { display: flex; flex-direction: column; height: 95vh; }
+        h1, p { flex-shrink: 0; }
+        #log { border: 1px solid #ccc; padding: 10px; flex-grow: 1; overflow-y: scroll; background-color: #fff; }
+        .event { padding: 2px; border-bottom: 1px solid #eee; }
+        .event-MouseMove { color: #333; }
+        .event-MouseDown { color: #008000; font-weight: bold; }
+        .event-MouseUp { color: #d9534f; }
+        .event-Click { color: #0000ff; font-weight: bold; }
+        .event-Error { color: #ff0000; font-weight: bold; }
+        button { font-size: 20px; padding: 10px; margin-bottom: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>マウスイベント テスター</h1>
+        <p>下のボタンを押してフルスクリーンモードにし、マウスカーソルを画面の最上部に移動してクリックしてみてください。</p>
+        <button id="fullscreenBtn">フルスクリーンモードを開始</button>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+        function logEvent(name, data) {
+            const eventDiv = document.createElement('div');
+            // CSSクラス名にドットやコロンが含まれないようにする
+            eventDiv.className = 'event event-' + name.replace(/[^a-zA-Z0-9]/g, '');
+            eventDiv.textContent = `${new Date().toLocaleTimeString()} - ${name}: ${JSON.stringify(data)}`;
+            log.insertBefore(eventDiv, log.firstChild);
+        }
+
+        // 最後のMouseMoveイベントの情報を保持
+        let lastMoveEvent = null;
+        let lastMoveTime = 0;
+
+        // MouseMoveイベントを少し間引いて記録する
+        function throttledLogMove(e) {
+            const now = Date.now();
+            if (now - lastMoveTime > 50) { // 50msごとに記録
+                logEvent('MouseMove', { clientX: e.clientX, clientY: e.clientY });
+                lastMoveTime = now;
+            }
+            lastMoveEvent = e;
+        }
+
+        // 常に最新の座標を表示するための要素
+        const coordsDiv = document.createElement('div');
+        coordsDiv.style.position = 'fixed';
+        coordsDiv.style.top = '10px';
+        coordsDiv.style.right = '10px';
+        coords-div.style.padding = '5px';
+        coordsDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+        coordsDiv.style.border = '1px solid black';
+        document.body.appendChild(coordsDiv);
+
+        window.addEventListener('mousemove', (e) => {
+            throttledLogMove(e);
+            // リアルタイムの座標は常に更新
+            coordsDiv.textContent = `X: ${e.clientX}, Y: ${e.clientY}`;
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            logEvent('MouseDown', { clientX: e.clientX, clientY: e.clientY, button: e.button });
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            logEvent('MouseUp', { clientX: e.clientX, clientY: e.clientY, button: e.button });
+        });
+
+        window.addEventListener('click', (e) => {
+            logEvent('Click', { clientX: e.clientX, clientY: e.clientY, button: e.button });
+        });
+
+        fullscreenBtn.addEventListener('click', () => {
+            document.documentElement.requestFullscreen().catch(err => {
+                logEvent('Error', { message: err.message });
+            });
+        });
+    </script>
+</body>
+</html>
