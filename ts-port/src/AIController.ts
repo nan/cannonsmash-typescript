@@ -21,7 +21,7 @@ export class AIController {
 
     // AIの挙動を制御する定数
     private readonly HOME_POSITION_X = 0.0;
-    private readonly HOME_POSITION_Y = -(TABLE_LENGTH / 2 + 0.5);
+    private readonly HOME_POSITION_Y = (TABLE_LENGTH / 2 + 0.5);
     private readonly RACKET_OFFSET_X = 0.3;
     private readonly MOVEMENT_ACCELERATION = 0.1;
     private readonly PLANTED_SWING_START_FRAME = 11;
