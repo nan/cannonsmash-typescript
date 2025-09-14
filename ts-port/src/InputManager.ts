@@ -35,10 +35,8 @@ class InputManager {
     private handlePointerLockChange() {
         if (document.pointerLockElement) {
             this.isPointerLocked = true;
-            console.log('Pointer locked');
         } else {
             this.isPointerLocked = false;
-            console.log('Pointer unlocked');
         }
     }
 
