@@ -16,6 +16,7 @@ export class Player {
     public velocity = new THREE.Vector3();
     public targetPosition: THREE.Vector2;
     public isAi: boolean;
+    public predictedHitPosition = new THREE.Vector2();
     public side: number;
     public aiController?: AIController;
 
@@ -31,6 +32,11 @@ export class Player {
     private animationClips: { [name: string]: THREE.AnimationClip } = {};
     private currentAction: THREE.AnimationAction | null = null;
     private rootBone: THREE.Group;
+
+    // Constants for AutoMove feature
+    private readonly MOVEMENT_ACCELERATION = 0.05;
+    private readonly RALLY_MAX_SPEED = 4.0;
+    private readonly POSITIONING_MAX_SPEED = 1.0;
 
     constructor(assets: GameAssets, isAi = false, side: number = 1) {
         this.assets = assets;
@@ -422,6 +428,115 @@ export class Player {
         }
     }
 
+    private isOpponentHit(ball: Ball): boolean {
+        const status = ball.status;
+        const side = this.side;
+        // Opponent has hit the ball and it's heading towards our side
+        if ((status === 0 && side === -1) || (status === 2 && side === 1)) {
+            return true;
+        }
+        // Opponent's hit has bounced on our side
+        if ((status === 1 && side === -1) || (status === 3 && side === 1)) {
+            return true;
+        }
+        return false;
+    }
+
+    private getBallTop(ball: Ball): { maxHeight: number; position: THREE.Vector2 } {
+        const simBall = ball.clone();
+        let maxHeight = -1.0;
+        const peakPosition = new THREE.Vector2();
+
+        // Simulate up to 500 frames (10 seconds) ahead
+        for (let i = 0; i < 500; i++) {
+            // Check if the ball is in a state where it has bounced on our side of the table
+            if ((simBall.status === 1 && this.side === -1) ||
+                (simBall.status === 3 && this.side === 1)) {
+                // Update the highest point (peak) after the bounce
+                if (simBall.mesh.position.y > maxHeight) {
+                    maxHeight = simBall.mesh.position.y;
+                    peakPosition.x = simBall.mesh.position.x;
+                    peakPosition.y = simBall.mesh.position.z; // The 2D y-coordinate corresponds to the 3D z-coordinate
+                }
+            }
+            // Advance the physics simulation by one frame
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(0.02); // 50Hz tick rate
+            simBall.checkCollision(oldPos);
+
+            // Stop the simulation if the ball becomes dead
+            if (simBall.status === -1) {
+                break;
+            }
+        }
+        return { maxHeight, position: peakPosition };
+    }
+
+    private shouldAutoMove(): boolean {
+        if (this.swing <= 0) {
+            return false; // Not swinging
+        }
+
+        const swingParams = stype.get(this.swingType);
+        if (!swingParams) {
+            return false; // Not a valid swing type
+        }
+
+        // Activate AutoMove after the backswing is complete and before the ball is hit.
+        return this.swing > swingParams.backswing && this.swing < swingParams.hitStart;
+    }
+
+    /**
+     * Automatically calculates the desired velocity to move the player
+     * towards an optimal hitting position.
+     * @param ball The ball object.
+     */
+    public autoMove(ball: Ball) {
+        // This function is only called during the swing, to make final adjustments.
+        // It should not move the player to a "home" position.
+
+        // 1. We must be able to hit the ball.
+        if (!this.canHitBall(ball)) {
+            // Safety check, should not happen if called at the right time.
+            // Dampen velocity to prevent residual movement.
+            this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+            return;
+        }
+
+        // 2. Predict where the ball will be.
+        const top = this.getBallTop(ball);
+        if (top.maxHeight <= 0) {
+            // Prediction failed, do not move. Dampen velocity.
+            this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+            return;
+        }
+
+        const targetPosition = top.position;
+        this.predictedHitPosition.copy(targetPosition); // Store for potential debugging/drawing
+
+        // 3. Calculate desired velocity to move towards the target
+        const direction = new THREE.Vector3(
+            targetPosition.x - this.mesh.position.x,
+            0,
+            targetPosition.y - this.mesh.position.z
+        );
+
+        const distance = direction.length();
+        if (distance < 0.05) { // Already at the target, reduce velocity to zero
+            this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+            return;
+        }
+
+        // 3. Set velocity based on distance and situation
+        const maxSpeed = this.isOpponentHit(ball) ? this.RALLY_MAX_SPEED : this.POSITIONING_MAX_SPEED;
+
+        // A simple proportional control for velocity, accelerates towards target
+        let targetVelocity = direction.normalize().multiplyScalar(maxSpeed);
+
+        // Smoothly adjust velocity towards the target velocity
+        this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
+    }
+
     public update(deltaTime: number, ball: Ball, game: Game) {
         // --- Swing and Serve Logic ---
         if (this.swing > 0) {
@@ -462,13 +577,31 @@ export class Player {
         }
 
         if (!this.isAi) {
-            // Human-controlled movement based on Pointer Lock API (relative motion)
+            let manualMove = false;
             if (inputManager.isPointerLocked) {
                 const movement = inputManager.getMouseMovement();
-                this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
-                // Mouse Y up (negative) should move player forward (Z position decreases).
-                this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
+                if (movement.x !== 0 || movement.y !== 0) {
+                    // Manual override: directly move the player and reset auto-move velocity
+                    this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
+                    this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
+                    this.velocity.set(0, 0, 0);
+                    manualMove = true;
+                }
             }
+
+            if (!manualMove) {
+                if (this.shouldAutoMove()) {
+                    // If no manual input and in the correct swing phase, let AutoMove calculate the velocity
+                    this.autoMove(ball);
+                } else {
+                    // AutoMove is not active, so smoothly dampen the velocity to zero.
+                    this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+                }
+            }
+
+            // Apply velocity from AutoMove to the player's position
+            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+
         } else {
             // AI movement is driven by its controller
             if (this.aiController) {
