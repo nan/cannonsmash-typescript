@@ -36,10 +36,8 @@ export class Game {
         this.scene = scene;
         this.camera = camera;
         this.assets = assets;
-
         this.scoreboardElement = document.getElementById('scoreboard')!;
-
-        this.setupScene();
+        this.resetGame(true); // Start in demo mode
     }
 
     private updateScoreboard() {
@@ -65,13 +63,26 @@ export class Game {
         }
     }
 
-    private setupScene() {
+    private resetGame(isDemo: boolean) {
+        this.isDemo = isDemo;
+        this.isPaused = false;
+
+        // Clear previous game objects from the scene
+        if (this.player1) this.scene.remove(this.player1.mesh);
+        if (this.player2) this.scene.remove(this.player2.mesh);
+        if (this.ball) this.scene.remove(this.ball.mesh);
+        if (this.field) this.scene.remove(this.field.mesh);
+
+        // Reset scores
+        this.score1 = 0;
+        this.score2 = 0;
+        this.updateScoreboard();
+
+        // Create new game objects
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        // In demo mode, both players are AI. Otherwise, player1 is human.
-        const isPlayer1Ai = this.isDemo;
-        this.player1 = new Player(this.assets, isPlayer1Ai, 1);
+        this.player1 = new Player(this.assets, isDemo, 1);
         this.scene.add(this.player1.mesh);
 
         this.player2 = new Player(this.assets, true, -1); // Player2 is always AI
@@ -86,15 +97,14 @@ export class Game {
         }
         this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
 
-
-        // Position them based on C++ code
+        // Position them
         this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
-        this.player1.mesh.rotation.x = -Math.PI / 2; // Stand the player up
+        this.player1.mesh.rotation.x = -Math.PI / 2;
         this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
-        this.player2.mesh.rotation.y = Math.PI; // Face the other player
-        this.player2.mesh.rotation.x = Math.PI / 2; // Stand the player up
+        this.player2.mesh.rotation.y = Math.PI;
+        this.player2.mesh.rotation.x = Math.PI / 2;
 
-        this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0); // Place ball on the table
+        this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0);
 
         this.cameraManager = new CameraManager(this.camera, this.player1, this.ball);
     }
@@ -246,7 +256,7 @@ export class Game {
     }
 
     public start(): void {
-        this.isDemo = false;
+        this.resetGame(false);
     }
 
     public pause(): void {
@@ -258,10 +268,7 @@ export class Game {
     }
 
     public returnToDemo(): void {
-        this.isDemo = true;
-        this.isPaused = false;
-        // NOTE: We might need to reset more game state here in the future,
-        // e.g., scores, ball position, etc.
+        this.resetGame(true);
     }
 
     /**
