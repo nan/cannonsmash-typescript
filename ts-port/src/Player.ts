@@ -428,7 +428,7 @@ export class Player {
         }
     }
 
-    public isOpponentHit(ball: Ball): boolean {
+    private isOpponentHit(ball: Ball): boolean {
         const status = ball.status;
         const side = this.side;
         // Opponent has hit the ball and it's heading towards our side
@@ -442,7 +442,7 @@ export class Player {
         return false;
     }
 
-    public getBallTop(ball: Ball): { maxHeight: number; position: THREE.Vector2 } {
+    private getBallTop(ball: Ball): { maxHeight: number; position: THREE.Vector2 } {
         const simBall = ball.clone();
         let maxHeight = -1.0;
         const peakPosition = new THREE.Vector2();
@@ -508,13 +508,11 @@ export class Player {
         if (top.maxHeight <= 0) {
             // Prediction failed, do not move. Dampen velocity.
             this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
-            console.log('[AutoMove] Prediction failed, stopping movement.');
             return;
         }
 
         const targetPosition = top.position;
         this.predictedHitPosition.copy(targetPosition); // Store for potential debugging/drawing
-        console.log(`[AutoMove] Predicted hit position: x=${targetPosition.x.toFixed(2)}, z=${targetPosition.y.toFixed(2)}`);
 
         // 3. Calculate desired velocity to move towards the target
         const direction = new THREE.Vector3(
@@ -537,7 +535,6 @@ export class Player {
 
         // Smoothly adjust velocity towards the target velocity
         this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
-        console.log(`[AutoMove] New velocity: x=${this.velocity.x.toFixed(2)}, z=${this.velocity.z.toFixed(2)}`);
     }
 
     public update(deltaTime: number, ball: Ball, game: Game) {
@@ -585,7 +582,6 @@ export class Player {
                 const movement = inputManager.getMouseMovement();
                 if (movement.x !== 0 || movement.y !== 0) {
                     // Manual override: directly move the player and reset auto-move velocity
-                    console.log('[AutoMove] Manual override detected.');
                     this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
                     this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
                     this.velocity.set(0, 0, 0);
@@ -595,7 +591,6 @@ export class Player {
 
             if (!manualMove && this.shouldAutoMove()) {
                 // If no manual input and in the correct swing phase, let AutoMove calculate the velocity
-                console.log(`[AutoMove] Activated at swing frame ${this.swing}.`);
                 this.autoMove(ball);
             }
 
