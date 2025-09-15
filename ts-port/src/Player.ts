@@ -469,14 +469,6 @@ export class Player {
                 // Mouse Y up (negative) should move player forward (Z position decreases).
                 this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
             }
-
-            // Clamp player position
-            if (this.mesh.position.z < TABLE_LENGTH / 2) {
-                this.mesh.position.z = TABLE_LENGTH / 2;
-            }
-            if (this.mesh.position.z > AREAYSIZE) {
-                this.mesh.position.z = AREAYSIZE;
-            }
         } else {
             // AI movement is driven by its controller
             if (this.aiController) {
@@ -499,14 +491,22 @@ export class Player {
         }
 
         // Boundary checks for z (depth)
-        if (this.isAi) {
-            // AI player boundary
+        if (this.side === 1) { // Near side player (human or AI)
+            if (this.mesh.position.z < TABLE_LENGTH / 2) {
+                this.mesh.position.z = TABLE_LENGTH / 2;
+                this.velocity.z = 0;
+            }
+            if (this.mesh.position.z > AREAYSIZE) {
+                this.mesh.position.z = AREAYSIZE;
+                this.velocity.z = 0;
+            }
+        } else { // Far side player (always AI)
             if (this.mesh.position.z > -TABLE_LENGTH / 2) {
                 this.mesh.position.z = -TABLE_LENGTH / 2;
                 this.velocity.z = 0;
             }
-            if (this.mesh.position.z < -AREAYSIZE / 2) {
-                this.mesh.position.z = -AREAYSIZE / 2;
+            if (this.mesh.position.z < -AREAYSIZE) {
+                this.mesh.position.z = -AREAYSIZE;
                 this.velocity.z = 0;
             }
         }

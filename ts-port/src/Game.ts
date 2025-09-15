@@ -5,7 +5,7 @@ import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT } from './constants';
 import { CameraManager } from './CameraManager';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
@@ -30,15 +30,14 @@ export class Game {
     private gameMode: GameMode = '11PTS';
     private isDemo = true;
     private isPaused = false;
+    private demoCameraAngle = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
         this.camera = camera;
         this.assets = assets;
-
         this.scoreboardElement = document.getElementById('scoreboard')!;
-
-        this.setupScene();
+        this.resetGame(true); // Start in demo mode
     }
 
     private updateScoreboard() {
@@ -64,30 +63,48 @@ export class Game {
         }
     }
 
-    private setupScene() {
+    private resetGame(isDemo: boolean) {
+        this.isDemo = isDemo;
+        this.isPaused = false;
+
+        // Clear previous game objects from the scene
+        if (this.player1) this.scene.remove(this.player1.mesh);
+        if (this.player2) this.scene.remove(this.player2.mesh);
+        if (this.ball) this.scene.remove(this.ball.mesh);
+        if (this.field) this.scene.remove(this.field.mesh);
+
+        // Reset scores
+        this.score1 = 0;
+        this.score2 = 0;
+        this.updateScoreboard();
+
+        // Create new game objects
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets, false, 1); // Human player, side 1
+        this.player1 = new Player(this.assets, isDemo, 1);
         this.scene.add(this.player1.mesh);
 
-        this.player2 = new Player(this.assets, true, -1); // AI player, side -1
+        this.player2 = new Player(this.assets, true, -1); // Player2 is always AI
         this.scene.add(this.player2.mesh);
 
         this.ball = new Ball();
-
-        // Now that both players and the ball exist, create the AI controller for player2
-        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
         this.scene.add(this.ball.mesh);
 
-        // Position them based on C++ code
-        this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
-        this.player1.mesh.rotation.x = -Math.PI / 2; // Stand the player up
-        this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
-        this.player2.mesh.rotation.y = Math.PI; // Face the other player
-        this.player2.mesh.rotation.x = Math.PI / 2; // Stand the player up
+        // Create AI controllers where needed
+        if (this.player1.isAi) {
+            this.player1.aiController = new AIController(this, this.player1, this.ball, this.player2);
+        }
+        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
 
-        this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0); // Place ball on the table
+        // Position them
+        this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
+        this.player1.mesh.rotation.x = -Math.PI / 2;
+        this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
+        this.player2.mesh.rotation.y = Math.PI;
+        this.player2.mesh.rotation.x = Math.PI / 2;
+
+        this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0);
 
         this.cameraManager = new CameraManager(this.camera, this.player1, this.ball);
     }
@@ -174,40 +191,57 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        // If in demo mode or paused, do nothing.
-        if (this.isDemo || this.isPaused) {
+        if (this.isPaused) {
             return;
         }
 
-        this.handleInput();
-
-        // --- Pre-serve logic ---
-        // If it's the player's turn to serve, get them into ready state.
-        if (this.ball.status === 8 && this.getService() === this.player1.side) {
-            this.ball.reset(this.player1);
-            if (this.player1.swingType < SERVE_MIN) {
-                this.player1.swingType = SERVE_NORMAL;
-            }
-        }
-
+        // The core game logic update
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
         this.ball.update(deltaTime, this);
-        this.cameraManager.update();
 
         // --- Scoring Logic ---
-        // Check if the ball just became dead in this frame
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.awardPoint();
         }
 
-        // Update target indicator position
-        this.field.targetIndicator.position.x = this.player1.targetPosition.x;
-        this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+        if (this.isDemo) {
+            // --- Demo Mode ---
+            // Circling camera logic
+            this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
+            const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
+            const z = Math.cos(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
+            this.camera.position.set(x, DEMO_CAMERA_HEIGHT, z);
+            this.camera.lookAt(0, TABLE_HEIGHT, 0); // Look at table height
+
+            // Reset the ball if it's dead for too long, to keep the demo going
+            if (this.ball.status < 0) {
+                this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
+            }
+
+        } else {
+            // --- Active Play Mode ---
+            this.handleInput();
+
+            // Pre-serve logic
+            if (this.ball.status === 8 && this.getService() === this.player1.side) {
+                this.ball.reset(this.player1);
+                if (this.player1.swingType < SERVE_MIN) {
+                    this.player1.swingType = SERVE_NORMAL;
+                }
+            }
+
+            this.cameraManager.update();
+
+            // Update target indicator position
+            this.field.targetIndicator.position.x = this.player1.targetPosition.x;
+            this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+
+            inputManager.update();
+        }
 
         // This must be the last thing in the update loop
         this.prevBallStatus = this.ball.status;
-        inputManager.update();
     }
 
     // --- State Management ---
@@ -221,7 +255,7 @@ export class Game {
     }
 
     public start(): void {
-        this.isDemo = false;
+        this.resetGame(false);
     }
 
     public pause(): void {
@@ -233,10 +267,7 @@ export class Game {
     }
 
     public returnToDemo(): void {
-        this.isDemo = true;
-        this.isPaused = false;
-        // NOTE: We might need to reset more game state here in the future,
-        // e.g., scores, ball position, etc.
+        this.resetGame(true);
     }
 
     /**

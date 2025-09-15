@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
 import { UIManager } from './UIManager';
-import { CAMERA_FOV } from './constants';
+import { AMB_LIGHT_COLOR, AMB_LIGHT_INTENSITY, CAMERA_FOV, DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY, DIR_LIGHT_POSITION } from './constants';
 
 async function main() {
   // --- Basic Three.js setup ---
@@ -23,12 +23,10 @@ async function main() {
   scene.background = new THREE.Color(0x333333);
 
   {
-    const color = 0xFFFFFF;
-    const intensity = 3;
-    const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(-1, 2, 4);
+    const light = new THREE.DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY);
+    light.position.copy(DIR_LIGHT_POSITION);
     scene.add(light);
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    const ambientLight = new THREE.AmbientLight(AMB_LIGHT_COLOR, AMB_LIGHT_INTENSITY);
     scene.add(ambientLight);
   }
 
