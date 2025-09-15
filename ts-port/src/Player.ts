@@ -589,9 +589,14 @@ export class Player {
                 }
             }
 
-            if (!manualMove && this.shouldAutoMove()) {
-                // If no manual input and in the correct swing phase, let AutoMove calculate the velocity
-                this.autoMove(ball);
+            if (!manualMove) {
+                if (this.shouldAutoMove()) {
+                    // If no manual input and in the correct swing phase, let AutoMove calculate the velocity
+                    this.autoMove(ball);
+                } else {
+                    // AutoMove is not active, so smoothly dampen the velocity to zero.
+                    this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+                }
             }
 
             // Apply velocity from AutoMove to the player's position
