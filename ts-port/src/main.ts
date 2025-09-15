@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { assetManager } from './AssetManager';
 import { Game } from './Game';
 import { UIManager } from './UIManager';
-import { CAMERA_FOV, TABLE_LENGTH, TABLE_WIDTH } from './constants';
+import { CAMERA_FOV } from './constants';
 
 async function main() {
   // --- Basic Three.js setup ---
@@ -23,18 +23,13 @@ async function main() {
   scene.background = new THREE.Color(0x333333);
 
   {
-    // A more standard PBR-friendly lighting setup.
-    // Hemisphere light for soft, global illumination.
-    const skyColor = 0xB1E1FF;  // light blue
-    const groundColor = 0x404040; // dark gray
-    const hemisphereIntensity = 1.5;
-    const hemisphereLight = new THREE.HemisphereLight(skyColor, groundColor, hemisphereIntensity);
-    scene.add(hemisphereLight);
-
-    // Point light for direct highlights and shadows.
-    const pointLight = new THREE.PointLight(0xffffff, 8, 0, 2); // color, intensity, distance, decay
-    pointLight.position.set(-TABLE_WIDTH, 3.0, TABLE_LENGTH / 2);
-    scene.add(pointLight);
+    const color = 0xFFFFFF;
+    const intensity = 3;
+    const light = new THREE.DirectionalLight(color, intensity);
+    light.position.set(-1, 2, 4);
+    scene.add(light);
+    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    scene.add(ambientLight);
   }
 
   // --- Asset and Game Loading ---
