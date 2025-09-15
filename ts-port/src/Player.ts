@@ -472,30 +472,51 @@ export class Player {
         return { maxHeight, position: peakPosition };
     }
 
+    private shouldAutoMove(): boolean {
+        if (this.swing <= 0) {
+            return false; // Not swinging
+        }
+
+        const swingParams = stype.get(this.swingType);
+        if (!swingParams) {
+            return false; // Not a valid swing type
+        }
+
+        // Activate AutoMove after the backswing is complete and before the ball is hit.
+        return this.swing > swingParams.backswing && this.swing < swingParams.hitStart;
+    }
+
     /**
      * Automatically calculates the desired velocity to move the player
      * towards an optimal hitting position.
      * @param ball The ball object.
      */
     public autoMove(ball: Ball) {
-        // 1. Determine the target position
-        let targetPosition: THREE.Vector2;
-        if (this.isOpponentHit(ball)) {
-            const top = this.getBallTop(ball);
-            if (top.maxHeight > 0) {
-                targetPosition = top.position;
-            } else {
-                // Could not predict, stay put or return to home
-                targetPosition = new THREE.Vector2(0, (TABLE_LENGTH / 2 + 0.5) * this.side);
-            }
-        } else {
-            // Not in a rally, move to a default ready position
-            targetPosition = new THREE.Vector2(0, (TABLE_LENGTH / 2 + 0.5) * this.side);
+        // This function is only called during the swing, to make final adjustments.
+        // It should not move the player to a "home" position.
+
+        // 1. We must be able to hit the ball.
+        if (!this.canHitBall(ball)) {
+            // Safety check, should not happen if called at the right time.
+            // Dampen velocity to prevent residual movement.
+            this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+            return;
         }
+
+        // 2. Predict where the ball will be.
+        const top = this.getBallTop(ball);
+        if (top.maxHeight <= 0) {
+            // Prediction failed, do not move. Dampen velocity.
+            this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+            console.log('[AutoMove] Prediction failed, stopping movement.');
+            return;
+        }
+
+        const targetPosition = top.position;
         this.predictedHitPosition.copy(targetPosition); // Store for potential debugging/drawing
         console.log(`[AutoMove] Predicted hit position: x=${targetPosition.x.toFixed(2)}, z=${targetPosition.y.toFixed(2)}`);
 
-        // 2. Calculate desired velocity to move towards the target
+        // 3. Calculate desired velocity to move towards the target
         const direction = new THREE.Vector3(
             targetPosition.x - this.mesh.position.x,
             0,
@@ -572,9 +593,9 @@ export class Player {
                 }
             }
 
-            if (!manualMove) {
-                // If no manual input, let AutoMove calculate the velocity
-                console.log('[AutoMove] Activated.');
+            if (!manualMove && this.shouldAutoMove()) {
+                // If no manual input and in the correct swing phase, let AutoMove calculate the velocity
+                console.log(`[AutoMove] Activated at swing frame ${this.swing}.`);
                 this.autoMove(ball);
             }
 
