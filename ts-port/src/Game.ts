@@ -5,7 +5,7 @@ import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT } from './constants';
 import { CameraManager } from './CameraManager';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
@@ -208,12 +208,11 @@ export class Game {
         if (this.isDemo) {
             // --- Demo Mode ---
             // Circling camera logic
-            this.demoCameraAngle += deltaTime * 0.218; // Match original speed
-            const radius = 4;
-            const x = Math.sin(this.demoCameraAngle) * radius;
-            const z = Math.cos(this.demoCameraAngle) * radius;
-            this.camera.position.set(x, 2.5, z);
-            this.camera.lookAt(0, 0.76, 0); // Look at table height
+            this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
+            const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
+            const z = Math.cos(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
+            this.camera.position.set(x, DEMO_CAMERA_HEIGHT, z);
+            this.camera.lookAt(0, TABLE_HEIGHT, 0); // Look at table height
 
             // Reset the ball if it's dead for too long, to keep the demo going
             if (this.ball.status < 0) {

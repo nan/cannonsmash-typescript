@@ -84,3 +84,15 @@ export const TABLE_E = 0.8; // Bounciness of the table
 
 // Fallback serve velocity if calculation fails
 export const FALLBACK_SERVE_VELOCITY = new THREE.Vector3(0, 2.8, -4.5);
+
+// Lighting
+export const DIR_LIGHT_COLOR = 0xFFFFFF;
+export const DIR_LIGHT_INTENSITY = 3;
+export const DIR_LIGHT_POSITION = new THREE.Vector3(-1, 2, 4);
+export const AMB_LIGHT_COLOR = 0x404040;
+export const AMB_LIGHT_INTENSITY = 2;
+
+// Demo Mode
+export const DEMO_CAMERA_SPEED = 0.218;
+export const DEMO_CAMERA_RADIUS = 4;
+export const DEMO_CAMERA_HEIGHT = 2.5;
