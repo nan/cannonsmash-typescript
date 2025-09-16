@@ -31,34 +31,48 @@ export class TrajectoryVisualizer {
         // Clear any previous visuals before showing new ones.
         this.hide();
 
+        // 1. Get the authoritative optimal hit point from the Player's prediction logic.
+        const prediction = player.predictOptimalHittingPoint(startBall);
+        if (!prediction || !prediction.position) return; // Can't draw if no prediction.
+        const optimalHitPoint = prediction.position;
+
         const simBall = startBall.clone();
         const trajectoryPoints: THREE.Vector3[] = [];
-        let optimalHitPoint: THREE.Vector3 | null = null;
         let optimalHitPointIndex = -1;
+        let minDistanceToOptimalSq = Infinity;
 
-        // Simulate the ball's movement for a number of steps.
+        // 2. Simulate the trajectory to get the points for the line.
         for (let i = 0; i < MAX_TRAJECTORY_POINTS; i++) {
-            const oldPos = simBall.mesh.position.clone();
-            trajectoryPoints.push(oldPos);
+            const currentPos = simBall.mesh.position.clone();
+            trajectoryPoints.push(currentPos);
 
-            // Update physics and check for collisions
-            simBall._updatePhysics(TICK);
-            simBall.checkCollision(oldPos);
-
-            // Check for the optimal hit point.
-            // We only care about the *first* hittable frame.
-            if (optimalHitPointIndex === -1 && player.canHitBall(simBall)) {
-                optimalHitPoint = simBall.mesh.position.clone();
+            // Find the point in the trajectory that is closest to the predicted optimal point.
+            // This ensures the marker is exactly on the drawn line.
+            const distanceSq = currentPos.distanceToSquared(optimalHitPoint);
+            if (distanceSq < minDistanceToOptimalSq) {
+                minDistanceToOptimalSq = distanceSq;
                 optimalHitPointIndex = i;
             }
 
-            // Stop simulation if the ball is dead.
+            // Stop if we are well past the optimal point and it was a bounce hit, to save computation.
+            if (prediction.isBounceHit && minDistanceToOptimalSq < 0.01 && simBall.velocity.y < 0) {
+                 if (currentPos.z > optimalHitPoint.z + 0.5) break;
+            }
+
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(TICK);
+            simBall.checkCollision(oldPos);
+
             if (simBall.status < 0) {
                 break;
             }
         }
 
+        // 3. Draw the visuals.
         if (optimalHitPointIndex !== -1) {
+            // Update the optimalHitPoint to be the exact point on the trajectory line.
+            const finalOptimalHitPoint = trajectoryPoints[optimalHitPointIndex];
+
             // --- Trajectory before the hit marker (Thick Tube) ---
             const pointsBefore = trajectoryPoints.slice(0, optimalHitPointIndex + 1);
             if (pointsBefore.length > 1) {
@@ -77,22 +91,20 @@ export class TrajectoryVisualizer {
                 this.trajectoryLine = new THREE.Line(lineGeometryAfter, lineMaterialAfter);
                 this.scene.add(this.trajectoryLine);
             }
+
+            // --- Optimal Hit Marker ---
+            const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+            const markerMaterial = new THREE.MeshBasicMaterial({ color: OPTIMAL_HIT_MARKER_COLOR });
+            this.optimalHitMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+            this.optimalHitMarker.position.copy(finalOptimalHitPoint);
+            this.scene.add(this.optimalHitMarker);
+
         } else {
             // If no hit point is found, draw the whole trajectory as a thin line.
             const lineGeometry = new THREE.BufferGeometry().setFromPoints(trajectoryPoints);
             const lineMaterial = new THREE.LineBasicMaterial({ color: TRAJECTORY_LINE_COLOR });
             this.trajectoryLine = new THREE.Line(lineGeometry, lineMaterial);
             this.scene.add(this.trajectoryLine);
-        }
-
-
-        // Create and add the optimal hit marker if a point was found.
-        if (optimalHitPoint) {
-            const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
-            const markerMaterial = new THREE.MeshBasicMaterial({ color: OPTIMAL_HIT_MARKER_COLOR });
-            this.optimalHitMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-            this.optimalHitMarker.position.copy(optimalHitPoint);
-            this.scene.add(this.optimalHitMarker);
         }
     }
 
