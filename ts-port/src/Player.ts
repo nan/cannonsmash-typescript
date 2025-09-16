@@ -444,18 +444,20 @@ export class Player {
         return false;
     }
 
-    public predictOptimalPlayerPosition(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean } {
+    public predictOptimalPlayerPosition(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean; trajectory: THREE.Vector3[]; hitIndex: number; } {
         const simBall = ball.clone();
+        const trajectory: THREE.Vector3[] = [];
         let maxHeight = -1.0;
         const peakPosition = new THREE.Vector3();
-        let pointFound = false;
+        let hitIndex = -1;
 
         // Simulate for a maximum number of steps to find the peak after a bounce.
         for (let i = 0; i < 500; i++) {
+            trajectory.push(simBall.mesh.position.clone());
+
             // Condition to check if the ball has bounced on the player's side.
             if ((simBall.status === 3 && this.side === 1) || (simBall.status === 1 && this.side === -1)) {
                 // If it has bounced, find the highest point (peak) of the trajectory.
-                // This part is a direct port of the C++ GetBallTop logic.
                 if (simBall.mesh.position.y > maxHeight) {
                     // The original C++ code has a peculiar condition to only consider the peak
                     // if it occurs very close to the table's baseline. This is crucial.
@@ -464,7 +466,7 @@ export class Player {
                     {
                         maxHeight = simBall.mesh.position.y;
                         peakPosition.copy(simBall.mesh.position);
-                        pointFound = true;
+                        hitIndex = i;
                     }
                 }
             }
@@ -481,13 +483,12 @@ export class Player {
         }
 
         // If a valid peak was found during the simulation, return its position.
-        if (pointFound) {
-            return { position: peakPosition, isBounceHit: true };
+        if (hitIndex !== -1) {
+            return { position: peakPosition, isBounceHit: true, trajectory, hitIndex };
         } else {
             // If no valid peak is found (e.g., ball goes out of bounds), return a default "home" position.
-            // This prevents the marker from disappearing or being placed at (0,0,0).
             const fallbackPosition = new THREE.Vector3(0, 0, this.side * (TABLE_LENGTH / 2 + 0.5));
-            return { position: fallbackPosition, isBounceHit: false };
+            return { position: fallbackPosition, isBounceHit: false, trajectory, hitIndex: -1 };
         }
     }
 
