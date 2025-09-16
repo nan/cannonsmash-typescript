@@ -396,7 +396,9 @@ export class Player {
      * @returns True if the ball can be hit.
      */
     public canHitBall(ball: Ball): boolean {
-        if ((ball.status === 3 && this.side === 1) || (ball.status === 1 && this.side === -1)) {
+        // 変更: プレイヤーサイド(side === 1)の場合、ボールがバウンドする前(status === 2)でも打てるようにする
+        if (((ball.status === 3 || ball.status === 2) && this.side === 1) || // Player's side
+            (ball.status === 1 && this.side === -1)) { // AI's side
             return true;
         }
         return false;
