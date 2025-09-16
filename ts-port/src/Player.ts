@@ -446,77 +446,49 @@ export class Player {
 
     public predictOptimalHittingPoint(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean } {
         const simBall = ball.clone();
-        const hittingPosition = new THREE.Vector3();
-
-        const idealVolleyHeight = TABLE_HEIGHT + NET_HEIGHT + 0.1; // A bit above the net
-
-        let maxHeightAfterBounce = -1.0;
+        let maxHeight = -1.0;
         const peakPosition = new THREE.Vector3();
-        let hasBouncedOnPlayerSide = false;
+        let pointFound = false;
 
-        // Simulate up to 500 frames (10 seconds)
+        // Simulate for a maximum number of steps to find the peak after a bounce.
         for (let i = 0; i < 500; i++) {
-            const oldPos = simBall.mesh.position.clone();
-            simBall._updatePhysics(0.02); // 50Hz tick rate
-            simBall.checkCollision(oldPos);
-
-            // --- Scenario 1: Pre-bounce (Rising/Volley) Hit ---
-            // If the ball is coming towards the player, check for an early hit opportunity.
-            if (this.side === 1 && simBall.status === 2) {
-                // Target a point where the ball is at a good height and still rising or near its apex.
-                if (simBall.mesh.position.y >= idealVolleyHeight && simBall.velocity.y > -0.5) {
-                    // Check if it's within a reasonable horizontal distance for a quick reaction.
-                    if (Math.abs(simBall.mesh.position.z - this.mesh.position.z) < 1.5) {
-                        hittingPosition.copy(simBall.mesh.position);
-                        // This is our ideal pre-bounce hit point. Return it immediately.
-                        return { position: hittingPosition, isBounceHit: false };
+            // Condition to check if the ball has bounced on the player's side.
+            if ((simBall.status === 3 && this.side === 1) || (simBall.status === 1 && this.side === -1)) {
+                // If it has bounced, find the highest point (peak) of the trajectory.
+                // This part is a direct port of the C++ GetBallTop logic.
+                if (simBall.mesh.position.y > maxHeight) {
+                    // The original C++ code has a peculiar condition to only consider the peak
+                    // if it occurs very close to the table's baseline. This is crucial.
+                    if (Math.abs(simBall.mesh.position.z) < TABLE_LENGTH / 2 + 1.0 &&
+                        Math.abs(simBall.mesh.position.z) > TABLE_LENGTH / 2 - 0.5)
+                    {
+                        maxHeight = simBall.mesh.position.y;
+                        peakPosition.copy(simBall.mesh.position);
+                        pointFound = true;
                     }
                 }
             }
 
-            // --- Scenario 2: Post-bounce Hit ---
-            // Check if the ball has bounced on the player's side.
-            if ((this.side === 1 && simBall.status === 3) || (this.side === -1 && simBall.status === 1)) {
-                hasBouncedOnPlayerSide = true;
-                // Find the peak of this bounce.
-                if (simBall.mesh.position.y > maxHeightAfterBounce) {
-                    maxHeightAfterBounce = simBall.mesh.position.y;
-                    peakPosition.copy(simBall.mesh.position);
-                }
-                // If the ball has started to fall after reaching its peak, we've found our spot.
-                if (simBall.velocity.y < 0 && maxHeightAfterBounce > -1.0) {
-                    return { position: peakPosition, isBounceHit: true };
-                }
-            }
+            // Advance the physics simulation by one frame.
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(0.02); // 50Hz tick rate
+            simBall.checkCollision(oldPos);
 
-            // Stop the simulation if the ball becomes dead
+            // Stop the simulation if the ball becomes "dead".
             if (simBall.status < 0) {
                 break;
             }
         }
 
-        // --- Fallback Logic ---
-        if (hasBouncedOnPlayerSide) {
-            // If we found a bounce but the loop ended before it peaked (e.g., high, slow ball), return the highest point found.
+        // If a valid peak was found during the simulation, return its position.
+        if (pointFound) {
             return { position: peakPosition, isBounceHit: true };
+        } else {
+            // If no valid peak is found (e.g., ball goes out of bounds), return a default "home" position.
+            // This prevents the marker from disappearing or being placed at (0,0,0).
+            const fallbackPosition = new THREE.Vector3(0, 0, this.side * (TABLE_LENGTH / 2 + 0.5));
+            return { position: fallbackPosition, isBounceHit: false };
         }
-
-        // If no other point was found, as a last resort, predict where the ball will cross the table baseline
-        // This can happen if the opponent's shot is very low and fast.
-        const finalSimBall = ball.clone();
-        for (let i = 0; i < 500; i++) {
-            const oldPos = finalSimBall.mesh.position.clone();
-            finalSimBall._updatePhysics(0.02);
-            finalSimBall.checkCollision(oldPos);
-            if (finalSimBall.mesh.position.z > this.mesh.position.z || finalSimBall.status < 0) {
-                hittingPosition.copy(finalSimBall.mesh.position);
-                return { position: hittingPosition, isBounceHit: false };
-            }
-        }
-
-        // Absolute fallback
-        hittingPosition.copy(simBall.mesh.position);
-        return { position: hittingPosition, isBounceHit: false };
     }
 
     private shouldAutoMove(): boolean {
