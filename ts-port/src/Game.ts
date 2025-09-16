@@ -7,6 +7,7 @@ import { AIController } from './AIController';
 import { inputManager } from './InputManager';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT } from './constants';
 import { CameraManager } from './CameraManager';
+import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
 
@@ -19,6 +20,7 @@ export class Game {
     private ball!: Ball;
     private field!: Field;
     private cameraManager!: CameraManager;
+    private trajectoryVisualizer!: TrajectoryVisualizer;
     private scoreboardElement: HTMLElement;
     private prevBallStatus = 0;
 
@@ -37,6 +39,7 @@ export class Game {
         this.camera = camera;
         this.assets = assets;
         this.scoreboardElement = document.getElementById('scoreboard')!;
+        this.trajectoryVisualizer = new TrajectoryVisualizer(this.scene);
         this.resetGame(true); // Start in demo mode
     }
 
@@ -72,6 +75,7 @@ export class Game {
         if (this.player2) this.scene.remove(this.player2.mesh);
         if (this.ball) this.scene.remove(this.ball.mesh);
         if (this.field) this.scene.remove(this.field.mesh);
+        this.trajectoryVisualizer.hide();
 
         // Reset scores
         this.score1 = 0;
@@ -236,6 +240,16 @@ export class Game {
             // Update target indicator position
             this.field.targetIndicator.position.x = this.player1.targetPosition.x;
             this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+
+            // --- Trajectory Visualizer Logic ---
+            if (this.ball.justHitBySide === -1) { // AI just hit the ball
+                this.trajectoryVisualizer.show(this.ball, this.player1);
+                this.ball.justHitBySide = 0; // Consume the event
+            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) { // Player hit or rally ended
+                this.trajectoryVisualizer.hide();
+                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0; // Consume the event
+            }
+
 
             inputManager.update();
         }
