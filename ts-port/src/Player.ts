@@ -444,7 +444,7 @@ export class Player {
         return false;
     }
 
-    public predictOptimalHittingPoint(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean } {
+    public predictOptimalPlayerPosition(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean } {
         const simBall = ball.clone();
         let maxHeight = -1.0;
         const peakPosition = new THREE.Vector3();
@@ -522,8 +522,8 @@ export class Player {
             return;
         }
 
-        // 2. Predict where the ball will be.
-        const prediction = this.predictOptimalHittingPoint(ball);
+        // 2. Predict where the player should be.
+        const prediction = this.predictOptimalPlayerPosition(ball);
         if (!prediction || !prediction.position) {
             // Prediction failed, do not move. Dampen velocity.
             this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
