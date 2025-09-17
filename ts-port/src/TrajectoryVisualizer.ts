@@ -48,7 +48,7 @@ export class TrajectoryVisualizer {
         const swingParams = stype.get(SWING_NORMAL);
         if (!swingParams) return; // Should not happen
 
-        const swingLagFrames = 0; // DEBUG: Set to 0 to test if hitIndex is correct
+        const swingLagFrames = swingParams.hitStart - swingParams.backswing; // e.g., 20 - 10 = 10 frames
         const markerIndex = Math.max(0, hitIndex - swingLagFrames);
         const markerPosition = trajectory[markerIndex];
 
