@@ -51,18 +51,24 @@ export class AIController {
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
         if (this.ball.status === 8 && game.getService() === this.player.side) {
+            // 1. Set the target to the home position for serving. This ensures the AI
+            // moves to the correct spot before attempting to serve.
+            this.predictedHitPosition.x = this.HOME_POSITION_X;
+            this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
+
+            // 2. Check if the AI has arrived at the serving position and is stable.
             const playerVel = this.player.velocity;
             const playerPos = this.player.mesh.position;
             const targetPos = this.predictedHitPosition;
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
-            // C++: fabs(m_parent->GetV()[0]) < 0.2 && fabs(m_parent->GetV()[1]) < 0.2
             const isStable = Math.abs(playerVel.x) < 0.2 && Math.abs(playerVel.z) < 0.2;
-            // C++: fabs(m_parent->GetX()[0]+m_parent->GetSide()*0.3-_hitX[0]) < 0.1 && fabs(m_parent->GetX()[1]-_hitX[1]) < 0.1
+            // The tolerance is returned to 0.1 as the root cause was the incorrect target, not the tolerance.
             const isAtPosition = Math.abs(playerPos.x - idealServePosX) < 0.1 && Math.abs(playerPos.z - targetPos.y) < 0.1;
 
+            // 3. If ready, perform the serve.
             if (isStable && isAtPosition && this.player.swing === 0) {
-                 // Set a specific target for the serve
+                // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.5);
                 const targetZ = (TABLE_LENGTH / 6) * -this.player.side;
                 this.player.targetPosition.set(targetX, targetZ);
