@@ -62,6 +62,7 @@ export class Game {
     private isDemo = true;
     private isPaused = false;
     private demoCameraAngle = 0;
+    private frameCount = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -196,6 +197,7 @@ export class Game {
     }
 
     public update(deltaTime: number) {
+        this.frameCount++;
         if (this.isPaused) {
             return;
         }
@@ -331,5 +333,9 @@ export class Game {
         // The C++ GetService returns -1 for near side (player1) and 1 for far side (player2).
         // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
         return -ret;
+    }
+
+    public getFrameCount(): number {
+        return this.frameCount;
     }
 }
