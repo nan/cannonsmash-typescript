@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Player } from './Player';
 import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FALLBACK_SERVE_VELOCITY } from './constants';
 import type { Game } from './Game';
+import { BallStatus } from './BallStatus';
 
 const BALL_RADIUS = 0.02;
 
@@ -15,7 +16,7 @@ export class Ball {
     public mesh: THREE.Mesh;
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
-    public status = 8;
+    public status: BallStatus = BallStatus.WAITING_FOR_SERVE;
     public justHitBySide: number = 0; // 0: none, 1: player1, -1: player2 (AI)
 
     constructor() {
@@ -42,10 +43,10 @@ export class Ball {
      * This includes physics, collision, and game state logic.
      */
     public update(deltaTime: number, game: Game) {
-        if (this.status === 8) { return; }
+        if (this.status === BallStatus.WAITING_FOR_SERVE) { return; }
 
         // Handle the reset timer for a dead ball
-        if (this.status < 0) {
+        if (this.status < 0) { // DEAD is -1, so this check is fine
             this.status--;
             if (this.status < -100) {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
@@ -141,20 +142,19 @@ export class Ball {
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
-            if (this.mesh.position.z > 0) {
+            if (this.mesh.position.z > 0) { // Bounce on Player 2 (AI) side
                 switch(this.status) {
-                    case 2: this.status = 3; break;
-                    case 4: this.status = 0; break;
+                    case BallStatus.IN_PLAY_TO_HUMAN: this.status = BallStatus.IN_PLAY_TO_AI; break;
+                    case BallStatus.SERVE_TO_AI: this.status = BallStatus.RALLY_TO_AI; break;
                     default: this.ballDead(); break;
                 }
-            } else {
+            } else { // Bounce on Player 1 (Human) side
                 switch(this.status) {
-                    case 0:
-                        this.status = 1;
-                        console.log(`[STATUS CHANGE] Ball status changed to ${this.status} on AI side bounce.`);
+                    case BallStatus.RALLY_TO_AI:
+                        this.status = BallStatus.RALLY_TO_HUMAN;
                         break;
-                    case 5:
-                        this.status = 2;
+                    case BallStatus.SERVE_TO_HUMAN:
+                        this.status = BallStatus.IN_PLAY_TO_HUMAN;
                         break;
                     default: this.ballDead(); break;
                 }
@@ -175,18 +175,18 @@ export class Ball {
     public hit(velocity: THREE.Vector3, spin: THREE.Vector2) {
         this.velocity.copy(velocity);
         this.spin.copy(spin);
-        if (this.status === 6) { this.status = 4; }
-        else if (this.status === 7) { this.status = 5; }
-        else if (this.status === 3) { this.status = 0; }
-        else if (this.status === 1) { this.status = 2; }
+        if (this.status === BallStatus.TOSS_P1) { this.status = BallStatus.SERVE_TO_AI; }
+        else if (this.status === BallStatus.TOSS_P2) { this.status = BallStatus.SERVE_TO_HUMAN; }
+        else if (this.status === BallStatus.IN_PLAY_TO_AI) { this.status = BallStatus.RALLY_TO_AI; }
+        else if (this.status === BallStatus.RALLY_TO_HUMAN) { this.status = BallStatus.IN_PLAY_TO_HUMAN; }
     }
 
-    private ballDead() { if (this.status >= 0) { this.status = -1; } }
+    private ballDead() { if (this.status >= 0) { this.status = BallStatus.DEAD; } }
 
     public toss(player: Player, power: number) {
         this.velocity.y = power;
         this.spin.set(0, 0);
-        this.status = player.side > 0 ? 6 : 7;
+        this.status = player.side > 0 ? BallStatus.TOSS_P1 : BallStatus.TOSS_P2;
     }
 
     public reset(player: Player) {
@@ -203,7 +203,7 @@ export class Ball {
         this.mesh.position.y = TABLE_HEIGHT + 0.15;
         this.velocity.set(0, 0, 0);
         this.spin.set(0, 0);
-        this.status = 8;
+        this.status = BallStatus.WAITING_FOR_SERVE;
     }
 
     // =================================================================================
