@@ -557,46 +557,48 @@ export class Player {
         this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
     }
 
-    public update(deltaTime: number, ball: Ball, game: Game) {
-        // --- Swing and Serve Logic ---
-        if (this.swing > 0) {
-            const swingParams = stype.get(this.swingType);
-            if (swingParams) {
-                // This logic mirrors the C++ code's Player::Move function
-                if (this.canServe(ball)) {
-                    // Ball is already tossed, just continue the swing
-                    if (ball.velocity.y < 0) { // Wait for toss to reach apex
-                        this.swing++;
-                    }
-                } else {
-                    // This block handles both serves (before the ball is tossed) and rally swings.
-                    // We need to check if a toss is required for the current swing type.
-                    if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
-                        ball.toss(this, swingParams.tossV);
-                    }
-                    this.swing++;
-                }
+    private _updateSwing(ball: Ball) {
+        if (this.swing <= 0) return;
 
-                // Impact
-                if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
-                    this.hitBall(ball);
-                }
-
-                // End of swing
-                if (this.swing >= swingParams.swingLength) {
-                    this.swing = 0;
-                    if (this.swingType >= SERVE_MIN) {
-                        this.swingType = SWING_NORMAL;
-                    }
-                    this.setState('IDLE');
-                }
-            } else {
-                // Invalid swing type, reset
-                this.swing = 0;
-            }
+        const swingParams = stype.get(this.swingType);
+        if (!swingParams) {
+            this.swing = 0; // Invalid swing type, reset
+            return;
         }
 
+        // This logic mirrors the C++ code's Player::Move function
+        if (this.canServe(ball)) {
+            // Ball is already tossed, just continue the swing
+            if (ball.velocity.y < 0) { // Wait for toss to reach apex
+                this.swing++;
+            }
+        } else {
+            // This block handles both serves (before the ball is tossed) and rally swings.
+            // We need to check if a toss is required for the current swing type.
+            if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
+                ball.toss(this, swingParams.tossV);
+            }
+            this.swing++;
+        }
+
+        // Impact
+        if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
+            this.hitBall(ball);
+        }
+
+        // End of swing
+        if (this.swing >= swingParams.swingLength) {
+            this.swing = 0;
+            if (this.swingType >= SERVE_MIN) {
+                this.swingType = SWING_NORMAL;
+            }
+            this.setState('IDLE');
+        }
+    }
+
+    private _updateMovement(deltaTime: number, ball: Ball, game: Game) {
         if (!this.isAi) {
+            // --- Human-controlled movement ---
             let manualMove = false;
             if (inputManager.isPointerLocked) {
                 const movement = inputManager.getMouseMovement();
@@ -618,44 +620,40 @@ export class Player {
                     this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
                 }
             }
-
-            // Apply velocity from AutoMove to the player's position
-            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-
         } else {
-            // AI movement is driven by its controller
+            // --- AI-controlled movement ---
             if (this.aiController) {
                 this.aiController.update(deltaTime, game);
             }
-            // The controller sets the velocity, and we apply it here.
-            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
         }
 
-        // Common logic for both human and AI
-        // Boundary checks for x
-        const halfArena = AREAXSIZE / 2;
-        if (this.mesh.position.x < -halfArena) {
-            this.mesh.position.x = -halfArena;
+        // Apply velocity from AutoMove (human) or AI controller to the player's position
+        this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+
+        // --- Boundary checks for all players ---
+        const halfArenaX = AREAXSIZE / 2;
+        if (this.mesh.position.x < -halfArenaX) {
+            this.mesh.position.x = -halfArenaX;
             this.velocity.x = 0;
         }
-        if (this.mesh.position.x > halfArena) {
-            this.mesh.position.x = halfArena;
+        if (this.mesh.position.x > halfArenaX) {
+            this.mesh.position.x = halfArenaX;
             this.velocity.x = 0;
         }
 
-        // Boundary checks for z (depth)
-        if (this.side === 1) { // Near side player (human or AI)
-            if (this.mesh.position.z < TABLE_LENGTH / 2) {
-                this.mesh.position.z = TABLE_LENGTH / 2;
+        const halfTableZ = TABLE_LENGTH / 2;
+        if (this.side === 1) { // Near side player
+            if (this.mesh.position.z < halfTableZ) {
+                this.mesh.position.z = halfTableZ;
                 this.velocity.z = 0;
             }
             if (this.mesh.position.z > AREAYSIZE) {
                 this.mesh.position.z = AREAYSIZE;
                 this.velocity.z = 0;
             }
-        } else { // Far side player (always AI)
-            if (this.mesh.position.z > -TABLE_LENGTH / 2) {
-                this.mesh.position.z = -TABLE_LENGTH / 2;
+        } else { // Far side player
+            if (this.mesh.position.z > -halfTableZ) {
+                this.mesh.position.z = -halfTableZ;
                 this.velocity.z = 0;
             }
             if (this.mesh.position.z < -AREAYSIZE) {
@@ -663,7 +661,11 @@ export class Player {
                 this.velocity.z = 0;
             }
         }
+    }
 
+    public update(deltaTime: number, ball: Ball, game: Game) {
+        this._updateSwing(ball);
+        this._updateMovement(deltaTime, ball, game);
         this.mixer.update(deltaTime);
     }
 }
