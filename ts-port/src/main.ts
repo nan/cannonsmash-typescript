@@ -50,6 +50,10 @@ async function main() {
 
   // --- Event Listeners ---
 
+  document.addEventListener('gameended', () => {
+    uiManager.showDemoScreen();
+  });
+
   demoScreen.addEventListener('click', () => {
     game.start();
     uiManager.showGameScreen();

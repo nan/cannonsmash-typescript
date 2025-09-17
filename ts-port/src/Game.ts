@@ -5,38 +5,11 @@ import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT, KEY_MAP_X, KEY_MAP_Y } from './constants';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
-
-// --- Constants for Keyboard Targeting ---
-const keyMapX: { [key: string]: number } = {
-    '1': -TABLE_WIDTH / 2 * 0.9, 'q': -TABLE_WIDTH / 2 * 0.9, 'a': -TABLE_WIDTH / 2 * 0.9, 'z': -TABLE_WIDTH / 2 * 0.9,
-    '2': -TABLE_WIDTH / 2 * 0.9, 'w': -TABLE_WIDTH / 2 * 0.9, 's': -TABLE_WIDTH / 2 * 0.9, 'x': -TABLE_WIDTH / 2 * 0.9,
-    '3': -TABLE_WIDTH / 2 * 0.9,
-    'e': -TABLE_WIDTH / 2 * 0.75,
-    'd': -TABLE_WIDTH / 2 * 0.6,
-    '4': -TABLE_WIDTH / 2 * 0.45, 'c': -TABLE_WIDTH / 2 * 0.45,
-    'r': -TABLE_WIDTH / 2 * 0.3,
-    'f': -TABLE_WIDTH / 2 * 0.15,
-    '5': 0, 'v': 0,
-    't': TABLE_WIDTH / 2 * 0.15,
-    'g': TABLE_WIDTH / 2 * 0.3,
-    '6': TABLE_WIDTH / 2 * 0.45, 'b': TABLE_WIDTH / 2 * 0.45,
-    'y': TABLE_WIDTH / 2 * 0.6,
-    'h': TABLE_WIDTH / 2 * 0.75,
-    '7': TABLE_WIDTH / 2 * 0.9, 'n': TABLE_WIDTH / 2 * 0.9, 'u': TABLE_WIDTH / 2 * 0.9, 'j': TABLE_WIDTH / 2 * 0.9,
-    '8': TABLE_WIDTH / 2 * 0.9, 'm': TABLE_WIDTH / 2 * 0.9, 'i': TABLE_WIDTH / 2 * 0.9, 'k': TABLE_WIDTH / 2 * 0.9,
-    '9': TABLE_WIDTH / 2 * 0.9, ',': TABLE_WIDTH / 2 * 0.9, 'o': TABLE_WIDTH / 2 * 0.9, 'l': TABLE_WIDTH / 2 * 0.9,
-    '0': TABLE_WIDTH / 2 * 0.9, '.': TABLE_WIDTH / 2 * 0.9, 'p': TABLE_WIDTH / 2 * 0.9, ';': TABLE_WIDTH / 2 * 0.9,
-};
-
-const keyMapY: { [key: string]: number } = {
-    '1': TABLE_LENGTH / 12 * 5, '2': TABLE_LENGTH / 12 * 5, '3': TABLE_LENGTH / 12 * 5, '4': TABLE_LENGTH / 12 * 5, '5': TABLE_LENGTH / 12 * 5, '6': TABLE_LENGTH / 12 * 5, '7': TABLE_LENGTH / 12 * 5, '8': TABLE_LENGTH / 12 * 5, '9': TABLE_LENGTH / 12 * 5, '0': TABLE_LENGTH / 12 * 5,
-    'q': TABLE_LENGTH / 12 * 4, 'w': TABLE_LENGTH / 12 * 4, 'e': TABLE_LENGTH / 12 * 4, 'r': TABLE_LENGTH / 12 * 4, 't': TABLE_LENGTH / 12 * 4, 'y': TABLE_LENGTH / 12 * 4, 'u': TABLE_LENGTH / 12 * 4, 'i': TABLE_LENGTH / 12 * 4, 'o': TABLE_LENGTH / 12 * 4, 'p': TABLE_LENGTH / 12 * 4,
-    'a': TABLE_LENGTH / 12 * 3, 's': TABLE_LENGTH / 12 * 3, 'd': TABLE_LENGTH / 12 * 3, 'f': TABLE_LENGTH / 12 * 3, 'g': TABLE_LENGTH / 12 * 3, 'h': TABLE_LENGTH / 12 * 3, 'j': TABLE_LENGTH / 12 * 3, 'k': TABLE_LENGTH / 12 * 3, 'l': TABLE_LENGTH / 12 * 3, ';': TABLE_LENGTH / 12 * 3,
-    'z': TABLE_LENGTH / 12 * 2, 'x': TABLE_LENGTH / 12 * 2, 'c': TABLE_LENGTH / 12 * 2, 'v': TABLE_LENGTH / 12 * 2, 'b': TABLE_LENGTH / 12 * 2, 'n': TABLE_LENGTH / 12 * 2, 'm': TABLE_LENGTH / 12 * 2, ',': TABLE_LENGTH / 12 * 2, '.': TABLE_LENGTH / 12 * 2,
-};
+import { UIManager } from './UIManager';
+import { BallStatus } from './BallStatus';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
 
@@ -61,6 +34,7 @@ export class Game {
     private gameMode: GameMode = '11PTS';
     private isDemo = true;
     private isPaused = false;
+    private isGameOver = false;
     private demoCameraAngle = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
@@ -84,25 +58,61 @@ export class Game {
         }
         this.updateScoreboard();
 
-        // Reset player statuses to full at the end of each point.
-        // This ensures that any fatigue/error penalty from the previous rally is cleared.
-        this.player1.resetStatus();
-        this.player2.resetStatus();
+        // Check for game over
+        const p1Score = this.score1;
+        const p2Score = this.score2;
+        const gameOver = (p1Score >= 11 || p2Score >= 11) && Math.abs(p1Score - p2Score) >= 2;
+
+        if (gameOver) {
+            this.endGame(p1Score > p2Score);
+        } else {
+            // Reset player statuses to full at the end of each point.
+            // This ensures that any fatigue/error penalty from the previous rally is cleared.
+            this.player1.resetStatus();
+            this.player2.resetStatus();
+        }
+    }
+
+    private endGame(player1Won: boolean) {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+
+        document.exitPointerLock();
+        this.scoreboardElement.innerText = player1Won ? 'You Win!' : 'You Lose!';
+
+        // Return to demo after a delay
+        setTimeout(() => {
+            this.returnToDemo();
+            // Dispatch an event to notify UI to return to demo screen
+            document.dispatchEvent(new CustomEvent('gameended'));
+        }, 4000);
     }
 
     private awardPoint() {
         // This logic is ported directly from the original C++ source
-        if (this.prevBallStatus === 0 || this.prevBallStatus === 3 ||
-            this.prevBallStatus === 4 || this.prevBallStatus === 6) {
-            this.pointWonBy(-1); // AI scores
-        } else {
-            this.pointWonBy(1); // Player scores
+        // It determines the winner of a point based on the ball's status before it went "dead".
+        switch (this.prevBallStatus) {
+            // Player 1 (Human) hit the ball, and it went out of bounds or into the net without bouncing correctly.
+            case BallStatus.IN_PLAY_TO_AI:      // Human's rally shot failed.
+            case BallStatus.SERVE_TO_AI:        // Human's serve failed.
+            case BallStatus.TOSS_P1:            // Human's serve toss failed.
+            // Player 1 (Human) was supposed to hit the ball, but missed.
+            case BallStatus.RALLY_TO_HUMAN:     // AI's rally shot was good, Human missed the return.
+            case BallStatus.SERVE_TO_HUMAN:     // AI's serve was good, Human missed the return.
+                this.pointWonBy(-1); // AI scores
+                break;
+
+            default:
+                // In all other cases, the AI must have made the error.
+                this.pointWonBy(1); // Player scores
+                break;
         }
     }
 
     private resetGame(isDemo: boolean) {
         this.isDemo = isDemo;
         this.isPaused = false;
+        this.isGameOver = false;
 
         // Clear previous game objects from the scene
         if (this.player1) this.scene.remove(this.player1.mesh);
@@ -158,7 +168,7 @@ export class Game {
         }
 
         // Check if it's player 1's turn to serve
-        if (this.ball.status === 8 && this.getService() === this.player1.side) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
@@ -184,16 +194,16 @@ export class Game {
         let targetY = this.player1.targetPosition.y;
 
         let targetUpdated = false;
-        for(const key in keyMapX) {
+        for(const key in KEY_MAP_X) {
             if(inputManager.isKeyPressed(key)) {
-                targetX = keyMapX[key]; // Do not multiply by side, X is absolute
+                targetX = KEY_MAP_X[key]; // Do not multiply by side, X is absolute
                 targetUpdated = true;
                 break;
             }
         }
-        for(const key in keyMapY) {
+        for(const key in KEY_MAP_Y) {
             if(inputManager.isKeyPressed(key)) {
-                targetY = keyMapY[key] * side;
+                targetY = KEY_MAP_Y[key] * side;
                 targetUpdated = true;
                 break;
             }
@@ -205,7 +215,7 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        if (this.isPaused) {
+        if (this.isPaused || this.isGameOver) {
             return;
         }
 
@@ -238,7 +248,7 @@ export class Game {
             this.handleInput();
 
             // Pre-serve logic
-            if (this.ball.status === 8 && this.getService() === this.player1.side) {
+            if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
                 this.ball.reset(this.player1);
                 if (this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
@@ -295,51 +305,66 @@ export class Game {
     }
 
     /**
-     * Determines which side has the service right based on the score.
-     * @returns 1 for player 1 (near side), -1 for player 2 (far side).
+     * Determines which player has the service right based on the score and game mode.
+     * The logic is ported and adapted from the original C++ source.
+     * @returns 1 for player 1 (human), -1 for player 2 (AI).
      */
     public getService(): number {
-        let ret = 0;
+        let serviceOwner = 0;
         switch (this.gameMode) {
             case '5PTS':
-                // Inverted the logic to make Player 1 serve first.
-                ret = ((this.score1 + this.score2) % 2 === 0 ? -1 : 1);
+                serviceOwner = this._getService5PTS();
                 break;
             case '11PTS':
-                if (this.score1 >= 10 && this.score2 >= 10) { // Deuce
-                    ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
-                } else {
-                    // Inverted the logic to make Player 1 serve first.
-                    if (Math.floor((this.score1 + this.score2) / 2) % 2 === 0) {
-                        ret = -1;
-                    } else {
-                        ret = 1;
-                    }
-                }
+                serviceOwner = this._getService11PTS();
                 break;
             case '21PTS':
-                if (this.score1 >= 20 && this.score2 >= 20) { // Deuce
-                    ret = ((this.score1 + this.score2) % 2 === 1 ? -1 : 1);
-                } else {
-                    // Inverted the logic to make Player 1 serve first.
-                    if (Math.floor((this.score1 + this.score2) / 5) % 2 === 0) {
-                        ret = -1;
-                    } else {
-                        ret = 1;
-                    }
-                }
+                serviceOwner = this._getService21PTS();
                 break;
         }
 
+        // In the second or subsequent games, the service order is reversed.
         if ((this.game1 + this.game2) % 2 === 1) {
-            ret = -ret;
+            serviceOwner = -serviceOwner;
         }
 
-        // In the C++ code, player 1 (human) is on the near side (y < 0), which corresponds to side 1.
-        // Player 2 (com) is on the far side (y > 0), which corresponds to side -1.
-        // The C++ GetService returns -1 for near side (player1) and 1 for far side (player2).
-        // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
-        return -ret;
+        // The original C++ logic returns -1 for the near side (our Player 1) and 1 for the far side (our Player 2).
+        // To match our convention where Player 1's side is 1 and Player 2's is -1, we must flip the final result.
+        return -serviceOwner;
+    }
+
+    private _getService11PTS(): number {
+        const totalScore = this.score1 + this.score2;
+        // Deuce condition: score is 10-10 or higher.
+        if (this.score1 >= 10 && this.score2 >= 10) {
+            // In deuce, serve alternates every point.
+            // If total score is odd (e.g., 10-11 -> 21), P2 serves.
+            return (totalScore % 2 === 1 ? -1 : 1);
+        } else {
+            // Before deuce, serve alternates every 2 points.
+            // Integer division by 2 groups scores into pairs (0-1, 2-3, 4-5, etc.).
+            // The server for each pair is determined by whether the pair index is even or odd.
+            // The logic is inverted from the C++ to make Player 1 serve first.
+            return (Math.floor(totalScore / 2) % 2 === 0) ? -1 : 1;
+        }
+    }
+
+    private _getService21PTS(): number {
+        const totalScore = this.score1 + this.score2;
+        // Deuce condition: score is 20-20 or higher.
+        if (this.score1 >= 20 && this.score2 >= 20) {
+            // In deuce, serve alternates every point.
+            return (totalScore % 2 === 1 ? -1 : 1);
+        } else {
+            // Before deuce, serve alternates every 5 points.
+            return (Math.floor(totalScore / 5) % 2 === 0) ? -1 : 1;
+        }
+    }
+
+    private _getService5PTS(): number {
+        // In a 5-point game, serve alternates every point.
+        const totalScore = this.score1 + this.score2;
+        return (totalScore % 2 === 0 ? -1 : 1);
     }
 
 }
