@@ -26,7 +26,9 @@ export class Player {
     public aiController?: AIController;
 
     // --- Status System Properties ---
+    /** The player's current status/stamina. Decreases with effort, affecting accuracy. */
     public status: number;
+    /** The maximum value for the player's status. */
     public statusMax: number;
 
     // Serve-related properties
@@ -421,7 +423,7 @@ export class Player {
      * @param ball The ball object.
      */
     /**
-     * Executes the logic for hitting the ball.
+     * Executes the logic for hitting the ball, including applying status-based errors for AI.
      * @param ball The ball object.
      */
     public hitBall(ball: Ball) {
@@ -435,7 +437,7 @@ export class Player {
             // --- RALLY HIT ---
             const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
 
-            // For AI, introduce errors based on status
+            // For AI players, introduce errors based on their current status to simulate fatigue.
             if (this.isAi) {
                 this.addError(velocity, ball);
             }
@@ -444,9 +446,8 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
 
-            // Reduce status after hitting
-            // C++: m_afterSwing = (long)(hypot( theBall.GetV()[0]*0.8-v[0], theBall.GetV()[1]*0.8+v[1] ) * (1.0+diff*10.0) + m_spin.len()*5.0 + fabs(theBall.GetSpin()[1])*4.0);
-            // Simplified version for now: penalty is proportional to the new velocity
+            // Reduce status after hitting. The penalty is proportional to the shot's power.
+            // This is a simplified port of the C++ `m_afterSwing` logic.
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }
@@ -686,46 +687,50 @@ export class Player {
     }
 
     /**
-     * Adds error to the ball's velocity based on the player's status.
-     * Ported from C++ Player::AddError.
-     * @param v The calculated velocity of the ball to be modified.
-     * @param ball The ball object, for its properties.
+     * Introduces an error to the ball's velocity based on the player's status.
+     * A lower status results in a larger potential error, making shots less accurate.
+     * This method is a direct port of the logic from the original C++ `Player::AddError`.
+     * @param v The calculated velocity vector of the ball, which will be modified.
+     * @param ball The ball object, used to get its position and spin properties.
      */
     private addError(v: THREE.Vector3, ball: Ball) {
         const playerPos = this.mesh.position;
         const ballPos = ball.mesh.position;
 
-        // C++: double xDiff = (fabs(m_x[0]-theBall.GetX()[0])-0.3)/0.3;
+        // Calculate the difference between player and ball, factoring in an ideal hit offset.
+        // This simulates how far off the player was from a "perfect" hit position.
         const xDiff = (Math.abs(playerPos.x - ballPos.x) - 0.3) / 0.3;
-        // C++: double yDiff = (m_x[1]-theBall.GetX()[1])/0.3;
-        const yDiff = (playerPos.z - ballPos.z) / 0.3; // Note: player y is z in THREE
+        const yDiff = (playerPos.z - ballPos.z) / 0.3; // Note: player's Y in 2D is Z in 3D space
 
-        // C++: radDiff = hypot( xDiff*(1+fabs(theBall.GetSpin()[0])), yDiff*(1+fabs(theBall.GetSpin()[1])) );
+        // Calculate the base error radius. It's larger if the player is further from the ideal hit point
+        // and is amplified by the ball's existing spin.
         let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
 
-        // C++: radDiff *= (double)(200-m_status)/200*3.141592/12;
+        // The core of the difficulty logic: The error radius is scaled by the inverse of the player's status.
+        // A full status (200) results in almost no error, while a low status results in a large error.
         radDiff *= (this.statusMax - this.status) / this.statusMax * (Math.PI / 12);
 
         const vl = v.length();
-        if (vl === 0) return;
+        if (vl === 0) return; // No velocity, no error to add.
 
-        // Create two orthogonal vectors (n1, n2) to the velocity vector 'v'
+        // To apply the error, we create an "error cone" around the velocity vector.
+        // First, find two vectors (n1, n2) that are orthogonal to the velocity vector 'v'.
         const n1 = new THREE.Vector3();
         const n2 = new THREE.Vector3();
         const vNorm = v.clone().normalize();
 
-        // Create a non-parallel vector to get the first orthogonal vector
+        // Create a non-parallel vector to get the first orthogonal vector using cross product.
         let nonParallel = new THREE.Vector3(1, 0, 0);
-        if (Math.abs(vNorm.x) > 0.9) {
+        if (Math.abs(vNorm.x) > 0.9) { // If v is mostly aligned with the x-axis, use y-axis instead.
             nonParallel = new THREE.Vector3(0, 1, 0);
         }
         n1.crossVectors(vNorm, nonParallel).normalize();
-        n2.crossVectors(vNorm, n1).normalize();
+        n2.crossVectors(vNorm, n1).normalize(); // The second is orthogonal to both v and n1.
 
-        // C++: radRand = RAND(360)*3.141592/180.0;
+        // Pick a random direction within the error cone.
         const radRand = Math.random() * 2 * Math.PI;
 
-        // Apply the error cone
+        // Calculate the final error vector and add it to the original velocity.
         const errorMagnitude = vl * Math.tan(radDiff);
         const errorVector = n1.multiplyScalar(Math.cos(radRand)).add(n2.multiplyScalar(Math.sin(radRand))).multiplyScalar(errorMagnitude);
 
@@ -734,8 +739,8 @@ export class Player {
 
 
     /**
-     * Changes the status value, ensuring it stays within bounds.
-     * @param diff The amount to add to the status.
+     * Modifies the player's status by a given amount, clamping it within the valid range [1, statusMax].
+     * @param diff The amount to add to the status (can be negative).
      */
     public addStatus(diff: number) {
         this.status += diff;
@@ -748,7 +753,7 @@ export class Player {
     }
 
     /**
-     * Resets the status to its maximum value.
+     * Resets the player's status to its maximum value. Called at the end of each point.
      */
     public resetStatus() {
         this.status = this.statusMax;
@@ -761,7 +766,7 @@ export class Player {
      * @param game The main game object.
      */
     public update(deltaTime: number, ball: Ball, game: Game) {
-        // Store previous velocity for acceleration calculation
+        // Store previous velocity for acceleration calculation before any updates.
         this.prevVelocity.copy(this.velocity);
 
         this._updateSwing(ball);
@@ -769,28 +774,34 @@ export class Player {
         this.mixer.update(deltaTime);
 
         // --- Status Reduction Logic (ported from Player::Move in C++) ---
+        // This section simulates player fatigue and effort.
+
         const swingParams = stype.get(this.swingType);
         if (swingParams) {
+            // Penalize status for being in the middle of a swing motion.
             if (this.swing > swingParams.backswing) {
                 this.addStatus(SWING_PENALTY);
             }
         }
 
+        // Penalize status for running too fast.
         if (this.velocity.length() > RUN_SPEED) {
             this.addStatus(RUN_PENALTY);
         }
 
+        // Reward status for moving slowly or standing still.
         if (this.velocity.length() < WALK_SPEED) {
             this.addStatus(WALK_BONUS);
         }
 
-        // Acceleration penalty (The "Handicap")
+        // Penalize status for accelerating too quickly (the "Handicap").
+        // This prevents the AI from making jerky, superhuman movements.
         // Note: We currently don't have gameLevel in the TS port, so we use the hardest level's limit.
-        if (this.velocity.distanceTo(this.prevVelocity) > ACCEL_LIMIT[3]) { // Using LEVEL_HARD index
+        if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > ACCEL_LIMIT[3]) { // Using LEVEL_HARD index
             this.addStatus(ACCEL_PENALTY);
         }
 
-        // Reset status if the point is over
+        // Reset status if the point is over (ball is dead or ready for serve).
         if (ball.status === -1 || ball.status === 8) {
             this.resetStatus();
         }

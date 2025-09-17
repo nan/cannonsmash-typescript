@@ -84,7 +84,8 @@ export class Game {
         }
         this.updateScoreboard();
 
-        // Reset player statuses after a point is scored
+        // Reset player statuses to full at the end of each point.
+        // This ensures that any fatigue/error penalty from the previous rally is cleared.
         this.player1.resetStatus();
         this.player2.resetStatus();
     }
@@ -141,7 +142,7 @@ export class Game {
         this.player2.mesh.rotation.y = Math.PI;
         this.player2.mesh.rotation.x = Math.PI / 2;
 
-        // Ensure status is reset at the start of a new game
+        // Ensure status is reset at the start of a new game for a clean slate.
         this.player1.resetStatus();
         this.player2.resetStatus();
 
