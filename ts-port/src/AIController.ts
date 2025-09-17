@@ -1,7 +1,18 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
+import {
+    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH,
+    SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT,
+    AI_SERVE_STABLE_VELOCITY_THRESHOLD, AI_SERVE_POSITION_TOLERANCE,
+    AI_SERVE_TARGET_DEPTH_DIVISOR, AI_SERVE_TARGET_X_RANDOM_FACTOR,
+    AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD, AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD,
+    AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR, AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR,
+    AI_TRAJECTORY_THRESHOLD_SHORT, AI_TRAJECTORY_THRESHOLD_MEDIUM,
+    AI_TARGET_DEPTH_SHORT_DIVISOR, AI_TARGET_DEPTH_MEDIUM_DIVISOR,
+    AI_TARGET_DEPTH_DEEP_NUMERATOR, AI_TARGET_DEPTH_DEEP_DENOMINATOR,
+    AI_TARGET_X_ZONE_FACTORS, AI_TARGET_X_MAX_FACTOR
+} from './constants';
 import type { Game } from './Game';
 
 /**
@@ -51,9 +62,31 @@ export class AIController {
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
         if (this.ball.status === 8 && game.getService() === this.player.side) {
-            // It's our turn to serve
-            this.player.startServe(Math.floor(Math.random() * 3) + 1); // Serve with random spin
-            return; // Don't do anything else this frame
+            // 1. Set the target to the home position for serving. This ensures the AI
+            // moves to the correct spot before attempting to serve.
+            this.predictedHitPosition.x = this.HOME_POSITION_X;
+            this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
+
+            // 2. Check if the AI has arrived at the serving position and is stable.
+            const playerVel = this.player.velocity;
+            const playerPos = this.player.mesh.position;
+            const targetPos = this.predictedHitPosition;
+            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
+
+            const isStable = Math.abs(playerVel.x) < AI_SERVE_STABLE_VELOCITY_THRESHOLD && Math.abs(playerVel.z) < AI_SERVE_STABLE_VELOCITY_THRESHOLD;
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
+
+            // 3. If ready, perform the serve.
+            if (isStable && isAtPosition && this.player.swing === 0) {
+                // Set a specific target for the serve
+                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
+                const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
+                this.player.targetPosition.set(targetX, targetZ);
+
+                // Start a specific serve type, similar to C++'s StartServe(3)
+                this.player.startServe(3);
+                return; // Don't do anything else this frame
+            }
         }
 
 
@@ -88,9 +121,16 @@ export class AIController {
 
         // AIがラケットでボールを捉えるための、理想的なX座標を計算 (C++: mx)
         const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
-        const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
-        const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
-        const idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        let idealRacketX;
+        // C++: if ( theBall.GetStatus() == 8 || ... )
+        if (this.ball.status === 8) {
+            // For serving, always use the forehand side for positioning.
+            idealRacketX = playerPos.x + racketOffsetX;
+        } else {
+            const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
+            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
+            idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        }
 
         // スイングの特定フレームでは、移動計算を停止して体を安定させる
         if (this.player.swing > this.PLANTED_SWING_START_FRAME && this.player.swing <= this.PLANTED_SWING_END_FRAME) {
@@ -200,7 +240,7 @@ export class AIController {
             }
 
             // 6. Initiate the swing.
-            this.setTarget();
+            this.setRallyTarget(simBall);
             this.player.startSwing(this.ball, spinCategory);
         }
     }
@@ -281,18 +321,51 @@ export class AIController {
     }
 
     /**
-     * C++版の SetTargetX に相当。
-     * AIの返球先となる目標座標を相手コートに設定する。
+     * C++版の `SetTargetX` および `Think` 内のラリー時のターゲット計算ロジックを移植。
+     * ラリー中の返球先となる目標座標（X, Z）を相手コートに設定する。
+     * @param simBall 予測に使用した未来のボールオブジェクト
      */
-    private setTarget() {
-        // 相手コートのX座標をランダムに決定
-        // TABLE_WIDTH / 2 * 0.9 とすることで、少し内側を狙う
-        const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.9);
+    private setRallyTarget(simBall: Ball) {
+        // --- 1. Target X Calculation (based on SetTargetX) ---
+        const width = TABLE_WIDTH / 2; // LEVEL_NORMAL相当
+        const randIndex = Math.floor(Math.random() * AI_TARGET_X_ZONE_FACTORS.length);
+        let targetX = width * AI_TARGET_X_ZONE_FACTORS[randIndex];
 
-        // 相手コートのZ座標をランダムに決定
-        // sideが-1なら、相手コートは正のZ方向。0からTABLE_LENGTH/2の間。
-        // 0.25から0.75を掛けることで、ネット際やエンドライン際を避ける。
-        const targetZ = (TABLE_LENGTH / 2) * (0.25 + Math.random() * 0.5) * -this.player.side;
+        const playerVelX = this.player.velocity.x;
+        if (playerVelX > AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD) {
+            targetX += TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR;
+        } else if (playerVelX > AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD) {
+            targetX += TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR;
+        } else if (playerVelX < -AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD) {
+            targetX -= TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR;
+        } else if (playerVelX < -AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD) {
+            targetX -= TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR;
+        }
+
+        // Clamp the target to be within the table bounds
+        const maxTargetX = TABLE_WIDTH / 2 * AI_TARGET_X_MAX_FACTOR;
+        if (targetX > maxTargetX) {
+            targetX = maxTargetX;
+        }
+        if (targetX < -maxTargetX) {
+            targetX = -maxTargetX;
+        }
+
+
+        // --- 2. Target Z Calculation (based on trajectory) ---
+        let targetZ = this.player.targetPosition.y; // Get current target Z for the division
+        const ballHeight = simBall.mesh.position.y;
+        const ballZ = simBall.mesh.position.z;
+        const side = this.player.side;
+        const trajectoryRatio = (ballHeight - TABLE_HEIGHT) / Math.abs(ballZ - targetZ);
+
+        if (trajectoryRatio < AI_TRAJECTORY_THRESHOLD_SHORT) {
+            targetZ = (TABLE_LENGTH / AI_TARGET_DEPTH_SHORT_DIVISOR) * -side;
+        } else if (trajectoryRatio < AI_TRAJECTORY_THRESHOLD_MEDIUM) {
+            targetZ = (TABLE_LENGTH / AI_TARGET_DEPTH_MEDIUM_DIVISOR) * -side;
+        } else {
+            targetZ = (TABLE_LENGTH * AI_TARGET_DEPTH_DEEP_NUMERATOR / AI_TARGET_DEPTH_DEEP_DENOMINATOR) * -side;
+        }
 
         this.player.targetPosition.set(targetX, targetZ);
     }

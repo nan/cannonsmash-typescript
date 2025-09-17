@@ -332,4 +332,5 @@ export class Game {
         // To match our player.side convention (1 for p1, -1 for p2), we must flip the result.
         return -ret;
     }
+
 }
