@@ -142,21 +142,30 @@ export class Ball {
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
-            if (this.mesh.position.z > 0) { // Bounce on Player 2 (AI) side
+            // Note: Player 1 (Human) is on the +z side, Player 2 (AI) is on the -z side.
+            if (this.mesh.position.z > 0) { // Bounce on Player 1's side (Human)
                 switch(this.status) {
-                    case BallStatus.IN_PLAY_TO_HUMAN: this.status = BallStatus.IN_PLAY_TO_AI; break;
-                    case BallStatus.SERVE_TO_AI: this.status = BallStatus.RALLY_TO_AI; break;
-                    default: this.ballDead(); break;
-                }
-            } else { // Bounce on Player 1 (Human) side
-                switch(this.status) {
-                    case BallStatus.RALLY_TO_AI:
+                    // Ball was heading to Human, and bounced. It's now Human's turn to hit.
+                    case BallStatus.IN_PLAY_TO_HUMAN:
+                    case BallStatus.SERVE_TO_HUMAN:
                         this.status = BallStatus.RALLY_TO_HUMAN;
                         break;
-                    case BallStatus.SERVE_TO_HUMAN:
-                        this.status = BallStatus.IN_PLAY_TO_HUMAN;
+                    // Any other bounce on this side is a fault (e.g., player's own serve bounces on their side).
+                    default:
+                        this.ballDead();
                         break;
-                    default: this.ballDead(); break;
+                }
+            } else { // Bounce on Player 2's side (AI)
+                switch(this.status) {
+                    // Ball was heading to AI, and bounced. It's now AI's turn to hit.
+                    case BallStatus.IN_PLAY_TO_AI:
+                    case BallStatus.SERVE_TO_AI:
+                        this.status = BallStatus.RALLY_TO_AI;
+                        break;
+                    // Any other bounce on this side is a fault.
+                    default:
+                        this.ballDead();
+                        break;
                 }
             }
             return; // A table collision precludes a floor collision
@@ -175,10 +184,29 @@ export class Ball {
     public hit(velocity: THREE.Vector3, spin: THREE.Vector2) {
         this.velocity.copy(velocity);
         this.spin.copy(spin);
-        if (this.status === BallStatus.TOSS_P1) { this.status = BallStatus.SERVE_TO_AI; }
-        else if (this.status === BallStatus.TOSS_P2) { this.status = BallStatus.SERVE_TO_HUMAN; }
-        else if (this.status === BallStatus.IN_PLAY_TO_AI) { this.status = BallStatus.RALLY_TO_AI; }
-        else if (this.status === BallStatus.RALLY_TO_HUMAN) { this.status = BallStatus.IN_PLAY_TO_HUMAN; }
+
+        switch (this.status) {
+            // Serve hits
+            case BallStatus.TOSS_P1: // Human is serving
+                this.status = BallStatus.SERVE_TO_AI;
+                break;
+            case BallStatus.TOSS_P2: // AI is serving
+                this.status = BallStatus.SERVE_TO_HUMAN;
+                break;
+
+            // Rally hits
+            case BallStatus.RALLY_TO_HUMAN: // Human hits the ball
+                this.status = BallStatus.IN_PLAY_TO_AI;
+                break;
+            case BallStatus.RALLY_TO_AI: // AI hits the ball
+                this.status = BallStatus.IN_PLAY_TO_HUMAN;
+                break;
+
+            // Hitting the ball in any other state is not a valid move,
+            // but we don't change the status here. The game logic should
+            // prevent hits in invalid states. If one occurs, the existing
+            // status will likely lead to a `ballDead` call later, which is fine.
+        }
     }
 
     private ballDead() { if (this.status >= 0) { this.status = BallStatus.DEAD; } }
