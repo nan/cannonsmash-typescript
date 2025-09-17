@@ -51,9 +51,26 @@ export class AIController {
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
         if (this.ball.status === 8 && game.getService() === this.player.side) {
-            // It's our turn to serve
-            this.player.startServe(Math.floor(Math.random() * 3) + 1); // Serve with random spin
-            return; // Don't do anything else this frame
+            const playerVel = this.player.velocity;
+            const playerPos = this.player.mesh.position;
+            const targetPos = this.predictedHitPosition;
+            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
+
+            // C++: fabs(m_parent->GetV()[0]) < 0.2 && fabs(m_parent->GetV()[1]) < 0.2
+            const isStable = playerVel.lengthSq() < 0.2 * 0.2;
+            // C++: fabs(m_parent->GetX()[0]+m_parent->GetSide()*0.3-_hitX[0]) < 0.1 && fabs(m_parent->GetX()[1]-_hitX[1]) < 0.1
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < 0.1 && Math.abs(playerPos.z - targetPos.y) < 0.1;
+
+            if (isStable && isAtPosition && this.player.swing === 0) {
+                 // Set a specific target for the serve
+                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.5);
+                const targetZ = (TABLE_LENGTH / 6) * -this.player.side;
+                this.player.targetPosition.set(targetX, targetZ);
+
+                // Start a specific serve type, similar to C++'s StartServe(3)
+                this.player.startServe(3);
+                return; // Don't do anything else this frame
+            }
         }
 
 
@@ -200,7 +217,7 @@ export class AIController {
             }
 
             // 6. Initiate the swing.
-            this.setTarget();
+            this.setRallyTarget(simBall);
             this.player.startSwing(this.ball, spinCategory);
         }
     }
@@ -281,18 +298,61 @@ export class AIController {
     }
 
     /**
-     * C++版の SetTargetX に相当。
-     * AIの返球先となる目標座標を相手コートに設定する。
+     * C++版の `SetTargetX` および `Think` 内のラリー時のターゲット計算ロジックを移植。
+     * ラリー中の返球先となる目標座標（X, Z）を相手コートに設定する。
+     * @param simBall 予測に使用した未来のボールオブジェクト
      */
-    private setTarget() {
-        // 相手コートのX座標をランダムに決定
-        // TABLE_WIDTH / 2 * 0.9 とすることで、少し内側を狙う
-        const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.9);
+    private setRallyTarget(simBall: Ball) {
+        // --- 1. Target X Calculation (based on SetTargetX) ---
+        const width = TABLE_WIDTH / 2; // LEVEL_NORMAL相当
+        let targetX = 0;
 
-        // 相手コートのZ座標をランダムに決定
-        // sideが-1なら、相手コートは正のZ方向。0からTABLE_LENGTH/2の間。
-        // 0.25から0.75を掛けることで、ネット際やエンドライン際を避ける。
-        const targetZ = (TABLE_LENGTH / 2) * (0.25 + Math.random() * 0.5) * -this.player.side;
+        const rand = Math.floor(Math.random() * 8);
+        switch (rand) {
+            case 0: targetX = -width * 7 / 16; break;
+            case 1: targetX = -width * 5 / 16; break;
+            case 2: targetX = -width * 3 / 16; break;
+            case 3: targetX = -width * 1 / 16; break;
+            case 4: targetX =  width * 1 / 16; break;
+            case 5: targetX =  width * 3 / 16; break;
+            case 6: targetX =  width * 5 / 16; break;
+            case 7: targetX =  width * 7 / 16; break;
+        }
+
+        const playerVelX = this.player.velocity.x;
+        if (playerVelX > 1.5) {
+            targetX += TABLE_WIDTH / 2;
+        } else if (playerVelX > 0.5) {
+            targetX += TABLE_WIDTH / 4;
+        } else if (playerVelX < -1.5) {
+            targetX -= TABLE_WIDTH / 2;
+        } else if (playerVelX < -0.5) {
+            targetX -= TABLE_WIDTH / 4;
+        }
+
+        if (targetX > TABLE_WIDTH / 2) {
+            targetX = TABLE_WIDTH * 7 / 16;
+        }
+        if (targetX < -TABLE_WIDTH / 2) {
+            targetX = -TABLE_WIDTH * 7 / 16;
+        }
+
+        // --- 2. Target Z Calculation (based on trajectory) ---
+        // C++: if ( (tmpBallX[2]-TABLEHEIGHT)/fabs(tmpBallX[1]-target[1]) < 0.0 )
+        // Note: In C++, target[1] is the Z coordinate.
+        let targetZ = this.player.targetPosition.y; // Get current target Z for the division
+        const ballHeight = simBall.mesh.position.y;
+        const ballZ = simBall.mesh.position.z;
+        const side = this.player.side;
+        const trajectoryRatio = (ballHeight - TABLE_HEIGHT) / Math.abs(ballZ - targetZ);
+
+        if (trajectoryRatio < 0.0) {
+            targetZ = (TABLE_LENGTH / 4) * -side; // Aggressive short shot
+        } else if (trajectoryRatio < 0.1) {
+            targetZ = (TABLE_LENGTH / 3) * -side; // Medium shot
+        } else {
+            targetZ = (TABLE_LENGTH * 6 / 16) * -side; // Deeper, safer shot
+        }
 
         this.player.targetPosition.set(targetX, targetZ);
     }
