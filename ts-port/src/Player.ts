@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
-import { AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z } from './constants';
+import {
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z,
+    // Status-related constants from C++ version
+    STATUS_MAX, RUN_SPEED, RUN_PENALTY, SWING_PENALTY, WALK_SPEED, WALK_BONUS, ACCEL_LIMIT, ACCEL_PENALTY
+} from './constants';
 import { Ball } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
@@ -14,11 +18,16 @@ export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
     public velocity = new THREE.Vector3();
+    private prevVelocity = new THREE.Vector3();
     public targetPosition: THREE.Vector2;
     public isAi: boolean;
     public predictedHitPosition = new THREE.Vector2();
     public side: number;
     public aiController?: AIController;
+
+    // --- Status System Properties ---
+    public status: number;
+    public statusMax: number;
 
     // Serve-related properties
     public swingType: number = SWING_NORMAL;
@@ -49,6 +58,9 @@ export class Player {
         this.mesh.add(this.rootBone);
 
         this.mixer = new THREE.AnimationMixer(this.rootBone);
+
+        this.status = STATUS_MAX;
+        this.statusMax = STATUS_MAX;
 
         this.buildModel();
         this.createAnimationClips();
@@ -408,6 +420,10 @@ export class Player {
      * Executes the logic for hitting the ball.
      * @param ball The ball object.
      */
+    /**
+     * Executes the logic for hitting the ball.
+     * @param ball The ball object.
+     */
     public hitBall(ball: Ball) {
         if (this.canServe(ball)) {
             // --- SERVE ---
@@ -417,16 +433,22 @@ export class Player {
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
             // --- RALLY HIT ---
-            // Use the new, more accurate calculation method.
             const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
 
+            // For AI, introduce errors based on status
             if (this.isAi) {
-                console.log(`[AI HIT] Player Pos: ${JSON.stringify(this.mesh.position)}, Ball Pos: ${JSON.stringify(ball.mesh.position)}, Target: ${JSON.stringify(this.targetPosition)}, Velocity: ${JSON.stringify(velocity)}`);
+                this.addError(velocity, ball);
             }
 
-            // Hit the ball with the calculated velocity and player's spin.
+            // Hit the ball with the calculated (and possibly modified) velocity and player's spin.
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
+
+            // Reduce status after hitting
+            // C++: m_afterSwing = (long)(hypot( theBall.GetV()[0]*0.8-v[0], theBall.GetV()[1]*0.8+v[1] ) * (1.0+diff*10.0) + m_spin.len()*5.0 + fabs(theBall.GetSpin()[1])*4.0);
+            // Simplified version for now: penalty is proportional to the new velocity
+            const afterSwingPenalty = velocity.length();
+            this.addStatus(-afterSwingPenalty);
         }
     }
 
@@ -663,9 +685,114 @@ export class Player {
         }
     }
 
+    /**
+     * Adds error to the ball's velocity based on the player's status.
+     * Ported from C++ Player::AddError.
+     * @param v The calculated velocity of the ball to be modified.
+     * @param ball The ball object, for its properties.
+     */
+    private addError(v: THREE.Vector3, ball: Ball) {
+        const playerPos = this.mesh.position;
+        const ballPos = ball.mesh.position;
+
+        // C++: double xDiff = (fabs(m_x[0]-theBall.GetX()[0])-0.3)/0.3;
+        const xDiff = (Math.abs(playerPos.x - ballPos.x) - 0.3) / 0.3;
+        // C++: double yDiff = (m_x[1]-theBall.GetX()[1])/0.3;
+        const yDiff = (playerPos.z - ballPos.z) / 0.3; // Note: player y is z in THREE
+
+        // C++: radDiff = hypot( xDiff*(1+fabs(theBall.GetSpin()[0])), yDiff*(1+fabs(theBall.GetSpin()[1])) );
+        let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
+
+        // C++: radDiff *= (double)(200-m_status)/200*3.141592/12;
+        radDiff *= (this.statusMax - this.status) / this.statusMax * (Math.PI / 12);
+
+        const vl = v.length();
+        if (vl === 0) return;
+
+        // Create two orthogonal vectors (n1, n2) to the velocity vector 'v'
+        const n1 = new THREE.Vector3();
+        const n2 = new THREE.Vector3();
+        const vNorm = v.clone().normalize();
+
+        // Create a non-parallel vector to get the first orthogonal vector
+        let nonParallel = new THREE.Vector3(1, 0, 0);
+        if (Math.abs(vNorm.x) > 0.9) {
+            nonParallel = new THREE.Vector3(0, 1, 0);
+        }
+        n1.crossVectors(vNorm, nonParallel).normalize();
+        n2.crossVectors(vNorm, n1).normalize();
+
+        // C++: radRand = RAND(360)*3.141592/180.0;
+        const radRand = Math.random() * 2 * Math.PI;
+
+        // Apply the error cone
+        const errorMagnitude = vl * Math.tan(radDiff);
+        const errorVector = n1.multiplyScalar(Math.cos(radRand)).add(n2.multiplyScalar(Math.sin(radRand))).multiplyScalar(errorMagnitude);
+
+        v.add(errorVector);
+    }
+
+
+    /**
+     * Changes the status value, ensuring it stays within bounds.
+     * @param diff The amount to add to the status.
+     */
+    public addStatus(diff: number) {
+        this.status += diff;
+        if (this.status > this.statusMax) {
+            this.status = this.statusMax;
+        }
+        if (this.status < 1) {
+            this.status = 1;
+        }
+    }
+
+    /**
+     * Resets the status to its maximum value.
+     */
+    public resetStatus() {
+        this.status = this.statusMax;
+    }
+
+    /**
+     * Main update loop for the player.
+     * @param deltaTime Time since last frame.
+     * @param ball The ball object.
+     * @param game The main game object.
+     */
     public update(deltaTime: number, ball: Ball, game: Game) {
+        // Store previous velocity for acceleration calculation
+        this.prevVelocity.copy(this.velocity);
+
         this._updateSwing(ball);
         this._updateMovement(deltaTime, ball, game);
         this.mixer.update(deltaTime);
+
+        // --- Status Reduction Logic (ported from Player::Move in C++) ---
+        const swingParams = stype.get(this.swingType);
+        if (swingParams) {
+            if (this.swing > swingParams.backswing) {
+                this.addStatus(SWING_PENALTY);
+            }
+        }
+
+        if (this.velocity.length() > RUN_SPEED) {
+            this.addStatus(RUN_PENALTY);
+        }
+
+        if (this.velocity.length() < WALK_SPEED) {
+            this.addStatus(WALK_BONUS);
+        }
+
+        // Acceleration penalty (The "Handicap")
+        // Note: We currently don't have gameLevel in the TS port, so we use the hardest level's limit.
+        if (this.velocity.distanceTo(this.prevVelocity) > ACCEL_LIMIT[3]) { // Using LEVEL_HARD index
+            this.addStatus(ACCEL_PENALTY);
+        }
+
+        // Reset status if the point is over
+        if (ball.status === -1 || ball.status === 8) {
+            this.resetStatus();
+        }
     }
 }
