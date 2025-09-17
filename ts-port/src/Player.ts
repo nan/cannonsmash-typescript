@@ -396,7 +396,9 @@ export class Player {
      * @returns True if the ball can be hit.
      */
     public canHitBall(ball: Ball): boolean {
-        if ((ball.status === 3 && this.side === 1) || (ball.status === 1 && this.side === -1)) {
+        // 変更: プレイヤーサイド(side === 1)の場合、ボールがバウンドする前(status === 2)でも打てるようにする
+        if (((ball.status === 3 || ball.status === 2) && this.side === 1) || // Player's side
+            (ball.status === 1 && this.side === -1)) { // AI's side
             return true;
         }
         return false;
@@ -442,34 +444,52 @@ export class Player {
         return false;
     }
 
-    private getBallTop(ball: Ball): { maxHeight: number; position: THREE.Vector2 } {
+    public predictOptimalPlayerPosition(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean; trajectory: THREE.Vector3[]; hitIndex: number; } {
         const simBall = ball.clone();
+        const trajectory: THREE.Vector3[] = [];
         let maxHeight = -1.0;
-        const peakPosition = new THREE.Vector2();
+        const peakPosition = new THREE.Vector3();
+        let hitIndex = -1;
 
-        // Simulate up to 500 frames (10 seconds) ahead
+        // Simulate for a maximum number of steps to find the peak after a bounce.
         for (let i = 0; i < 500; i++) {
-            // Check if the ball is in a state where it has bounced on our side of the table
-            if ((simBall.status === 1 && this.side === -1) ||
-                (simBall.status === 3 && this.side === 1)) {
-                // Update the highest point (peak) after the bounce
+            trajectory.push(simBall.mesh.position.clone());
+
+            // Condition to check if the ball has bounced on the player's side.
+            if ((simBall.status === 3 && this.side === 1) || (simBall.status === 1 && this.side === -1)) {
+                // If it has bounced, find the highest point (peak) of the trajectory.
                 if (simBall.mesh.position.y > maxHeight) {
-                    maxHeight = simBall.mesh.position.y;
-                    peakPosition.x = simBall.mesh.position.x;
-                    peakPosition.y = simBall.mesh.position.z; // The 2D y-coordinate corresponds to the 3D z-coordinate
+                    // The original C++ code has a peculiar condition to only consider the peak
+                    // if it occurs very close to the table's baseline. This is crucial.
+                    if (Math.abs(simBall.mesh.position.z) < TABLE_LENGTH / 2 + 1.0 &&
+                        Math.abs(simBall.mesh.position.z) > TABLE_LENGTH / 2 - 0.5)
+                    {
+                        maxHeight = simBall.mesh.position.y;
+                        peakPosition.copy(simBall.mesh.position);
+                        hitIndex = i;
+                    }
                 }
             }
-            // Advance the physics simulation by one frame
+
+            // Advance the physics simulation by one frame.
             const oldPos = simBall.mesh.position.clone();
             simBall._updatePhysics(0.02); // 50Hz tick rate
             simBall.checkCollision(oldPos);
 
-            // Stop the simulation if the ball becomes dead
-            if (simBall.status === -1) {
+            // Stop the simulation if the ball becomes "dead".
+            if (simBall.status < 0) {
                 break;
             }
         }
-        return { maxHeight, position: peakPosition };
+
+        // If a valid peak was found during the simulation, return its position.
+        if (hitIndex !== -1) {
+            return { position: peakPosition, isBounceHit: true, trajectory, hitIndex };
+        } else {
+            // If no valid peak is found (e.g., ball goes out of bounds), return a default "home" position.
+            const fallbackPosition = new THREE.Vector3(0, 0, this.side * (TABLE_LENGTH / 2 + 0.5));
+            return { position: fallbackPosition, isBounceHit: false, trajectory, hitIndex: -1 };
+        }
     }
 
     private shouldAutoMove(): boolean {
@@ -503,15 +523,15 @@ export class Player {
             return;
         }
 
-        // 2. Predict where the ball will be.
-        const top = this.getBallTop(ball);
-        if (top.maxHeight <= 0) {
+        // 2. Predict where the player should be.
+        const prediction = this.predictOptimalPlayerPosition(ball);
+        if (!prediction || !prediction.position) {
             // Prediction failed, do not move. Dampen velocity.
             this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
             return;
         }
 
-        const targetPosition = top.position;
+        const targetPosition = prediction.position;
         this.predictedHitPosition.copy(targetPosition); // Store for potential debugging/drawing
 
         // 3. Calculate desired velocity to move towards the target
@@ -537,46 +557,48 @@ export class Player {
         this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
     }
 
-    public update(deltaTime: number, ball: Ball, game: Game) {
-        // --- Swing and Serve Logic ---
-        if (this.swing > 0) {
-            const swingParams = stype.get(this.swingType);
-            if (swingParams) {
-                // This logic mirrors the C++ code's Player::Move function
-                if (this.canServe(ball)) {
-                    // Ball is already tossed, just continue the swing
-                    if (ball.velocity.y < 0) { // Wait for toss to reach apex
-                        this.swing++;
-                    }
-                } else {
-                    // This block handles both serves (before the ball is tossed) and rally swings.
-                    // We need to check if a toss is required for the current swing type.
-                    if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
-                        ball.toss(this, swingParams.tossV);
-                    }
-                    this.swing++;
-                }
+    private _updateSwing(ball: Ball) {
+        if (this.swing <= 0) return;
 
-                // Impact
-                if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
-                    this.hitBall(ball);
-                }
-
-                // End of swing
-                if (this.swing >= swingParams.swingLength) {
-                    this.swing = 0;
-                    if (this.swingType >= SERVE_MIN) {
-                        this.swingType = SWING_NORMAL;
-                    }
-                    this.setState('IDLE');
-                }
-            } else {
-                // Invalid swing type, reset
-                this.swing = 0;
-            }
+        const swingParams = stype.get(this.swingType);
+        if (!swingParams) {
+            this.swing = 0; // Invalid swing type, reset
+            return;
         }
 
+        // This logic mirrors the C++ code's Player::Move function
+        if (this.canServe(ball)) {
+            // Ball is already tossed, just continue the swing
+            if (ball.velocity.y < 0) { // Wait for toss to reach apex
+                this.swing++;
+            }
+        } else {
+            // This block handles both serves (before the ball is tossed) and rally swings.
+            // We need to check if a toss is required for the current swing type.
+            if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
+                ball.toss(this, swingParams.tossV);
+            }
+            this.swing++;
+        }
+
+        // Impact
+        if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
+            this.hitBall(ball);
+        }
+
+        // End of swing
+        if (this.swing >= swingParams.swingLength) {
+            this.swing = 0;
+            if (this.swingType >= SERVE_MIN) {
+                this.swingType = SWING_NORMAL;
+            }
+            this.setState('IDLE');
+        }
+    }
+
+    private _updateMovement(deltaTime: number, ball: Ball, game: Game) {
         if (!this.isAi) {
+            // --- Human-controlled movement ---
             let manualMove = false;
             if (inputManager.isPointerLocked) {
                 const movement = inputManager.getMouseMovement();
@@ -598,44 +620,40 @@ export class Player {
                     this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1);
                 }
             }
-
-            // Apply velocity from AutoMove to the player's position
-            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-
         } else {
-            // AI movement is driven by its controller
+            // --- AI-controlled movement ---
             if (this.aiController) {
                 this.aiController.update(deltaTime, game);
             }
-            // The controller sets the velocity, and we apply it here.
-            this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
         }
 
-        // Common logic for both human and AI
-        // Boundary checks for x
-        const halfArena = AREAXSIZE / 2;
-        if (this.mesh.position.x < -halfArena) {
-            this.mesh.position.x = -halfArena;
+        // Apply velocity from AutoMove (human) or AI controller to the player's position
+        this.mesh.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+
+        // --- Boundary checks for all players ---
+        const halfArenaX = AREAXSIZE / 2;
+        if (this.mesh.position.x < -halfArenaX) {
+            this.mesh.position.x = -halfArenaX;
             this.velocity.x = 0;
         }
-        if (this.mesh.position.x > halfArena) {
-            this.mesh.position.x = halfArena;
+        if (this.mesh.position.x > halfArenaX) {
+            this.mesh.position.x = halfArenaX;
             this.velocity.x = 0;
         }
 
-        // Boundary checks for z (depth)
-        if (this.side === 1) { // Near side player (human or AI)
-            if (this.mesh.position.z < TABLE_LENGTH / 2) {
-                this.mesh.position.z = TABLE_LENGTH / 2;
+        const halfTableZ = TABLE_LENGTH / 2;
+        if (this.side === 1) { // Near side player
+            if (this.mesh.position.z < halfTableZ) {
+                this.mesh.position.z = halfTableZ;
                 this.velocity.z = 0;
             }
             if (this.mesh.position.z > AREAYSIZE) {
                 this.mesh.position.z = AREAYSIZE;
                 this.velocity.z = 0;
             }
-        } else { // Far side player (always AI)
-            if (this.mesh.position.z > -TABLE_LENGTH / 2) {
-                this.mesh.position.z = -TABLE_LENGTH / 2;
+        } else { // Far side player
+            if (this.mesh.position.z > -halfTableZ) {
+                this.mesh.position.z = -halfTableZ;
                 this.velocity.z = 0;
             }
             if (this.mesh.position.z < -AREAYSIZE) {
@@ -643,7 +661,11 @@ export class Player {
                 this.velocity.z = 0;
             }
         }
+    }
 
+    public update(deltaTime: number, ball: Ball, game: Game) {
+        this._updateSwing(ball);
+        this._updateMovement(deltaTime, ball, game);
         this.mixer.update(deltaTime);
     }
 }

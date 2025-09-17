@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TICK } from './constants';
+import { SWING_NORMAL, TICK, stype } from './constants';
 
 const MAX_TRAJECTORY_POINTS = 300;
 const OPTIMAL_HIT_MARKER_COLOR = 0xff0000;
@@ -28,72 +28,57 @@ export class TrajectoryVisualizer {
      * @param player The player for whom the prediction is being made.
      */
     public show(startBall: Ball, player: Player): void {
-        // Clear any previous visuals before showing new ones.
         this.hide();
 
-        const simBall = startBall.clone();
-        const trajectoryPoints: THREE.Vector3[] = [];
-        let optimalHitPoint: THREE.Vector3 | null = null;
-        let optimalHitPointIndex = -1;
+        // 1. Get the full trajectory prediction from the Player class.
+        // This avoids duplicating the simulation logic here.
+        const prediction = player.predictOptimalPlayerPosition(startBall);
+        const { trajectory, hitIndex } = prediction;
 
-        // Simulate the ball's movement for a number of steps.
-        for (let i = 0; i < MAX_TRAJECTORY_POINTS; i++) {
-            const oldPos = simBall.mesh.position.clone();
-            trajectoryPoints.push(oldPos);
-
-            // Update physics and check for collisions
-            simBall._updatePhysics(TICK);
-            simBall.checkCollision(oldPos);
-
-            // Check for the optimal hit point.
-            // We only care about the *first* hittable frame.
-            if (optimalHitPointIndex === -1 && player.canHitBall(simBall)) {
-                optimalHitPoint = simBall.mesh.position.clone();
-                optimalHitPointIndex = i;
-            }
-
-            // Stop simulation if the ball is dead.
-            if (simBall.status < 0) {
-                break;
-            }
-        }
-
-        if (optimalHitPointIndex !== -1) {
-            // --- Trajectory before the hit marker (Thick Tube) ---
-            const pointsBefore = trajectoryPoints.slice(0, optimalHitPointIndex + 1);
-            if (pointsBefore.length > 1) {
-                const curveBefore = new THREE.CatmullRomCurve3(pointsBefore);
-                const tubeGeometry = new THREE.TubeGeometry(curveBefore, pointsBefore.length, TRAJECTORY_TUBE_RADIUS, 8, false);
-                const tubeMaterial = new THREE.MeshBasicMaterial({ color: TRAJECTORY_TUBE_COLOR });
-                this.trajectoryTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
-                this.scene.add(this.trajectoryTube);
-            }
-
-            // --- Trajectory after the hit marker (Thin Line) ---
-            const pointsAfter = trajectoryPoints.slice(optimalHitPointIndex);
-            if (pointsAfter.length > 1) {
-                const lineGeometryAfter = new THREE.BufferGeometry().setFromPoints(pointsAfter);
-                const lineMaterialAfter = new THREE.LineBasicMaterial({ color: TRAJECTORY_LINE_COLOR });
-                this.trajectoryLine = new THREE.Line(lineGeometryAfter, lineMaterialAfter);
-                this.scene.add(this.trajectoryLine);
-            }
-        } else {
-            // If no hit point is found, draw the whole trajectory as a thin line.
-            const lineGeometry = new THREE.BufferGeometry().setFromPoints(trajectoryPoints);
+        // 2. If no valid hit point was found, draw the whole trajectory as a simple line.
+        if (hitIndex === -1) {
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(trajectory);
             const lineMaterial = new THREE.LineBasicMaterial({ color: TRAJECTORY_LINE_COLOR });
             this.trajectoryLine = new THREE.Line(lineGeometry, lineMaterial);
             this.scene.add(this.trajectoryLine);
+            return;
         }
 
+        // 3. A hit point was found, so calculate the timing marker position.
+        const swingParams = stype.get(SWING_NORMAL);
+        if (!swingParams) return; // Should not happen
 
-        // Create and add the optimal hit marker if a point was found.
-        if (optimalHitPoint) {
-            const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
-            const markerMaterial = new THREE.MeshBasicMaterial({ color: OPTIMAL_HIT_MARKER_COLOR });
-            this.optimalHitMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-            this.optimalHitMarker.position.copy(optimalHitPoint);
-            this.scene.add(this.optimalHitMarker);
+        const swingLagFrames = swingParams.hitStart - swingParams.backswing; // e.g., 20 - 10 = 10 frames
+        const markerIndex = Math.max(0, hitIndex - swingLagFrames);
+        const markerPosition = trajectory[markerIndex];
+
+        // 4. Draw the visuals based on the marker's timing.
+
+        // --- Trajectory before the marker (Thick Tube) ---
+        const pointsBefore = trajectory.slice(0, markerIndex + 1);
+        if (pointsBefore.length > 1) {
+            const curveBefore = new THREE.CatmullRomCurve3(pointsBefore);
+            const tubeGeometry = new THREE.TubeGeometry(curveBefore, pointsBefore.length, TRAJECTORY_TUBE_RADIUS, 8, false);
+            const tubeMaterial = new THREE.MeshBasicMaterial({ color: TRAJECTORY_TUBE_COLOR });
+            this.trajectoryTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            this.scene.add(this.trajectoryTube);
         }
+
+        // --- Trajectory after the marker (Thin Line) ---
+        const pointsAfter = trajectory.slice(markerIndex);
+        if (pointsAfter.length > 1) {
+            const lineGeometryAfter = new THREE.BufferGeometry().setFromPoints(pointsAfter);
+            const lineMaterialAfter = new THREE.LineBasicMaterial({ color: TRAJECTORY_LINE_COLOR });
+            this.trajectoryLine = new THREE.Line(lineGeometryAfter, lineMaterialAfter);
+            this.scene.add(this.trajectoryLine);
+        }
+
+        // --- Timing Marker ---
+        const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+        const markerMaterial = new THREE.MeshBasicMaterial({ color: OPTIMAL_HIT_MARKER_COLOR });
+        this.optimalHitMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+        this.optimalHitMarker.position.copy(markerPosition);
+        this.scene.add(this.optimalHitMarker);
     }
 
     /**
