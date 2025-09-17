@@ -57,7 +57,7 @@ export class AIController {
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
             // C++: fabs(m_parent->GetV()[0]) < 0.2 && fabs(m_parent->GetV()[1]) < 0.2
-            const isStable = playerVel.lengthSq() < 0.2 * 0.2;
+            const isStable = Math.abs(playerVel.x) < 0.2 && Math.abs(playerVel.z) < 0.2;
             // C++: fabs(m_parent->GetX()[0]+m_parent->GetSide()*0.3-_hitX[0]) < 0.1 && fabs(m_parent->GetX()[1]-_hitX[1]) < 0.1
             const isAtPosition = Math.abs(playerPos.x - idealServePosX) < 0.1 && Math.abs(playerPos.z - targetPos.y) < 0.1;
 
