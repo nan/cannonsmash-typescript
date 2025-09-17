@@ -8,6 +8,7 @@ import { inputManager } from './InputManager';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT } from './constants';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
+import { UIManager } from './UIManager';
 
 // --- Constants for Keyboard Targeting ---
 const keyMapX: { [key: string]: number } = {
@@ -61,7 +62,9 @@ export class Game {
     private gameMode: GameMode = '11PTS';
     private isDemo = true;
     private isPaused = false;
+    private isGameOver = false;
     private demoCameraAngle = 0;
+    private uiManager!: UIManager;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -70,6 +73,10 @@ export class Game {
         this.scoreboardElement = document.getElementById('scoreboard')!;
         this.trajectoryVisualizer = new TrajectoryVisualizer(this.scene);
         this.resetGame(true); // Start in demo mode
+    }
+
+    public setUIManager(uiManager: UIManager) {
+        this.uiManager = uiManager;
     }
 
     private updateScoreboard() {
@@ -84,10 +91,32 @@ export class Game {
         }
         this.updateScoreboard();
 
-        // Reset player statuses to full at the end of each point.
-        // This ensures that any fatigue/error penalty from the previous rally is cleared.
-        this.player1.resetStatus();
-        this.player2.resetStatus();
+        // Check for game over
+        const p1Score = this.score1;
+        const p2Score = this.score2;
+        const gameOver = (p1Score >= 11 || p2Score >= 11) && Math.abs(p1Score - p2Score) >= 2;
+
+        if (gameOver) {
+            this.endGame(p1Score > p2Score);
+        } else {
+            // Reset player statuses to full at the end of each point.
+            // This ensures that any fatigue/error penalty from the previous rally is cleared.
+            this.player1.resetStatus();
+            this.player2.resetStatus();
+        }
+    }
+
+    private endGame(player1Won: boolean) {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+
+        this.uiManager.showGameOverScreen(player1Won);
+
+        // Return to demo after a delay
+        setTimeout(() => {
+            this.returnToDemo();
+            this.uiManager.showDemoScreen();
+        }, 4000);
     }
 
     private awardPoint() {
@@ -103,6 +132,7 @@ export class Game {
     private resetGame(isDemo: boolean) {
         this.isDemo = isDemo;
         this.isPaused = false;
+        this.isGameOver = false;
 
         // Clear previous game objects from the scene
         if (this.player1) this.scene.remove(this.player1.mesh);
@@ -205,7 +235,7 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        if (this.isPaused) {
+        if (this.isPaused || this.isGameOver) {
             return;
         }
 
