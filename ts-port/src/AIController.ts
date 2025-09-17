@@ -1,7 +1,18 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
+import {
+    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH,
+    SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT,
+    AI_SERVE_STABLE_VELOCITY_THRESHOLD, AI_SERVE_POSITION_TOLERANCE,
+    AI_SERVE_TARGET_DEPTH_DIVISOR, AI_SERVE_TARGET_X_RANDOM_FACTOR,
+    AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD, AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD,
+    AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR, AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR,
+    AI_TRAJECTORY_THRESHOLD_SHORT, AI_TRAJECTORY_THRESHOLD_MEDIUM,
+    AI_TARGET_DEPTH_SHORT_DIVISOR, AI_TARGET_DEPTH_MEDIUM_DIVISOR,
+    AI_TARGET_DEPTH_DEEP_NUMERATOR, AI_TARGET_DEPTH_DEEP_DENOMINATOR,
+    AI_TARGET_X_ZONE_FACTORS, AI_TARGET_X_MAX_FACTOR
+} from './constants';
 import type { Game } from './Game';
 
 /**
@@ -62,14 +73,14 @@ export class AIController {
             const targetPos = this.predictedHitPosition;
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
-            const isStable = Math.abs(playerVel.x) < 0.2 && Math.abs(playerVel.z) < 0.2;
-            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < 0.1 && Math.abs(playerPos.z - targetPos.y) < 0.1;
+            const isStable = Math.abs(playerVel.x) < AI_SERVE_STABLE_VELOCITY_THRESHOLD && Math.abs(playerVel.z) < AI_SERVE_STABLE_VELOCITY_THRESHOLD;
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
 
             // 3. If ready, perform the serve.
             if (isStable && isAtPosition && this.player.swing === 0) {
                 // Set a specific target for the serve
-                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.5);
-                const targetZ = (TABLE_LENGTH / 6) * -this.player.side;
+                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
+                const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
                 this.player.targetPosition.set(targetX, targetZ);
 
                 // Start a specific serve type, similar to C++'s StartServe(3)
@@ -317,53 +328,43 @@ export class AIController {
     private setRallyTarget(simBall: Ball) {
         // --- 1. Target X Calculation (based on SetTargetX) ---
         const width = TABLE_WIDTH / 2; // LEVEL_NORMAL相当
-        let targetX = 0;
-
-        const rand = Math.floor(Math.random() * 8);
-        switch (rand) {
-            case 0: targetX = -width * 7 / 16; break;
-            case 1: targetX = -width * 5 / 16; break;
-            case 2: targetX = -width * 3 / 16; break;
-            case 3: targetX = -width * 1 / 16; break;
-            case 4: targetX =  width * 1 / 16; break;
-            case 5: targetX =  width * 3 / 16; break;
-            case 6: targetX =  width * 5 / 16; break;
-            case 7: targetX =  width * 7 / 16; break;
-        }
+        const randIndex = Math.floor(Math.random() * AI_TARGET_X_ZONE_FACTORS.length);
+        let targetX = width * AI_TARGET_X_ZONE_FACTORS[randIndex];
 
         const playerVelX = this.player.velocity.x;
-        if (playerVelX > 1.5) {
-            targetX += TABLE_WIDTH / 2;
-        } else if (playerVelX > 0.5) {
-            targetX += TABLE_WIDTH / 4;
-        } else if (playerVelX < -1.5) {
-            targetX -= TABLE_WIDTH / 2;
-        } else if (playerVelX < -0.5) {
-            targetX -= TABLE_WIDTH / 4;
+        if (playerVelX > AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD) {
+            targetX += TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR;
+        } else if (playerVelX > AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD) {
+            targetX += TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR;
+        } else if (playerVelX < -AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD) {
+            targetX -= TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR;
+        } else if (playerVelX < -AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD) {
+            targetX -= TABLE_WIDTH / AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR;
         }
 
-        if (targetX > TABLE_WIDTH / 2) {
-            targetX = TABLE_WIDTH * 7 / 16;
+        // Clamp the target to be within the table bounds
+        const maxTargetX = TABLE_WIDTH / 2 * AI_TARGET_X_MAX_FACTOR;
+        if (targetX > maxTargetX) {
+            targetX = maxTargetX;
         }
-        if (targetX < -TABLE_WIDTH / 2) {
-            targetX = -TABLE_WIDTH * 7 / 16;
+        if (targetX < -maxTargetX) {
+            targetX = -maxTargetX;
         }
+
 
         // --- 2. Target Z Calculation (based on trajectory) ---
-        // C++: if ( (tmpBallX[2]-TABLEHEIGHT)/fabs(tmpBallX[1]-target[1]) < 0.0 )
-        // Note: In C++, target[1] is the Z coordinate.
         let targetZ = this.player.targetPosition.y; // Get current target Z for the division
         const ballHeight = simBall.mesh.position.y;
         const ballZ = simBall.mesh.position.z;
         const side = this.player.side;
         const trajectoryRatio = (ballHeight - TABLE_HEIGHT) / Math.abs(ballZ - targetZ);
 
-        if (trajectoryRatio < 0.0) {
-            targetZ = (TABLE_LENGTH / 4) * -side; // Aggressive short shot
-        } else if (trajectoryRatio < 0.1) {
-            targetZ = (TABLE_LENGTH / 3) * -side; // Medium shot
+        if (trajectoryRatio < AI_TRAJECTORY_THRESHOLD_SHORT) {
+            targetZ = (TABLE_LENGTH / AI_TARGET_DEPTH_SHORT_DIVISOR) * -side;
+        } else if (trajectoryRatio < AI_TRAJECTORY_THRESHOLD_MEDIUM) {
+            targetZ = (TABLE_LENGTH / AI_TARGET_DEPTH_MEDIUM_DIVISOR) * -side;
         } else {
-            targetZ = (TABLE_LENGTH * 6 / 16) * -side; // Deeper, safer shot
+            targetZ = (TABLE_LENGTH * AI_TARGET_DEPTH_DEEP_NUMERATOR / AI_TARGET_DEPTH_DEEP_DENOMINATOR) * -side;
         }
 
         this.player.targetPosition.set(targetX, targetZ);

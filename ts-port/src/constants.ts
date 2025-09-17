@@ -96,3 +96,32 @@ export const AMB_LIGHT_INTENSITY = 2;
 export const DEMO_CAMERA_SPEED = 0.218;
 export const DEMO_CAMERA_RADIUS = 4;
 export const DEMO_CAMERA_HEIGHT = 2.5;
+
+// --- AI Controller Constants ---
+
+// Serve Logic
+export const AI_SERVE_STABLE_VELOCITY_THRESHOLD = 0.2;
+export const AI_SERVE_POSITION_TOLERANCE = 0.1;
+export const AI_SERVE_TARGET_DEPTH_DIVISOR = 6;
+export const AI_SERVE_TARGET_X_RANDOM_FACTOR = 0.5;
+
+// Rally Targeting: Velocity-based adjustments
+export const AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_THRESHOLD = 1.5;
+export const AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_THRESHOLD = 0.5;
+export const AI_RALLY_TARGET_VELOCITY_ADJUST_HIGH_DIVISOR = 2;
+export const AI_RALLY_TARGET_VELOCITY_ADJUST_LOW_DIVISOR = 4;
+
+// Rally Targeting: Trajectory-based depth adjustments
+export const AI_TRAJECTORY_THRESHOLD_SHORT = 0.0;
+export const AI_TRAJECTORY_THRESHOLD_MEDIUM = 0.1;
+export const AI_TARGET_DEPTH_SHORT_DIVISOR = 4;
+export const AI_TARGET_DEPTH_MEDIUM_DIVISOR = 3;
+export const AI_TARGET_DEPTH_DEEP_NUMERATOR = 6;
+export const AI_TARGET_DEPTH_DEEP_DENOMINATOR = 16;
+
+// Rally Targeting: X-coordinate zones
+export const AI_TARGET_X_MAX_FACTOR = 7/16;
+// Corresponds to `switch(RAND(8))` in the original C++ code.
+export const AI_TARGET_X_ZONE_FACTORS = [
+    -AI_TARGET_X_MAX_FACTOR, -5/16, -3/16, -1/16, 1/16, 3/16, 5/16, AI_TARGET_X_MAX_FACTOR
+];
