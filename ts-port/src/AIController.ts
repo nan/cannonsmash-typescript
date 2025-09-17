@@ -51,8 +51,6 @@ export class AIController {
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
         if (this.ball.status === 8 && game.getService() === this.player.side) {
-            console.log(`[AI Serve Check] Frame: ${this.game.getFrameCount()}`);
-
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -65,18 +63,10 @@ export class AIController {
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
             const isStable = Math.abs(playerVel.x) < 0.2 && Math.abs(playerVel.z) < 0.2;
-            const posErrorX = Math.abs(playerPos.x - idealServePosX);
-            const posErrorZ = Math.abs(playerPos.z - targetPos.y);
-            const isAtPosition = posErrorX < 0.1 && posErrorZ < 0.1;
-
-            console.log(`  - Target Pos: { x: ${idealServePosX.toFixed(2)}, z: ${targetPos.y.toFixed(2)} }`);
-            console.log(`  - Actual Pos: { x: ${playerPos.x.toFixed(2)}, z: ${playerPos.z.toFixed(2)} }`);
-            console.log(`  - Position Error: { x: ${posErrorX.toFixed(2)}, z: ${posErrorZ.toFixed(2)} } -> isAtPosition: ${isAtPosition}`);
-            console.log(`  - Velocity: { x: ${playerVel.x.toFixed(2)}, z: ${playerVel.z.toFixed(2)} } -> isStable: ${isStable}`);
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < 0.1 && Math.abs(playerPos.z - targetPos.y) < 0.1;
 
             // 3. If ready, perform the serve.
             if (isStable && isAtPosition && this.player.swing === 0) {
-                console.log(`[AI SERVING!] Conditions met.`);
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * 0.5);
                 const targetZ = (TABLE_LENGTH / 6) * -this.player.side;
@@ -120,9 +110,16 @@ export class AIController {
 
         // AIがラケットでボールを捉えるための、理想的なX座標を計算 (C++: mx)
         const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
-        const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
-        const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
-        const idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        let idealRacketX;
+        // C++: if ( theBall.GetStatus() == 8 || ... )
+        if (this.ball.status === 8) {
+            // For serving, always use the forehand side for positioning.
+            idealRacketX = playerPos.x + racketOffsetX;
+        } else {
+            const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
+            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
+            idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        }
 
         // スイングの特定フレームでは、移動計算を停止して体を安定させる
         if (this.player.swing > this.PLANTED_SWING_START_FRAME && this.player.swing <= this.PLANTED_SWING_END_FRAME) {

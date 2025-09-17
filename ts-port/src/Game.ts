@@ -62,7 +62,6 @@ export class Game {
     private isDemo = true;
     private isPaused = false;
     private demoCameraAngle = 0;
-    private frameCount = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -197,7 +196,6 @@ export class Game {
     }
 
     public update(deltaTime: number) {
-        this.frameCount++;
         if (this.isPaused) {
             return;
         }
@@ -335,7 +333,4 @@ export class Game {
         return -ret;
     }
 
-    public getFrameCount(): number {
-        return this.frameCount;
-    }
 }
