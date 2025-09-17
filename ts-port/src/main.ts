@@ -40,17 +40,19 @@ async function main() {
   // --- UI and Event Handling Setup ---
   const demoScreen = document.getElementById('demo-screen');
   const pauseScreen = document.getElementById('pause-screen');
-  const gameOverScreen = document.getElementById('game-over-screen');
 
-  if (!demoScreen || !pauseScreen || !gameOverScreen) {
+  if (!demoScreen || !pauseScreen) {
     console.error("UI elements not found!");
     return;
   }
 
-  const uiManager = new UIManager(demoScreen, pauseScreen, gameOverScreen);
-  game.setUIManager(uiManager);
+  const uiManager = new UIManager(demoScreen, pauseScreen);
 
   // --- Event Listeners ---
+
+  document.addEventListener('gameended', () => {
+    uiManager.showDemoScreen();
+  });
 
   demoScreen.addEventListener('click', () => {
     game.start();

@@ -64,7 +64,6 @@ export class Game {
     private isPaused = false;
     private isGameOver = false;
     private demoCameraAngle = 0;
-    private uiManager!: UIManager;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -73,10 +72,6 @@ export class Game {
         this.scoreboardElement = document.getElementById('scoreboard')!;
         this.trajectoryVisualizer = new TrajectoryVisualizer(this.scene);
         this.resetGame(true); // Start in demo mode
-    }
-
-    public setUIManager(uiManager: UIManager) {
-        this.uiManager = uiManager;
     }
 
     private updateScoreboard() {
@@ -110,12 +105,14 @@ export class Game {
         if (this.isGameOver) return;
         this.isGameOver = true;
 
-        this.uiManager.showGameOverScreen(player1Won);
+        document.exitPointerLock();
+        this.scoreboardElement.innerText = player1Won ? 'You Win!' : 'You Lose!';
 
         // Return to demo after a delay
         setTimeout(() => {
             this.returnToDemo();
-            this.uiManager.showDemoScreen();
+            // Dispatch an event to notify UI to return to demo screen
+            document.dispatchEvent(new CustomEvent('gameended'));
         }, 4000);
     }
 
