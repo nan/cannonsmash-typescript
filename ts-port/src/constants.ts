@@ -125,3 +125,13 @@ export const AI_TARGET_X_MAX_FACTOR = 7/16;
 export const AI_TARGET_X_ZONE_FACTORS = [
     -AI_TARGET_X_MAX_FACTOR, -5/16, -3/16, -1/16, 1/16, 3/16, 5/16, AI_TARGET_X_MAX_FACTOR
 ];
+
+// --- Status System Constants (from Player.h) ---
+export const STATUS_MAX = 200;
+export const RUN_SPEED = 2.0;
+export const RUN_PENALTY = -1;
+export const SWING_PENALTY = -1;
+export const WALK_SPEED = 1.0;
+export const WALK_BONUS = 1;
+export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EASY, NORMAL, HARD, TSUBORISH}
+export const ACCEL_PENALTY = -1;
