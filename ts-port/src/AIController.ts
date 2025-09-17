@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
+import { TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, SWING_NORMAL, stype, TICK, SWING_DRIVE, SWING_CUT } from './constants';
 import type { Game } from './Game';
 
 /**
