@@ -142,6 +142,7 @@ export class Ball {
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
+            const oldStatus = this.status;
             // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
             if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
                 switch(this.status) {
@@ -172,6 +173,9 @@ export class Ball {
                         break;
                 }
             }
+            if (oldStatus !== this.status) {
+                console.log(`%c[Ball Status] Changed on Bounce: ${BallStatus[oldStatus]} -> ${BallStatus[this.status]}`, "color: #ffa500");
+            }
             return; // A table collision precludes a floor collision
         }
 
@@ -188,6 +192,7 @@ export class Ball {
     public hit(velocity: THREE.Vector3, spin: THREE.Vector2) {
         this.velocity.copy(velocity);
         this.spin.copy(spin);
+        const oldStatus = this.status;
         if (this.status === BallStatus.TOSS_P1) {
             this.status = BallStatus.SERVE_TO_AI;
         } else if (this.status === BallStatus.TOSS_P2) {
@@ -197,9 +202,18 @@ export class Ball {
         } else if (this.status === BallStatus.RALLY_TO_HUMAN) { // Human hits the ball
             this.status = BallStatus.IN_PLAY_TO_AI;
         }
+        if (oldStatus !== this.status) {
+            console.log(`%c[Ball Status] Changed on Hit: ${BallStatus[oldStatus]} -> ${BallStatus[this.status]}`, "color: #00ced1");
+        }
     }
 
-    private ballDead() { if (this.status >= 0) { this.status = BallStatus.DEAD; } }
+    private ballDead() {
+        if (this.status >= 0) {
+            const oldStatus = this.status;
+            this.status = BallStatus.DEAD;
+            console.log(`%c[Ball Status] Changed on Dead: ${BallStatus[oldStatus]} -> ${BallStatus[this.status]}`, "color: #ff4500");
+        }
+    }
 
     public toss(player: Player, power: number) {
         this.velocity.y = power;
