@@ -7,6 +7,7 @@ import {
     STATUS_MAX, RUN_SPEED, RUN_PENALTY, SWING_PENALTY, WALK_SPEED, WALK_BONUS, ACCEL_LIMIT, ACCEL_PENALTY
 } from './constants';
 import { Ball } from './Ball';
+import { BallStatus } from './BallStatus';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 
@@ -259,7 +260,8 @@ export class Player {
      * @returns True if the ball is tossed and ready to be hit for a serve.
      */
     public canServe(ball: Ball): boolean {
-        if ((ball.status === 6 && this.side === 1) || (ball.status === 7 && this.side === -1)) {
+        if ((ball.status === BallStatus.TOSS_P1 && this.side === 1) ||
+            (ball.status === BallStatus.TOSS_P2 && this.side === -1)) {
             return true;
         }
         return false;
@@ -410,12 +412,13 @@ export class Player {
      * @returns True if the ball can be hit.
      */
     public canHitBall(ball: Ball): boolean {
-        // 変更: プレイヤーサイド(side === 1)の場合、ボールがバウンドする前(status === 2)でも打てるようにする
-        if (((ball.status === 3 || ball.status === 2) && this.side === 1) || // Player's side
-            (ball.status === 1 && this.side === -1)) { // AI's side
-            return true;
+        if (this.side === 1) {
+            // The human player can hit the ball when it's their turn.
+            return ball.status === BallStatus.RALLY_TO_HUMAN;
+        } else {
+            // The AI player can hit the ball when it's their turn.
+            return ball.status === BallStatus.RALLY_TO_AI;
         }
-        return false;
     }
 
     /**
@@ -457,11 +460,11 @@ export class Player {
         const status = ball.status;
         const side = this.side;
         // Opponent has hit the ball and it's heading towards our side
-        if ((status === 0 && side === -1) || (status === 2 && side === 1)) {
+        if ((status === BallStatus.RALLY_TO_AI && side === -1) || (status === BallStatus.IN_PLAY_TO_HUMAN && side === 1)) {
             return true;
         }
         // Opponent's hit has bounced on our side
-        if ((status === 1 && side === -1) || (status === 3 && side === 1)) {
+        if ((status === BallStatus.RALLY_TO_HUMAN && side === -1) || (status === BallStatus.IN_PLAY_TO_AI && side === 1)) {
             return true;
         }
         return false;
@@ -479,7 +482,7 @@ export class Player {
             trajectory.push(simBall.mesh.position.clone());
 
             // Condition to check if the ball has bounced on the player's side.
-            if ((simBall.status === 3 && this.side === 1) || (simBall.status === 1 && this.side === -1)) {
+            if ((simBall.status === BallStatus.RALLY_TO_HUMAN && this.side === 1) || (simBall.status === BallStatus.RALLY_TO_AI && this.side === -1)) {
                 // If it has bounced, find the highest point (peak) of the trajectory.
                 if (simBall.mesh.position.y > maxHeight) {
                     // The original C++ code has a peculiar condition to only consider the peak
@@ -802,7 +805,7 @@ export class Player {
         }
 
         // Reset status if the point is over (ball is dead or ready for serve).
-        if (ball.status === -1 || ball.status === 8) {
+        if (ball.status === BallStatus.DEAD || ball.status === BallStatus.WAITING_FOR_SERVE) {
             this.resetStatus();
         }
     }

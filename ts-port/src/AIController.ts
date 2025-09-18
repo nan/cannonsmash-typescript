@@ -14,6 +14,7 @@ import {
     AI_TARGET_X_ZONE_FACTORS, AI_TARGET_X_MAX_FACTOR
 } from './constants';
 import type { Game } from './Game';
+import { BallStatus } from './BallStatus';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -61,7 +62,7 @@ export class AIController {
      */
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
-        if (this.ball.status === 8 && game.getService() === this.player.side) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side) {
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -123,7 +124,7 @@ export class AIController {
         const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
         let idealRacketX;
         // C++: if ( theBall.GetStatus() == 8 || ... )
-        if (this.ball.status === 8) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
             // For serving, always use the forehand side for positioning.
             idealRacketX = playerPos.x + racketOffsetX;
         } else {
@@ -255,11 +256,11 @@ export class AIController {
             if (top.maxHeight > 0) {
                 this.predictedHitPosition.copy(top.position);
             }
-        } else if (this.ball.status === 8) {
+        } else if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
             // Ball is ready for serve, but it's not our turn. Move to ready position.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
-        } else if (this.ball.status < 6) {
+        } else if (this.ball.status <= BallStatus.SERVE_TO_HUMAN) { // Any in-play status
             // Rally is not in progress, return to home position.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
@@ -274,15 +275,14 @@ export class AIController {
     private isOpponentHit(): boolean {
         const status = this.ball.status;
         const side = this.player.side;
-        // 相手が打った後、自コートに向かっている状態
-        if ((status === 0 && side === -1) || (status === 2 && side === 1)) {
-            return true;
+
+        if (side === -1) { // This controller is for the AI player (Player 2)
+            // The opponent (Human) has hit the ball if it's in play towards the AI,
+            // or if it has bounced and is ready for the AI to hit.
+            return status === BallStatus.IN_PLAY_TO_AI || status === BallStatus.RALLY_TO_AI;
+        } else { // This controller is for a hypothetical Player 1 AI
+            return status === BallStatus.IN_PLAY_TO_HUMAN || status === BallStatus.RALLY_TO_HUMAN;
         }
-        // 相手が打った後、ネットを越えて自コートでバウンドした状態
-        if ((status === 1 && side === -1) || (status === 3 && side === 1)) {
-            return true;
-        }
-        return false;
     }
 
     /**
@@ -298,8 +298,8 @@ export class AIController {
         // 最大500フレーム（10秒）先までシミュレーション
         for (let i = 0; i < 500; i++) {
             // ボールが自コートでバウンドした後の状態かチェック
-            if ((simBall.status === 1 && this.player.side === -1) ||
-                (simBall.status === 3 && this.player.side === 1)) {
+            if ((simBall.status === BallStatus.RALLY_TO_AI && this.player.side === -1) ||
+                (simBall.status === BallStatus.RALLY_TO_HUMAN && this.player.side === 1)) {
                 // 最高到達点を更新
                 if (simBall.mesh.position.y > maxHeight) {
                     maxHeight = simBall.mesh.position.y;

@@ -102,9 +102,6 @@ export class Ball {
                 const collisionX = oldPos.x + (currentPos.x - oldPos.x) * t;
                 const collisionY = oldPos.y + (currentPos.y - oldPos.y) * t;
 
-                // Log the actual crossing event regardless of collision
-                console.log(`[Actual] Ball crossed net plane at height: ${collisionY.toFixed(3)}. Position: { x: ${collisionX.toFixed(2)}, y: ${collisionY.toFixed(2)}, z: 0.00 }`);
-
                 if (collisionX > -TABLE_WIDTH / 2 && collisionX < TABLE_WIDTH / 2 &&
                     collisionY > 0 && collisionY < TABLE_HEIGHT + NET_HEIGHT) {
 
@@ -131,32 +128,40 @@ export class Ball {
             this.mesh.position.x > -halfTableW && this.mesh.position.x < halfTableW &&
             this.mesh.position.z > -halfTableL && this.mesh.position.z < halfTableL) {
 
-            if (this.justHitBySide === -1) {
-                console.log(`[AI BOUNCE] Position: ${JSON.stringify(this.mesh.position)}`);
-            } else {
-                console.log(`Bounce at: { x: ${this.mesh.position.x.toFixed(3)}, y: ${this.mesh.position.y.toFixed(3)}, z: ${this.mesh.position.z.toFixed(3)} }`);
-            }
             this.justHitBySide = 0; // Reset after first bounce
 
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
-            if (this.mesh.position.z > 0) { // Bounce on Player 2 (AI) side
+            // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
+            if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
                 switch(this.status) {
-                    case BallStatus.IN_PLAY_TO_HUMAN: this.status = BallStatus.IN_PLAY_TO_AI; break;
-                    case BallStatus.SERVE_TO_AI: this.status = BallStatus.RALLY_TO_AI; break;
-                    default: this.ballDead(); break;
+                    // Human serves, ball bounces on their own side first.
+                    case BallStatus.SERVE_TO_AI:
+                        this.status = BallStatus.IN_PLAY_TO_AI; // Now it's in play, heading to AI
+                        break;
+                    // AI has hit the ball, it bounces on the human's side.
+                    case BallStatus.IN_PLAY_TO_HUMAN:
+                        this.status = BallStatus.RALLY_TO_HUMAN; // Now it's a rally ball for the human to hit
+                        break;
+                    default:
+                        this.ballDead(); // Any other bounce on this side is a fault
+                        break;
                 }
-            } else { // Bounce on Player 1 (Human) side
+            } else { // Bounce on Player 2 (AI) side
                 switch(this.status) {
-                    case BallStatus.RALLY_TO_AI:
-                        this.status = BallStatus.RALLY_TO_HUMAN;
-                        break;
+                    // AI serves, ball bounces on their own side first.
                     case BallStatus.SERVE_TO_HUMAN:
-                        this.status = BallStatus.IN_PLAY_TO_HUMAN;
+                        this.status = BallStatus.IN_PLAY_TO_HUMAN; // Now it's in play, heading to Human
                         break;
-                    default: this.ballDead(); break;
+                    // Human has hit the ball, it bounces on the AI's side.
+                    case BallStatus.IN_PLAY_TO_AI:
+                        this.status = BallStatus.RALLY_TO_AI; // Now it's a rally ball for the AI to hit
+                        break;
+                    default:
+                        this.ballDead(); // Any other bounce on this side is a fault
+                        break;
                 }
             }
             return; // A table collision precludes a floor collision
@@ -175,10 +180,15 @@ export class Ball {
     public hit(velocity: THREE.Vector3, spin: THREE.Vector2) {
         this.velocity.copy(velocity);
         this.spin.copy(spin);
-        if (this.status === BallStatus.TOSS_P1) { this.status = BallStatus.SERVE_TO_AI; }
-        else if (this.status === BallStatus.TOSS_P2) { this.status = BallStatus.SERVE_TO_HUMAN; }
-        else if (this.status === BallStatus.IN_PLAY_TO_AI) { this.status = BallStatus.RALLY_TO_AI; }
-        else if (this.status === BallStatus.RALLY_TO_HUMAN) { this.status = BallStatus.IN_PLAY_TO_HUMAN; }
+        if (this.status === BallStatus.TOSS_P1) {
+            this.status = BallStatus.SERVE_TO_AI;
+        } else if (this.status === BallStatus.TOSS_P2) {
+            this.status = BallStatus.SERVE_TO_HUMAN;
+        } else if (this.status === BallStatus.RALLY_TO_AI) { // AI hits the ball
+            this.status = BallStatus.IN_PLAY_TO_HUMAN;
+        } else if (this.status === BallStatus.RALLY_TO_HUMAN) { // Human hits the ball
+            this.status = BallStatus.IN_PLAY_TO_AI;
+        }
     }
 
     private ballDead() { if (this.status >= 0) { this.status = BallStatus.DEAD; } }
@@ -489,7 +499,6 @@ export class Ball {
 
         if (bestHorizontalSpeedSq > 0) {
             // We found a solution. Return it.
-            console.log(`targetToVS: Target: {x: ${target.x.toFixed(2)}, z: ${target.y.toFixed(2)}}, Calculated Vel: {x: ${bestVelocity.x.toFixed(2)}, y: ${bestVelocity.y.toFixed(2)}, z: ${bestVelocity.z.toFixed(2)}}`);
             return bestVelocity;
         } else {
             // FALLBACK IMPLEMENTATION if no solution was found
@@ -545,7 +554,6 @@ export class Ball {
                 // Does it clear the net by a small margin?
                 if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN) {
                     // This is a valid trajectory! Return this velocity.
-                    console.log(`[Rally Calc] Found valid trajectory. Speed: ${speed.toFixed(2)}, Height at net: ${heightAtNet.toFixed(3)}`);
                     return v0;
                 }
             }
