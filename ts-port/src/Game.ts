@@ -178,7 +178,12 @@ export class Game {
             }
         } else {
             // --- Rally hit controls ---
-            if (this.player1.canHitBall(this.ball)) {
+            const ballStatus = this.ball.status;
+            // Allow the player to initiate a swing if the ball is heading towards them,
+            // either before the bounce (IN_PLAY_TO_HUMAN) or after (RALLY_TO_HUMAN).
+            const canStartSwing = ballStatus === BallStatus.RALLY_TO_HUMAN || ballStatus === BallStatus.IN_PLAY_TO_HUMAN;
+
+            if (this.player1.side === 1 && canStartSwing) {
                 if (inputManager.isMouseButtonJustPressed(0)) { // Left click for Forehand
                     this.player1.startSwing(this.ball, 3);
                 } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click for Backhand
