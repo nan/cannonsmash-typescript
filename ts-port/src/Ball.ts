@@ -142,21 +142,27 @@ export class Ball {
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
-            if (this.mesh.position.z > 0) { // Bounce on Player 2 (AI) side
+
+            // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
+            if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
                 switch(this.status) {
-                    case BallStatus.IN_PLAY_TO_HUMAN: this.status = BallStatus.IN_PLAY_TO_AI; break;
-                    case BallStatus.SERVE_TO_AI: this.status = BallStatus.RALLY_TO_AI; break;
-                    default: this.ballDead(); break;
-                }
-            } else { // Bounce on Player 1 (Human) side
-                switch(this.status) {
-                    case BallStatus.RALLY_TO_AI:
+                    case BallStatus.IN_PLAY_TO_HUMAN:
+                    case BallStatus.SERVE_TO_HUMAN:
                         this.status = BallStatus.RALLY_TO_HUMAN;
                         break;
-                    case BallStatus.SERVE_TO_HUMAN:
-                        this.status = BallStatus.IN_PLAY_TO_HUMAN;
+                    default:
+                        this.ballDead();
                         break;
-                    default: this.ballDead(); break;
+                }
+            } else { // Bounce on Player 2 (AI) side
+                switch(this.status) {
+                    case BallStatus.IN_PLAY_TO_AI:
+                    case BallStatus.SERVE_TO_AI:
+                        this.status = BallStatus.RALLY_TO_AI;
+                        break;
+                    default:
+                        this.ballDead();
+                        break;
                 }
             }
             return; // A table collision precludes a floor collision
