@@ -101,7 +101,12 @@ export class AIController {
         this._updateMovement();
 
         // 3. スイング開始の判断
-        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
+        const canHit = this.player.canHitBall(this.ball);
+        if (this.ball.status >= 0 && this.ball.status < 8) { // Don't log while waiting for serve
+            console.log(`[AI Pre-Swing Check] ball.status: ${BallStatus[this.ball.status]}(${this.ball.status}), player.swing: ${this.player.swing}, canHitBall: ${canHit}`);
+        }
+
+        if (this.player.swing === 0 && canHit) {
             this.trySwing();
         }
     }
