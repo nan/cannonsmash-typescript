@@ -101,12 +101,7 @@ export class AIController {
         this._updateMovement();
 
         // 3. スイング開始の判断
-        const canHit = this.player.canHitBall(this.ball);
-        if (this.ball.status >= 0 && this.ball.status < 8) { // Don't log while waiting for serve
-            console.log(`[AI Pre-Swing Check] ball.status: ${BallStatus[this.ball.status]}(${this.ball.status}), player.swing: ${this.player.swing}, canHitBall: ${canHit}`);
-        }
-
-        if (this.player.swing === 0 && canHit) {
+        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
             this.trySwing();
         }
     }
@@ -198,33 +193,22 @@ export class AIController {
      * 未来予測を行い、適切なタイミングでスイングを開始する。
      */
     private trySwing() {
-        console.log(`[AI Debug] trySwing called. Ball status: ${this.ball.status}`);
-
         // 1. Ask the player object to predict the best swing for the situation.
         const { swingType, spinCategory } = this.player.getPredictedSwing(this.ball);
 
         const swingParams = stype.get(swingType);
-        if (!swingParams) {
-            console.log("[AI Debug] No swing parameters found for swing type.");
-            return;
-        }
+        if (!swingParams) return;
 
         const hitFrames = swingParams.hitStart;
-        if (hitFrames <= 1) {
-            console.log(`[AI Debug] hitFrames too small (${hitFrames}), skipping swing.`);
-            return; // Animation delay is required for this logic.
-        }
-        console.log(`[AI Debug] Predicted swingType: ${swingType}, hitFrames: ${hitFrames}`);
+        if (hitFrames <= 1) return; // Animation delay is required for this logic.
 
         // 2. Simulate the ball's state 'hitFrames' into the future.
         const simBall = this.ball.clone();
-        console.log(`[AI Debug] Before sim loop - simBall status: ${simBall.status}, pos: ${simBall.mesh.position.z.toFixed(2)}`);
         for (let i = 0; i < hitFrames - 1; i++) {
             const oldPos = simBall.mesh.position.clone();
             simBall._updatePhysics(TICK);
             simBall.checkCollision(oldPos);
         }
-        console.log(`[AI Debug] After sim loop - simBall status: ${simBall.status}, pos: ${simBall.mesh.position.z.toFixed(2)}`);
 
         // 3. Predict the player's position 'hitFrames' into the future.
         const playerPos = this.player.mesh.position;
@@ -236,13 +220,10 @@ export class AIController {
 
         // 4. Check if the ball will be in a hittable zone in the future.
         const futurePlayerBallZDiff = (simPlayerPos.y - simBall.mesh.position.z) * this.player.side;
-        const canHit = this.player.canHitBall(simBall);
-        const inHittingZone = futurePlayerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
-                              futurePlayerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY;
+        if (this.player.canHitBall(simBall) &&
+            futurePlayerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
+            futurePlayerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
 
-        console.log(`[AI Debug] Swing Condition Check: canHit: ${canHit}, inHittingZone: ${inHittingZone} (zDiff: ${futurePlayerBallZDiff.toFixed(3)})`);
-
-        if (canHit && inHittingZone) {
             // 5. Fine-tuning: check if waiting one more frame is better.
             const simBallNextFrame = simBall.clone();
             const oldPos = simBallNextFrame.mesh.position.clone();
@@ -255,14 +236,11 @@ export class AIController {
             );
             const zDiffNextFrame = (simPlayerPosNextFrame.y - simBallNextFrame.mesh.position.z) * this.player.side;
 
-            console.log(`[AI Debug] Fine-tuning Check: current zDiff: ${Math.abs(futurePlayerBallZDiff).toFixed(3)}, next zDiff: ${Math.abs(zDiffNextFrame).toFixed(3)}`);
             if (Math.abs(zDiffNextFrame) < Math.abs(futurePlayerBallZDiff) - this.WAIT_FOR_BETTER_SHOT_MARGIN) {
-                console.log("[AI Debug] Fine-tuning: Decided to wait for a better time.");
                 return; // Wait for a better time.
             }
 
             // 6. Initiate the swing.
-            console.log("%c[AI Debug] SWINGING NOW!", "color: #00ff00; font-weight: bold;");
             this.setRallyTarget(simBall);
             this.player.startSwing(this.ball, spinCategory);
         }

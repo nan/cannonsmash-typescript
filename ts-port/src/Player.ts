@@ -7,6 +7,7 @@ import {
     STATUS_MAX, RUN_SPEED, RUN_PENALTY, SWING_PENALTY, WALK_SPEED, WALK_BONUS, ACCEL_LIMIT, ACCEL_PENALTY
 } from './constants';
 import { Ball } from './Ball';
+import { BallStatus } from './BallStatus';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 
@@ -410,12 +411,13 @@ export class Player {
      * @returns True if the ball can be hit.
      */
     public canHitBall(ball: Ball): boolean {
-        // 変更: プレイヤーサイド(side === 1)の場合、ボールがバウンドする前(status === 2)でも打てるようにする
-        if (((ball.status === 3 || ball.status === 2) && this.side === 1) || // Player's side
-            (ball.status === 1 && this.side === -1)) { // AI's side
-            return true;
+        if (this.side === 1) {
+            // The human player can hit the ball when it's their turn.
+            return ball.status === BallStatus.RALLY_TO_HUMAN;
+        } else {
+            // The AI player can hit the ball when it's their turn.
+            return ball.status === BallStatus.RALLY_TO_AI;
         }
-        return false;
     }
 
     /**
