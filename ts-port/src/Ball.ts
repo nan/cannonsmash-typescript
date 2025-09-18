@@ -142,26 +142,33 @@ export class Ball {
             this.velocity.y *= -TABLE_E;
             this.spin.x *= 0.95;
             this.spin.y *= 0.8;
-
             // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
             if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
                 switch(this.status) {
+                    // Human serves, ball bounces on their own side first.
+                    case BallStatus.SERVE_TO_AI:
+                        this.status = BallStatus.IN_PLAY_TO_AI; // Now it's in play, heading to AI
+                        break;
+                    // AI has hit the ball, it bounces on the human's side.
                     case BallStatus.IN_PLAY_TO_HUMAN:
-                    case BallStatus.SERVE_TO_HUMAN:
-                        this.status = BallStatus.RALLY_TO_HUMAN;
+                        this.status = BallStatus.RALLY_TO_HUMAN; // Now it's a rally ball for the human to hit
                         break;
                     default:
-                        this.ballDead();
+                        this.ballDead(); // Any other bounce on this side is a fault
                         break;
                 }
             } else { // Bounce on Player 2 (AI) side
                 switch(this.status) {
+                    // AI serves, ball bounces on their own side first.
+                    case BallStatus.SERVE_TO_HUMAN:
+                        this.status = BallStatus.IN_PLAY_TO_HUMAN; // Now it's in play, heading to Human
+                        break;
+                    // Human has hit the ball, it bounces on the AI's side.
                     case BallStatus.IN_PLAY_TO_AI:
-                    case BallStatus.SERVE_TO_AI:
-                        this.status = BallStatus.RALLY_TO_AI;
+                        this.status = BallStatus.RALLY_TO_AI; // Now it's a rally ball for the AI to hit
                         break;
                     default:
-                        this.ballDead();
+                        this.ballDead(); // Any other bounce on this side is a fault
                         break;
                 }
             }
@@ -181,10 +188,15 @@ export class Ball {
     public hit(velocity: THREE.Vector3, spin: THREE.Vector2) {
         this.velocity.copy(velocity);
         this.spin.copy(spin);
-        if (this.status === BallStatus.TOSS_P1) { this.status = BallStatus.SERVE_TO_AI; }
-        else if (this.status === BallStatus.TOSS_P2) { this.status = BallStatus.SERVE_TO_HUMAN; }
-        else if (this.status === BallStatus.IN_PLAY_TO_AI) { this.status = BallStatus.RALLY_TO_AI; }
-        else if (this.status === BallStatus.RALLY_TO_HUMAN) { this.status = BallStatus.IN_PLAY_TO_HUMAN; }
+        if (this.status === BallStatus.TOSS_P1) {
+            this.status = BallStatus.SERVE_TO_AI;
+        } else if (this.status === BallStatus.TOSS_P2) {
+            this.status = BallStatus.SERVE_TO_HUMAN;
+        } else if (this.status === BallStatus.RALLY_TO_AI) { // AI hits the ball
+            this.status = BallStatus.IN_PLAY_TO_HUMAN;
+        } else if (this.status === BallStatus.RALLY_TO_HUMAN) { // Human hits the ball
+            this.status = BallStatus.IN_PLAY_TO_AI;
+        }
     }
 
     private ballDead() { if (this.status >= 0) { this.status = BallStatus.DEAD; } }
