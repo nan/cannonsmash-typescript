@@ -298,8 +298,8 @@ export class AIController {
         // 最大500フレーム（10秒）先までシミュレーション
         for (let i = 0; i < 500; i++) {
             // ボールが自コートでバウンドした後の状態かチェック
-            if ((simBall.status === 1 && this.player.side === -1) ||
-                (simBall.status === 3 && this.player.side === 1)) {
+            if ((simBall.status === BallStatus.RALLY_TO_AI && this.player.side === -1) ||
+                (simBall.status === BallStatus.RALLY_TO_HUMAN && this.player.side === 1)) {
                 // 最高到達点を更新
                 if (simBall.mesh.position.y > maxHeight) {
                     maxHeight = simBall.mesh.position.y;
