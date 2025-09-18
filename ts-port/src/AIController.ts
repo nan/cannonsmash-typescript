@@ -101,7 +101,8 @@ export class AIController {
         this._updateMovement();
 
         // 3. スイング開始の判断
-        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
+        // isOpponentHit() を使うことで、ボールがバウンドする前でもスイング準備に入れるようにする
+        if (this.player.swing === 0 && this.isOpponentHit()) {
             this.trySwing();
         }
     }
