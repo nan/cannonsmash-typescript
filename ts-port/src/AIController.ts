@@ -14,6 +14,7 @@ import {
     AI_TARGET_X_ZONE_FACTORS, AI_TARGET_X_MAX_FACTOR
 } from './constants';
 import type { Game } from './Game';
+import { BallStatus } from './BallStatus';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -274,15 +275,14 @@ export class AIController {
     private isOpponentHit(): boolean {
         const status = this.ball.status;
         const side = this.player.side;
-        // 相手が打った後、自コートに向かっている状態
-        if ((status === 0 && side === -1) || (status === 2 && side === 1)) {
-            return true;
+
+        if (side === -1) { // This controller is for the AI player (Player 2)
+            // The opponent (Human) has hit the ball if it's in play towards the AI,
+            // or if it has bounced and is ready for the AI to hit.
+            return status === BallStatus.IN_PLAY_TO_AI || status === BallStatus.RALLY_TO_AI;
+        } else { // This controller is for a hypothetical Player 1 AI
+            return status === BallStatus.IN_PLAY_TO_HUMAN || status === BallStatus.RALLY_TO_HUMAN;
         }
-        // 相手が打った後、ネットを越えて自コートでバウンドした状態
-        if ((status === 1 && side === -1) || (status === 3 && side === 1)) {
-            return true;
-        }
-        return false;
     }
 
     /**
