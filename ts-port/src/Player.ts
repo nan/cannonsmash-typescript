@@ -482,7 +482,7 @@ export class Player {
             trajectory.push(simBall.mesh.position.clone());
 
             // Condition to check if the ball has bounced on the player's side.
-            if ((simBall.status === BallStatus.IN_PLAY_TO_AI && this.side === 1) || (simBall.status === BallStatus.RALLY_TO_HUMAN && this.side === -1)) {
+            if ((simBall.status === BallStatus.RALLY_TO_HUMAN && this.side === 1) || (simBall.status === BallStatus.RALLY_TO_AI && this.side === -1)) {
                 // If it has bounced, find the highest point (peak) of the trajectory.
                 if (simBall.mesh.position.y > maxHeight) {
                     // The original C++ code has a peculiar condition to only consider the peak
