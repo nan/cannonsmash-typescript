@@ -187,25 +187,26 @@ export class Ball {
 
         switch (this.status) {
             // Serve hits
-            case BallStatus.TOSS_P1: // Human is serving
+            case BallStatus.TOSS_P1:
                 this.status = BallStatus.SERVE_TO_AI;
                 break;
-            case BallStatus.TOSS_P2: // AI is serving
+            case BallStatus.TOSS_P2:
                 this.status = BallStatus.SERVE_TO_HUMAN;
                 break;
 
-            // Rally hits
-            case BallStatus.RALLY_TO_HUMAN: // Human hits the ball
+            // Human hits the ball (volley or after bounce)
+            case BallStatus.RALLY_TO_HUMAN:
+            case BallStatus.IN_PLAY_TO_HUMAN:
+            case BallStatus.SERVE_TO_HUMAN:
                 this.status = BallStatus.IN_PLAY_TO_AI;
                 break;
-            case BallStatus.RALLY_TO_AI: // AI hits the ball
+
+            // AI hits the ball (volley or after bounce)
+            case BallStatus.RALLY_TO_AI:
+            case BallStatus.IN_PLAY_TO_AI:
+            case BallStatus.SERVE_TO_AI:
                 this.status = BallStatus.IN_PLAY_TO_HUMAN;
                 break;
-
-            // Hitting the ball in any other state is not a valid move,
-            // but we don't change the status here. The game logic should
-            // prevent hits in invalid states. If one occurs, the existing
-            // status will likely lead to a `ballDead` call later, which is fine.
         }
     }
 
