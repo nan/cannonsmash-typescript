@@ -260,7 +260,8 @@ export class Player {
      * @returns True if the ball is tossed and ready to be hit for a serve.
      */
     public canServe(ball: Ball): boolean {
-        if ((ball.status === 6 && this.side === 1) || (ball.status === 7 && this.side === -1)) {
+        if ((ball.status === BallStatus.TOSS_P1 && this.side === 1) ||
+            (ball.status === BallStatus.TOSS_P2 && this.side === -1)) {
             return true;
         }
         return false;
@@ -459,11 +460,11 @@ export class Player {
         const status = ball.status;
         const side = this.side;
         // Opponent has hit the ball and it's heading towards our side
-        if ((status === 0 && side === -1) || (status === 2 && side === 1)) {
+        if ((status === BallStatus.RALLY_TO_AI && side === -1) || (status === BallStatus.IN_PLAY_TO_HUMAN && side === 1)) {
             return true;
         }
         // Opponent's hit has bounced on our side
-        if ((status === 1 && side === -1) || (status === 3 && side === 1)) {
+        if ((status === BallStatus.RALLY_TO_HUMAN && side === -1) || (status === BallStatus.IN_PLAY_TO_AI && side === 1)) {
             return true;
         }
         return false;
@@ -481,7 +482,7 @@ export class Player {
             trajectory.push(simBall.mesh.position.clone());
 
             // Condition to check if the ball has bounced on the player's side.
-            if ((simBall.status === 3 && this.side === 1) || (simBall.status === 1 && this.side === -1)) {
+            if ((simBall.status === BallStatus.IN_PLAY_TO_AI && this.side === 1) || (simBall.status === BallStatus.RALLY_TO_HUMAN && this.side === -1)) {
                 // If it has bounced, find the highest point (peak) of the trajectory.
                 if (simBall.mesh.position.y > maxHeight) {
                     // The original C++ code has a peculiar condition to only consider the peak
@@ -804,7 +805,7 @@ export class Player {
         }
 
         // Reset status if the point is over (ball is dead or ready for serve).
-        if (ball.status === -1 || ball.status === 8) {
+        if (ball.status === BallStatus.DEAD || ball.status === BallStatus.WAITING_FOR_SERVE) {
             this.resetStatus();
         }
     }

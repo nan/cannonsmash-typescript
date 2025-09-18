@@ -62,7 +62,7 @@ export class AIController {
      */
     public update(deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
-        if (this.ball.status === 8 && game.getService() === this.player.side) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side) {
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -124,7 +124,7 @@ export class AIController {
         const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
         let idealRacketX;
         // C++: if ( theBall.GetStatus() == 8 || ... )
-        if (this.ball.status === 8) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
             // For serving, always use the forehand side for positioning.
             idealRacketX = playerPos.x + racketOffsetX;
         } else {
@@ -256,11 +256,11 @@ export class AIController {
             if (top.maxHeight > 0) {
                 this.predictedHitPosition.copy(top.position);
             }
-        } else if (this.ball.status === 8) {
+        } else if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
             // Ball is ready for serve, but it's not our turn. Move to ready position.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
-        } else if (this.ball.status < 6) {
+        } else if (this.ball.status <= BallStatus.SERVE_TO_HUMAN) { // Any in-play status
             // Rally is not in progress, return to home position.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
