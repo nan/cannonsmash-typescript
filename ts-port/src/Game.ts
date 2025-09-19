@@ -248,14 +248,14 @@ export class Game {
             this.handleInput();
 
             // Pre-serve logic
-            if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
-                this.ball.reset(this.player1);
-                if (this.player1.swingType < SERVE_MIN) {
+            if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
+                const server = this.getService() === this.player1.side ? this.player1 : this.player2;
+                this.ball.reset(server);
+
+                // This logic only applies to the human player, so keep it separate.
+                if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
-            } else if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player2.side) {
-                // This is the fix: ensure the ball is reset for the AI's serve as well.
-                this.ball.reset(this.player2);
             }
 
             this.cameraManager.update();
