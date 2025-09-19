@@ -248,9 +248,12 @@ export class Game {
             this.handleInput();
 
             // Pre-serve logic
-            if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
-                this.ball.reset(this.player1);
-                if (this.player1.swingType < SERVE_MIN) {
+            if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
+                const server = this.getService() === this.player1.side ? this.player1 : this.player2;
+                this.ball.reset(server);
+
+                // This logic only applies to the human player, so keep it separate.
+                if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
             }
