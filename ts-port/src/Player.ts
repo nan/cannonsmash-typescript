@@ -422,6 +422,22 @@ export class Player {
     }
 
     /**
+     * Checks if the player is in a state where they can initiate a swing.
+     * This is more permissive than canHitBall, allowing a swing to start
+     * while the ball is still on its way to the player's side.
+     * @param ball The ball object.
+     * @returns True if the player can start a swing.
+     */
+    public canInitiateSwing(ball: Ball): boolean {
+        const status = ball.status;
+        if (this.side === 1) { // Human player
+            return status === BallStatus.RALLY_TO_HUMAN || status === BallStatus.IN_PLAY_TO_HUMAN;
+        } else { // AI player
+            return status === BallStatus.RALLY_TO_AI || status === BallStatus.IN_PLAY_TO_AI;
+        }
+    }
+
+    /**
      * Executes the logic for hitting the ball.
      * @param ball The ball object.
      */
