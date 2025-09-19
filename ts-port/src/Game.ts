@@ -253,6 +253,9 @@ export class Game {
                 if (this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
+            } else if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player2.side) {
+                // This is the fix: ensure the ball is reset for the AI's serve as well.
+                this.ball.reset(this.player2);
             }
 
             this.cameraManager.update();
