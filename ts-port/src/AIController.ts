@@ -101,7 +101,8 @@ export class AIController {
         this._updateMovement();
 
         // 3. スイング開始の判断
-        if (this.player.swing === 0 && this.player.canHitBall(this.ball)) {
+        // player.canInitiateSwing() を使うことで、ボールがバウンドする前でもスイング準備に入れるようにする
+        if (this.player.swing === 0 && this.player.canInitiateSwing(this.ball)) {
             this.trySwing();
         }
     }
@@ -175,7 +176,7 @@ export class AIController {
         }
 
         // 【動的な速度制限】状況に応じて最大速度を切り替える
-        if (this.isOpponentHit()) {
+        if (this.player.canInitiateSwing(this.ball)) {
             // ラリー中は素早く動く
             if (playerVel.lengthSq() > this.RALLY_MAX_SPEED * this.RALLY_MAX_SPEED) {
                 playerVel.normalize().multiplyScalar(this.RALLY_MAX_SPEED);
@@ -251,7 +252,7 @@ export class AIController {
      * ボールの状況に応じて、AIが狙うべき打点を計算し、`predictedHitPosition`を更新する。
      */
     private calculateHitArea() {
-        if (this.isOpponentHit()) {
+        if (this.player.canInitiateSwing(this.ball)) {
             const top = this.getBallTop();
             if (top.maxHeight > 0) {
                 this.predictedHitPosition.copy(top.position);
@@ -264,24 +265,6 @@ export class AIController {
             // Rally is not in progress, return to home position.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
             this.predictedHitPosition.y = this.HOME_POSITION_Y * this.player.side;
-        }
-    }
-
-    /**
-     * C++版の isOpponentHit に相当。
-     * ボールが相手プレイヤーから打たれた状態かどうかを判定する。
-     * @returns 相手が打ったボールであればtrue
-     */
-    private isOpponentHit(): boolean {
-        const status = this.ball.status;
-        const side = this.player.side;
-
-        if (side === -1) { // This controller is for the AI player (Player 2)
-            // The opponent (Human) has hit the ball if it's in play towards the AI,
-            // or if it has bounced and is ready for the AI to hit.
-            return status === BallStatus.IN_PLAY_TO_AI || status === BallStatus.RALLY_TO_AI;
-        } else { // This controller is for a hypothetical Player 1 AI
-            return status === BallStatus.IN_PLAY_TO_HUMAN || status === BallStatus.RALLY_TO_HUMAN;
         }
     }
 
