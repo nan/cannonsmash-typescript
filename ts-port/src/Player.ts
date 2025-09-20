@@ -11,6 +11,7 @@ import { BallStatus } from './BallStatus';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
 
 export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 
@@ -47,13 +48,11 @@ export class Player {
         this.side = side;
         this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
 
-        // this.mesh is the player's root container. It is NOT replaced.
         this.mesh = new THREE.Group();
 
         this.status = STATUS_MAX;
         this.statusMax = STATUS_MAX;
 
-        // New setup process
         if (this.assets.playerModel) {
             this.setupModelFromGltf(this.assets.playerModel);
         } else {
@@ -66,29 +65,22 @@ export class Player {
         }
     }
 
-    /**
-     * Correctly sets up the player model from a loaded GLTF asset.
-     */
     private setupModelFromGltf(gltf: GLTF) {
-        const model = gltf.scene;
+        // Clone the model to ensure each player instance has a unique object
+        const model = SkeletonUtils.clone(gltf.scene);
 
-        // --- Adjust model's scale, position, and rotation ---
-        // The GLTF's root node already contains the correct rotation.
-        // We only need to adjust the scale and position to fit the scene.
-        model.scale.set(0.3, 0.3, 0.3); // Adjusted scale for realistic height
-        model.position.y = -0.8; // Adjust to stand on the ground plane
+        model.scale.set(0.2, 0.2, 0.2);
+        model.position.y = -0.8;
 
-        // Add the correctly oriented model to the main container
         this.mesh.add(model);
 
-        // Make the human player semi-transparent
-        if (!this.isAi) {
+        // Make the human player (side 1) semi-transparent
+        if (this.side === 1) {
             model.traverse((child) => {
                 if ((child as THREE.Mesh).isMesh) {
                     const meshChild = child as THREE.Mesh;
                     const materials = Array.isArray(meshChild.material) ? meshChild.material : [meshChild.material];
 
-                    // Modify materials directly instead of cloning to prevent issues.
                     for (const mat of materials) {
                         mat.transparent = true;
                         mat.opacity = 0.5;
@@ -97,10 +89,9 @@ export class Player {
             });
         }
 
-        // The mixer should be attached to the object that has the animations
         this.mixer = new THREE.AnimationMixer(model);
+        // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
         gltf.animations.forEach((clip) => {
-            console.log(`Found animation clip: ${clip.name}`);
             this.animationClips[clip.name] = clip;
         });
     }
@@ -144,8 +135,6 @@ export class Player {
             console.warn(`Animation clip not found: ${name}`);
         }
     }
-
-    // --- Gameplay logic methods below are unchanged ---
 
     public changeServeType() {
         if (this.swing > 0) return;
