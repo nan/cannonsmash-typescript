@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { DATLoader } from './DATLoader';
 import { AffineLoader, type AffineData } from './AffineLoader';
 import { QuaternionLoader, type QuaternionData } from './QuaternionLoader';
@@ -13,6 +14,7 @@ export interface Motion {
 export interface GameAssets {
     baseModels: { [modelName: string]: THREE.BufferGeometry };
     motions: { [motionName: string]: Motion };
+    playerModel?: GLTF;
 }
 
 class AssetManager {
@@ -20,6 +22,7 @@ class AssetManager {
     private datLoader = new DATLoader(this.manager);
     private affineLoader = new AffineLoader(this.manager);
     private quaternionLoader = new QuaternionLoader(this.manager);
+    private gltfLoader = new GLTFLoader(this.manager);
 
     private readonly modelNames = [
         "head", "chest", "hip", "racket",
@@ -37,11 +40,28 @@ class AssetManager {
     public async loadAll(): Promise<GameAssets> {
         console.log('AssetManager: Starting asset loading...');
 
-        const baseModels = await this.loadBaseModels();
-        const motions = await this.loadAllMotions();
+        // Load all assets in parallel
+        const [baseModels, motions, playerModel] = await Promise.all([
+            this.loadBaseModels(),
+            this.loadAllMotions(),
+            this.loadPlayerModel()
+        ]);
 
         console.log('AssetManager: All assets loaded.');
-        return { baseModels, motions };
+        return { baseModels, motions, playerModel };
+    }
+
+    private async loadPlayerModel(): Promise<GLTF> {
+        const path = 'scene.gltf'; // The file is in the public folder
+        return new Promise<GLTF>((resolve, reject) => {
+            this.gltfLoader.load(path, (gltf) => {
+                console.log('AssetManager: Player model loaded successfully.');
+                resolve(gltf);
+            }, undefined, (error) => {
+                 console.error('AssetManager: An error happened while loading the player model', error);
+                 reject(error);
+            });
+        });
     }
 
     private async loadBaseModels(): Promise<{ [modelName: string]: THREE.BufferGeometry }> {
