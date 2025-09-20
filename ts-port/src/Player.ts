@@ -73,9 +73,10 @@ export class Player {
         const model = gltf.scene;
 
         // --- Adjust model's scale, position, and rotation ---
+        // The GLTF's root node already contains the correct rotation.
+        // We only need to adjust the scale and position to fit the scene.
         model.scale.set(0.8, 0.8, 0.8);
         model.position.y = -0.8; // Adjust to stand on the ground plane
-        model.rotation.x = Math.PI / 2; // Correct for Z-up vs Y-up coordinate systems
 
         // Add the correctly oriented model to the main container
         this.mesh.add(model);
