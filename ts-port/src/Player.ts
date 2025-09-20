@@ -71,6 +71,7 @@ export class Player {
 
         model.scale.set(0.2, 0.2, 0.2);
         model.position.y = -0.8;
+        model.rotation.y = Math.PI; // Rotate model to face the table
 
         this.mesh.add(model);
 
@@ -83,7 +84,7 @@ export class Player {
 
                     for (const mat of materials) {
                         mat.transparent = true;
-                        mat.opacity = 0.5;
+                        mat.opacity = 0.2; // Increased transparency
                     }
                 }
             });
