@@ -218,10 +218,22 @@ export class Player {
         this.swingType = this.determineSwingType(tmpBall, isForehand);
         let animationName: string;
         switch (this.swingType) {
-            case SWING_DRIVE: animationName = 'Fdrive'; break;
-            case SWING_SMASH: animationName = 'Fsmash'; break;
-            case SWING_CUT: case SWING_POKE: animationName = 'Bnormal'; break;
-            case SWING_NORMAL: default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
+            case SWING_DRIVE:
+                animationName = 'Fdrive'; // Only forehand drive exists in the provided list
+                break;
+            case SWING_SMASH:
+                animationName = 'Fsmash'; // Only forehand smash
+                break;
+            case SWING_CUT:
+                animationName = isForehand ? 'Fcut' : 'Bcut';
+                break;
+            case SWING_POKE:
+                animationName = isForehand ? 'Fpeck' : 'Bpeck';
+                break;
+            case SWING_NORMAL:
+            default:
+                animationName = isForehand ? 'Fnormal' : 'Bnormal';
+                break;
         }
         this.swing = 1;
         this.playAnimation(animationName, false);
