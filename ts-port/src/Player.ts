@@ -59,9 +59,10 @@ export class Player {
             console.error("Player model not found in assets!");
         }
 
-        if (Object.keys(this.animationClips).length > 0) {
-            const idleAnimationName = Object.keys(this.animationClips)[0];
-            this.playAnimation(idleAnimationName, true);
+        if (this.animationClips['Fnormal']) {
+            this.playAnimation('Fnormal', true);
+        } else if (Object.keys(this.animationClips).length > 0) {
+            this.playAnimation(Object.keys(this.animationClips)[0], true);
         }
     }
 
@@ -113,13 +114,16 @@ export class Player {
 
         switch (this.state) {
             case 'IDLE':
-                this.playAnimation(this.animationClips['Idle'] ? 'Idle' : Object.keys(this.animationClips)[0], true);
+                // Default to Fnormal for the idle animation.
+                this.playAnimation('Fnormal', true);
                 break;
+            // Other states are mainly for triggering one-shot animations,
+            // which is handled directly in the swing/serve methods.
+            // This switch can be expanded if more persistent states are needed.
             case 'SWING_DRIVE':
-                this.playAnimation('Fdrive', false);
-                break;
             case 'SWING_CUT':
-                this.playAnimation('Fcut', false);
+                // These states are transient and will be immediately followed by IDLE
+                // once the swing animation finishes, so no action is needed here.
                 break;
         }
     }
