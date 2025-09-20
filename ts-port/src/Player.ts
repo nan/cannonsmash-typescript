@@ -80,11 +80,21 @@ export class Player {
             model.traverse((child) => {
                 if ((child as THREE.Mesh).isMesh) {
                     const meshChild = child as THREE.Mesh;
-                    const materials = Array.isArray(meshChild.material) ? meshChild.material : [meshChild.material];
 
-                    for (const mat of materials) {
-                        mat.transparent = true;
-                        mat.opacity = 0.2; // Increased transparency
+                    // To prevent modifying the material shared with the other player,
+                    // we clone it before making it transparent.
+                    if (Array.isArray(meshChild.material)) {
+                        meshChild.material = meshChild.material.map(mat => {
+                            const newMat = mat.clone();
+                            newMat.transparent = true;
+                            newMat.opacity = 0.2;
+                            return newMat;
+                        });
+                    } else {
+                        const newMat = meshChild.material.clone();
+                        newMat.transparent = true;
+                        newMat.opacity = 0.2;
+                        meshChild.material = newMat;
                     }
                 }
             });
