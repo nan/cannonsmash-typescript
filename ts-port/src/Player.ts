@@ -12,8 +12,6 @@ import { AIController } from './AIController';
 import type { Game } from './Game';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 
-// const FRAME_RATE = 50; // No longer needed for procedural animation
-
 export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 
 export class Player {
@@ -35,11 +33,9 @@ export class Player {
     public spin = new THREE.Vector2();
 
     private assets: GameAssets;
-    // private bodyParts: { [name: string]: THREE.Object3D } = {}; // Removed
-    private mixer!: THREE.AnimationMixer; // Will be initialized in setupModelFromGltf
+    private mixer!: THREE.AnimationMixer;
     private animationClips: { [name: string]: THREE.AnimationClip } = {};
     private currentAction: THREE.AnimationAction | null = null;
-    // private rootBone: THREE.Group; // Removed
 
     private readonly MOVEMENT_ACCELERATION = 0.05;
     private readonly RALLY_MAX_SPEED = 4.0;
@@ -51,7 +47,7 @@ export class Player {
         this.side = side;
         this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
 
-        // this.mesh will be replaced by the GLTF scene
+        // this.mesh is the player's root container. It is NOT replaced.
         this.mesh = new THREE.Group();
 
         this.status = STATUS_MAX;
@@ -62,11 +58,8 @@ export class Player {
             this.setupModelFromGltf(this.assets.playerModel);
         } else {
             console.error("Player model not found in assets!");
-            // Fallback to an empty group if model fails to load
         }
 
-        // The old animation system is replaced, so we can't set state based on old animation names yet.
-        // We will play the first available animation from the new model as a default idle.
         if (Object.keys(this.animationClips).length > 0) {
             const idleAnimationName = Object.keys(this.animationClips)[0];
             this.playAnimation(idleAnimationName, true);
@@ -74,24 +67,24 @@ export class Player {
     }
 
     /**
-     * New method to set up the player model from a loaded GLTF asset.
+     * Correctly sets up the player model from a loaded GLTF asset.
      */
     private setupModelFromGltf(gltf: GLTF) {
-        // Replace the placeholder mesh with the loaded GLTF scene
-        this.mesh = gltf.scene;
+        const model = gltf.scene;
 
         // --- Adjust model's scale, position, and rotation ---
-        // These values are guesses and will likely need tweaking.
-        this.mesh.scale.set(0.5, 0.5, 0.5); // Scale it down to fit the scene
-        //this.mesh.position.set(0, -0.8, 0); // Adjust vertical position
-        this.mesh.rotation.y = Math.PI; // Rotate to face the correct direction
+        model.scale.set(0.8, 0.8, 0.8);
+        model.position.y = -0.8; // Adjust to stand on the ground plane
+        model.rotation.x = Math.PI / 2; // Correct for Z-up vs Y-up coordinate systems
+
+        // Add the correctly oriented model to the main container
+        this.mesh.add(model);
 
         // Make the human player semi-transparent
         if (!this.isAi) {
-            this.mesh.traverse((child) => {
+            model.traverse((child) => {
                 if ((child as THREE.Mesh).isMesh) {
                     const meshChild = child as THREE.Mesh;
-                    // Ensure material is an array
                     const materials = Array.isArray(meshChild.material) ? meshChild.material : [meshChild.material];
 
                     for (let i = 0; i < materials.length; i++) {
@@ -103,42 +96,33 @@ export class Player {
             });
         }
 
-        // --- Set up animation ---
-        this.mixer = new THREE.AnimationMixer(this.mesh);
+        // The mixer should be attached to the object that has the animations
+        this.mixer = new THREE.AnimationMixer(model);
         gltf.animations.forEach((clip) => {
             console.log(`Found animation clip: ${clip.name}`);
             this.animationClips[clip.name] = clip;
         });
     }
 
-    // setState and playAnimation are largely unchanged, but they will now use
-    // the animation names from the GLTF file (e.g., "Idle", "Running")
-    // instead of the old names ("Fnormal", "Fdrive").
-    // For now, the existing logic will fail to find animations, which is expected.
-    // We will just play the default animation in the constructor.
-
     public setState(newState: PlayerState) {
         if (this.state === newState) return;
         this.state = newState;
 
-        // This switch will no longer work as intended because the animation
-        // names have changed. We'll need to map old states to new animations later.
         switch (this.state) {
             case 'IDLE':
-                // Attempt to play an animation named "Idle" or the first available one
                 this.playAnimation(this.animationClips['Idle'] ? 'Idle' : Object.keys(this.animationClips)[0], true);
                 break;
             case 'SWING_DRIVE':
-                this.playAnimation('Fdrive', false); // This will likely fail, which is OK for now
+                this.playAnimation('Fdrive', false);
                 break;
             case 'SWING_CUT':
-                this.playAnimation('Fcut', false); // This will likely fail, which is OK for now
+                this.playAnimation('Fcut', false);
                 break;
         }
     }
 
     public playAnimation(name: string, loop = true) {
-        if (!this.mixer) return; // Guard against missing mixer
+        if (!this.mixer) return;
 
         if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
             return;
@@ -150,25 +134,17 @@ export class Player {
             newAction.clampWhenFinished = !loop;
 
             if (this.currentAction) {
-                this.currentAction.fadeOut(0.2); // Fade out previous animation
+                this.currentAction.fadeOut(0.2);
             }
-            newAction.reset().fadeIn(0.2).play(); // Fade in new animation
+            newAction.reset().fadeIn(0.2).play();
 
             this.currentAction = newAction;
-
-            // The old 'finished' event listener is problematic with fading,
-            // and the logic needs to be re-thought with the new state machine.
-            // Removing it for now to prevent bugs.
         } else {
             console.warn(`Animation clip not found: ${name}`);
         }
     }
 
-    // --- The rest of the gameplay logic remains largely the same ---
-    // Methods like canServe, startServe, determineSwingType, hitBall, etc.,
-    // are related to game rules and physics, not the visual representation.
-    // The only change is that calls to playAnimation with old names will
-    // now print a warning, which is the expected outcome of this step.
+    // --- Gameplay logic methods below are unchanged ---
 
     public changeServeType() {
         if (this.swing > 0) return;
@@ -192,7 +168,6 @@ export class Player {
             this.spin.x = 0;
             this.spin.y = 0;
         }
-        // This animation will fail, which is expected.
         this.playAnimation('Fcut', false);
         return true;
     }
@@ -248,7 +223,6 @@ export class Player {
             case SWING_NORMAL: default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
         }
         this.swing = 1;
-        // This animation will fail, which is expected.
         this.playAnimation(animationName, false);
         return true;
     }
