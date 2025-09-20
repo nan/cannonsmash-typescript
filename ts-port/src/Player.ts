@@ -11,7 +11,7 @@ import { BallStatus } from './BallStatus';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 
