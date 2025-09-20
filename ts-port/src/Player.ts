@@ -75,7 +75,7 @@ export class Player {
         // --- Adjust model's scale, position, and rotation ---
         // The GLTF's root node already contains the correct rotation.
         // We only need to adjust the scale and position to fit the scene.
-        model.scale.set(0.8, 0.8, 0.8);
+        model.scale.set(0.3, 0.3, 0.3); // Adjusted scale for realistic height
         model.position.y = -0.8; // Adjust to stand on the ground plane
 
         // Add the correctly oriented model to the main container
@@ -88,10 +88,10 @@ export class Player {
                     const meshChild = child as THREE.Mesh;
                     const materials = Array.isArray(meshChild.material) ? meshChild.material : [meshChild.material];
 
-                    for (let i = 0; i < materials.length; i++) {
-                        materials[i] = materials[i].clone();
-                        materials[i].transparent = true;
-                        materials[i].opacity = 0.5;
+                    // Modify materials directly instead of cloning to prevent issues.
+                    for (const mat of materials) {
+                        mat.transparent = true;
+                        mat.opacity = 0.5;
                     }
                 }
             });
