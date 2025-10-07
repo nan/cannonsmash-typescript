@@ -34,7 +34,7 @@ class AssetManager {
     }
 
     private async loadPlayerModel(): Promise<GLTF> {
-        const path = 'scene.gltf'; // The file is in the public folder
+        const path = 'player.glb'; // The file is in the public folder
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
                 console.log('AssetManager: Player model loaded successfully.');
