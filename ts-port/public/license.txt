@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low-poly test dummy.
+* source:	https://sketchfab.com/3d-models/low-poly-test-dummy-2f0d22a321d846eb80bf7497a527c5d2
+* author:	HipDaMaster (https://sketchfab.com/HipDaMaster)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low-poly test dummy." (https://sketchfab.com/3d-models/low-poly-test-dummy-2f0d22a321d846eb80bf7497a527c5d2) by HipDaMaster (https://sketchfab.com/HipDaMaster) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
