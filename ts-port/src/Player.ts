@@ -173,7 +173,7 @@ export class Player {
             this.spin.x = 0;
             this.spin.y = 0;
         }
-        this.playAnimation('Fcut', false);
+        this.playAnimation('Fdrive', false);
         return true;
     }
 
