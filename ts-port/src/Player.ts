@@ -70,7 +70,7 @@ export class Player {
         // Clone the model to ensure each player instance has a unique object
         const model = SkeletonUtils.clone(gltf.scene);
 
-        model.scale.set(0.2, 0.2, 0.2);
+        model.scale.set(2.0, 2.0, 2.0);
         model.position.y = -0.8;
         model.rotation.y = Math.PI; // Rotate model to face the table
 
