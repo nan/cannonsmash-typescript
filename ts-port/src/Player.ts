@@ -102,6 +102,11 @@ export class Player {
         }
 
         this.mixer = new THREE.AnimationMixer(model);
+
+        // Log all available animation clip names for debugging
+        const clipNames = gltf.animations.map(clip => clip.name);
+        console.log('Available animation clips in player.glb:', clipNames);
+
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
         gltf.animations.forEach((clip) => {
             this.animationClips[clip.name] = clip;
