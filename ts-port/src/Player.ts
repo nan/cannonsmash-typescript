@@ -131,6 +131,7 @@ export class Player {
     }
 
     public playAnimation(name: string, loop = true) {
+        console.log(`Playing animation: ${name}`);
         if (!this.mixer) return;
 
         if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
@@ -225,18 +226,11 @@ export class Player {
         let animationName: string;
         switch (this.swingType) {
             case SWING_DRIVE:
-                animationName = 'Fdrive'; // Only forehand drive exists in the provided list
-                break;
-            case SWING_SMASH:
-                animationName = 'Fsmash'; // Only forehand smash
+                animationName = 'Fddrive';
                 break;
             case SWING_CUT:
                 animationName = isForehand ? 'Fcut' : 'Bcut';
                 break;
-            case SWING_POKE:
-                animationName = isForehand ? 'Fpeck' : 'Bpeck';
-                break;
-            case SWING_NORMAL:
             default:
                 animationName = isForehand ? 'Fnormal' : 'Bnormal';
                 break;
