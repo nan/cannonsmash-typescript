@@ -103,13 +103,9 @@ export class Player {
 
         this.mixer = new THREE.AnimationMixer(model);
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
-        const animationClip = gltf.animations.find(clip => clip.name === 'motion_20250509221737_motion_20250509221737');
-        if (animationClip) {
-            const animationNames = ['Fnormal', 'Bnormal', 'Fdrive', 'Fsmash', 'Fcut', 'Bcut', 'Fpeck', 'Bpeck'];
-            animationNames.forEach(name => {
-                this.animationClips[name] = animationClip;
-            });
-        }
+        gltf.animations.forEach((clip) => {
+            this.animationClips[clip.name] = clip;
+        });
     }
 
     public setState(newState: PlayerState) {
