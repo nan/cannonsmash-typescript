@@ -101,6 +101,51 @@ export class Player {
             });
         }
 
+        // --- START DETAILED LOGGING ---
+        // Only log for the human player to avoid console spam
+        if (this.side === 1 && !this.isAi) {
+            console.log("--- Animation Debugging Info ---");
+
+            // 1. Log model hierarchy to understand its structure
+            console.log("Model Hierarchy:");
+            model.traverse((obj) => {
+                let indent = '- ';
+                let current = obj;
+                while (current.parent && current !== model) {
+                    indent = '  ' + indent;
+                    current = current.parent;
+                }
+                console.log(`${indent}${obj.name} (${obj.type})`);
+            });
+
+            // 2. Find and log the skeleton's bone names
+            let skeletonFound = false;
+            model.traverse((child) => {
+                const skinnedMesh = child as THREE.SkinnedMesh;
+                if (skinnedMesh.isSkinnedMesh) {
+                    console.log(`\nSkeleton found in mesh: "${skinnedMesh.name}"`);
+                    const boneNames = skinnedMesh.skeleton.bones.map(bone => bone.name);
+                    console.log("Bone Names:", boneNames);
+                    skeletonFound = true;
+                }
+            });
+            if (!skeletonFound) {
+                console.log("Error: No skeleton found in the model.");
+            }
+
+            // 3. Log the names of the tracks within each animation clip
+            console.log("\nAnimation Clip Tracks:");
+            gltf.animations.forEach((clip) => {
+                console.log(`- Clip: "${clip.name}"`);
+                clip.tracks.forEach(track => {
+                    // The track name is what binds the animation to a bone
+                    console.log(`  - Track Name: ${track.name}`);
+                });
+            });
+            console.log("--- End Animation Debugging Info ---");
+        }
+        // --- END DETAILED LOGGING ---
+
         this.mixer = new THREE.AnimationMixer(model);
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
         console.log('Loaded animation clips:');
