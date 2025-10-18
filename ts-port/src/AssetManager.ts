@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { DATLoader } from './DATLoader';
 // A structure to hold all game assets
 export interface GameAssets {
@@ -38,7 +39,19 @@ class AssetManager {
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
                 console.log('AssetManager: Player model loaded successfully.');
-                resolve(gltf);
+
+                // Clone the scene and animations to ensure we have a clean, independent copy
+                const clonedScene = SkeletonUtils.clone(gltf.scene);
+                const clonedAnimations = gltf.animations.map(clip => clip.clone());
+
+                // Create a new GLTF-like object with the cloned data
+                const clonedGltf: GLTF = {
+                    ...gltf,
+                    scene: clonedScene,
+                    animations: clonedAnimations,
+                };
+
+                resolve(clonedGltf);
             }, undefined, (error) => {
                  console.error('AssetManager: An error happened while loading the player model', error);
                  reject(error);

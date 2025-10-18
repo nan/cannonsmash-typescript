@@ -101,53 +101,12 @@ export class Player {
             });
         }
 
-        // --- START DETAILED LOGGING ---
-        // Only log for the human player to avoid console spam
-        if (this.side === 1 && !this.isAi) {
-            console.log("--- Animation Debugging Info ---");
-
-            // 1. Log model hierarchy to understand its structure
-            console.log("Model Hierarchy:");
-            model.traverse((obj) => {
-                let indent = '- ';
-                let current = obj;
-                while (current.parent && current !== model) {
-                    indent = '  ' + indent;
-                    current = current.parent;
-                }
-                console.log(`${indent}${obj.name} (${obj.type})`);
-            });
-
-            // 2. Find and log the skeleton's bone names
-            let skeletonFound = false;
-            model.traverse((child) => {
-                const skinnedMesh = child as THREE.SkinnedMesh;
-                if (skinnedMesh.isSkinnedMesh) {
-                    console.log(`\nSkeleton found in mesh: "${skinnedMesh.name}"`);
-                    const boneNames = skinnedMesh.skeleton.bones.map(bone => bone.name);
-                    console.log("Bone Names:", boneNames);
-                    skeletonFound = true;
-                }
-            });
-            if (!skeletonFound) {
-                console.log("Error: No skeleton found in the model.");
-            }
-
-            // 3. Log the number of tracks within each animation clip
-            console.log("\nAnimation Clip Track Counts:");
-            gltf.animations.forEach((clip) => {
-                console.log(`- Clip: "${clip.name}", Number of tracks: ${clip.tracks.length}`);
-            });
-            console.log("--- End Animation Debugging Info ---");
-        }
-        // --- END DETAILED LOGGING ---
-
         this.mixer = new THREE.AnimationMixer(model);
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
         console.log('Loaded animation clips:');
         gltf.animations.forEach((clip) => {
             console.log(`- ${clip.name}`);
-            this.animationClips[clip.name] = clip.clone();
+            this.animationClips[clip.name] = clip;
         });
     }
 
