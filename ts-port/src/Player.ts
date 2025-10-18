@@ -106,7 +106,7 @@ export class Player {
         console.log('Loaded animation clips:');
         gltf.animations.forEach((clip) => {
             console.log(`- ${clip.name}`);
-            this.animationClips[clip.name] = clip;
+            this.animationClips[clip.name] = clip.clone();
         });
     }
 
