@@ -133,14 +133,10 @@ export class Player {
                 console.log("Error: No skeleton found in the model.");
             }
 
-            // 3. Log the names of the tracks within each animation clip
-            console.log("\nAnimation Clip Tracks:");
+            // 3. Log the number of tracks within each animation clip
+            console.log("\nAnimation Clip Track Counts:");
             gltf.animations.forEach((clip) => {
-                console.log(`- Clip: "${clip.name}"`);
-                clip.tracks.forEach(track => {
-                    // The track name is what binds the animation to a bone
-                    console.log(`  - Track Name: ${track.name}`);
-                });
+                console.log(`- Clip: "${clip.name}", Number of tracks: ${clip.tracks.length}`);
             });
             console.log("--- End Animation Debugging Info ---");
         }
