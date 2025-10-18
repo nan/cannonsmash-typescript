@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { DATLoader } from './DATLoader';
+import { AnimationClip } from 'three';
 // A structure to hold all game assets
 export interface GameAssets {
     baseModels: { [modelName: string]: THREE.BufferGeometry };
@@ -22,15 +22,12 @@ class AssetManager {
     ];
 
     public async loadAll(): Promise<GameAssets> {
-        console.log('AssetManager: Starting asset loading...');
-
         // Load all assets in parallel
         const [baseModels, playerModel] = await Promise.all([
             this.loadBaseModels(),
             this.loadPlayerModel()
         ]);
 
-        console.log('AssetManager: All assets loaded.');
         return { baseModels, playerModel };
     }
 
@@ -38,24 +35,21 @@ class AssetManager {
         const path = 'player.glb'; // The file is in the public folder
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
-                console.log('AssetManager: Player model loaded successfully.');
+                let skinnedMesh: THREE.SkinnedMesh | undefined;
+                gltf.scene.traverse((child) => {
+                    if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
+                        skinnedMesh = child as THREE.SkinnedMesh;
+                    }
+                });
 
-                // Clone the scene and animations to ensure we have a clean, independent copy
-                const clonedScene = SkeletonUtils.clone(gltf.scene);
-                const clonedAnimations = gltf.animations.map(clip => clip.clone());
+                if (skinnedMesh && gltf.parser.json.animations) {
+                    const bones = skinnedMesh.skeleton.bones;
+                    const animations = gltf.parser.json.animations.map((anim: any) => AnimationClip.parse(anim, bones));
+                    gltf.animations = animations;
+                }
 
-                // Create a new GLTF-like object with the cloned data
-                const clonedGltf: GLTF = {
-                    ...gltf,
-                    scene: clonedScene,
-                    animations: clonedAnimations,
-                };
-
-                resolve(clonedGltf);
-            }, undefined, (error) => {
-                 console.error('AssetManager: An error happened while loading the player model', error);
-                 reject(error);
-            });
+                resolve(gltf);
+            }, undefined, reject);
         });
     }
 
