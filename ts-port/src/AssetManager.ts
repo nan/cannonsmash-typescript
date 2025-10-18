@@ -36,16 +36,16 @@ class AssetManager {
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
                 const scene = gltf.scene;
-                let mesh: THREE.SkinnedMesh | undefined;
+                let skinMesh: THREE.SkinnedMesh | undefined;
 
                 scene.traverse((child) => {
-                    if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-                        mesh = child as THREE.SkinnedMesh;
+                    if ((child as THREE.SkinnedMesh).isSkinnedMesh && child.name === 'skin') {
+                        skinMesh = child as THREE.SkinnedMesh;
                     }
                 });
 
-                if (mesh && gltf.parser.json.animations) {
-                    const bones = mesh.skeleton.bones;
+                if (skinMesh && gltf.parser.json.animations) {
+                    const bones = skinMesh.skeleton.bones;
                     gltf.animations = gltf.parser.json.animations.map((animation: any) => AnimationClip.parse(animation, bones));
                 }
 
