@@ -106,7 +106,7 @@ export class Player {
         console.log('Loaded animation clips:');
         gltf.animations.forEach((clip) => {
             console.log(`- ${clip.name}`);
-            this.animationClips[clip.name] = clip;
+            this.animationClips[clip.name] = clip.clone();
         });
     }
 
@@ -417,12 +417,6 @@ export class Player {
         this._updateMovement(deltaTime, ball, game);
         if (this.mixer) {
             this.mixer.update(deltaTime);
-            if(this.side === 1 && !this.isAi) { // Log only for the human player
-                console.log(`Mixer time: ${this.mixer.time.toFixed(2)}`);
-                if (this.currentAction) {
-                    console.log(`Action: ${this.currentAction.getClip().name}, Is running: ${this.currentAction.isRunning()}`);
-                }
-            }
         }
         const swingParams = stype.get(this.swingType);
         if (swingParams) {
