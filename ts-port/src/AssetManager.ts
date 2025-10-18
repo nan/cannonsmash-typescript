@@ -35,17 +35,18 @@ class AssetManager {
         const path = 'player.glb'; // The file is in the public folder
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
-                let skinnedMesh: THREE.SkinnedMesh | undefined;
-                gltf.scene.traverse((child) => {
+                const scene = gltf.scene;
+                let mesh: THREE.SkinnedMesh | undefined;
+
+                scene.traverse((child) => {
                     if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-                        skinnedMesh = child as THREE.SkinnedMesh;
+                        mesh = child as THREE.SkinnedMesh;
                     }
                 });
 
-                if (skinnedMesh && gltf.parser.json.animations) {
-                    const bones = skinnedMesh.skeleton.bones;
-                    const animations = gltf.parser.json.animations.map((anim: any) => AnimationClip.parse(anim, bones));
-                    gltf.animations = animations;
+                if (mesh && gltf.parser.json.animations) {
+                    const bones = mesh.skeleton.bones;
+                    gltf.animations = gltf.parser.json.animations.map((animation: any) => AnimationClip.parse(animation, bones));
                 }
 
                 resolve(gltf);
