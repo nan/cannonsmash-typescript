@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { KHRAnimationPointerLoaderPlugin } from '@needle-tools/three-animation-pointer';
 import { DATLoader } from './DATLoader';
 import { AnimationClip } from 'three';
 // A structure to hold all game assets
@@ -11,7 +12,7 @@ export interface GameAssets {
 class AssetManager {
     private manager = new THREE.LoadingManager();
     private datLoader = new DATLoader(this.manager);
-    private gltfLoader = new GLTFLoader(this.manager);
+    private gltfLoader = new GLTFLoader(this.manager).register(parser => new KHRAnimationPointerLoaderPlugin(parser));
 
     private readonly modelNames = [
         "head", "chest", "hip", "racket",
@@ -35,7 +36,6 @@ class AssetManager {
         const path = 'player.glb'; // The file is in the public folder
         return new Promise<GLTF>((resolve, reject) => {
             this.gltfLoader.load(path, (gltf) => {
-                console.log(JSON.stringify(gltf.parser.json.animations, null, 2));
                 resolve(gltf);
             }, undefined, reject);
         });
