@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { KHRAnimationPointerLoaderPlugin } from '@needle-tools/three-animation-pointer';
+import { GLTFAnimationPointerExtension } from '@needle-tools/three-animation-pointer';
 import { DATLoader } from './DATLoader';
-import { AnimationClip } from 'three';
 // A structure to hold all game assets
 export interface GameAssets {
     baseModels: { [modelName: string]: THREE.BufferGeometry };
@@ -12,7 +11,7 @@ export interface GameAssets {
 class AssetManager {
     private manager = new THREE.LoadingManager();
     private datLoader = new DATLoader(this.manager);
-    private gltfLoader = new GLTFLoader(this.manager).register(parser => new KHRAnimationPointerLoaderPlugin(parser));
+    private gltfLoader = new GLTFLoader(this.manager).register(parser => new GLTFAnimationPointerExtension(parser));
 
     private readonly modelNames = [
         "head", "chest", "hip", "racket",
