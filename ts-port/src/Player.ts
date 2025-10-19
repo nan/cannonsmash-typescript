@@ -59,11 +59,6 @@ export class Player {
             console.error("Player model not found in assets!");
         }
 
-        if (this.animationClips['Fnormal']) {
-            this.playAnimation('Fnormal', true);
-        } else if (Object.keys(this.animationClips).length > 0) {
-            this.playAnimation(Object.keys(this.animationClips)[0], true);
-        }
     }
 
     private setupModelFromGltf(gltf: GLTF) {
@@ -128,6 +123,18 @@ export class Player {
                 // once the swing animation finishes, so no action is needed here.
                 break;
         }
+    }
+
+    public stopAllAnimations() {
+        if (!this.mixer) return;
+        this.mixer.stopAllAction();
+        this.currentAction = null;
+    }
+
+    public setIdleAnimation() {
+        // We assume 'Fnormal' is the idle animation.
+        // This could be made more robust by having a dedicated 'idle' animation.
+        this.playAnimation('Fnormal', true);
     }
 
     public playAnimation(name: string, loop = true) {

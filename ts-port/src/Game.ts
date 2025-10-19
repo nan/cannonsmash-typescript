@@ -227,6 +227,9 @@ export class Game {
         // --- Scoring Logic ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.awardPoint();
+            // Stop animations for both players once a point is decided
+            this.player1.stopAllAnimations();
+            this.player2.stopAllAnimations();
         }
 
         if (this.isDemo) {
@@ -251,6 +254,10 @@ export class Game {
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
                 this.ball.reset(server);
+
+                // Set both players to their idle animation while waiting.
+                this.player1.setIdleAnimation();
+                this.player2.setIdleAnimation();
 
                 // This logic only applies to the human player, so keep it separate.
                 if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
