@@ -111,8 +111,8 @@ export class Player {
 
         switch (this.state) {
             case 'IDLE':
-                // Default to Fnormal for the idle animation.
-                this.playAnimation('Fnormal', true);
+                // Default to 'Default' for the idle animation.
+                this.playAnimation('Default', true);
                 break;
             // Other states are mainly for triggering one-shot animations,
             // which is handled directly in the swing/serve methods.
@@ -132,9 +132,8 @@ export class Player {
     }
 
     public setIdleAnimation() {
-        // We assume 'Fnormal' is the idle animation.
-        // This could be made more robust by having a dedicated 'idle' animation.
-        this.playAnimation('Fnormal', true);
+        // Use the 'Default' animation for the idle/waiting state.
+        this.playAnimation('Default', true);
     }
 
     public playAnimation(name: string, loop = true) {
@@ -183,7 +182,7 @@ export class Player {
             this.spin.x = 0;
             this.spin.y = 0;
         }
-        this.playAnimation('Fddrive', false);
+        this.playAnimation('Fdrive', false);
         return true;
     }
 
@@ -233,7 +232,7 @@ export class Player {
         let animationName: string;
         switch (this.swingType) {
             case SWING_DRIVE:
-                animationName = 'Fddrive';
+                animationName = 'Fdrive';
                 break;
             case SWING_CUT:
                 animationName = isForehand ? 'Fcut' : 'Bcut';
