@@ -148,9 +148,9 @@ export class Game {
         // Position them
         this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
         this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
-        // Both players need to be rotated to face the table.
-        this.player1.mesh.rotation.y = Math.PI;
-        this.player2.mesh.rotation.y = Math.PI;
+        // Rotate players to face each other across the table.
+        this.player1.mesh.rotation.y = Math.PI; // Near side player faces away from camera
+        this.player2.mesh.rotation.y = 0;      // Far side player faces towards camera
 
         // Ensure status is reset at the start of a new game for a clean slate.
         this.player1.resetStatus();
