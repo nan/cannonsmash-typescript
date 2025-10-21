@@ -137,33 +137,36 @@ export class Player {
     }
 
     public playAnimation(name: string, loop = true) {
-        console.log(`[playAnimation] Attempting to play animation: ${name}`);
-        if (!this.mixer) {
-            console.error("[playAnimation] Mixer not initialized!");
-            return;
-        }
+        if (!this.mixer) return;
 
         if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
-            console.log(`[playAnimation] Animation ${name} is already playing.`);
             return;
         }
         const clip = this.animationClips[name];
         if (clip) {
-            console.log(`[playAnimation] Found clip: ${name}`);
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
 
+            // When a non-looping animation finishes, return to IDLE state.
+            if (!loop) {
+                const listener = (event: any) => {
+                    if (event.action === newAction) {
+                        this.setState('IDLE');
+                        this.mixer.removeEventListener('finished', listener);
+                    }
+                };
+                this.mixer.addEventListener('finished', listener);
+            }
+
             if (this.currentAction) {
-                console.log(`[playAnimation] Fading out previous action: ${this.currentAction.getClip().name}`);
                 this.currentAction.fadeOut(0.2);
             }
-            console.log(`[playAnimation] Playing new action: ${name}`);
             newAction.reset().fadeIn(0.2).play();
 
             this.currentAction = newAction;
         } else {
-            console.warn(`[playAnimation] Animation clip not found: ${name}`);
+            console.warn(`Animation clip not found: ${name}`);
         }
     }
 
@@ -178,14 +181,9 @@ export class Player {
     }
 
     public startServe(spinCategory: number) {
-        console.log("[startServe] Called.");
-        if (this.swing > 0) {
-            console.log("[startServe] Already swinging, returning.");
-            return false;
-        }
+        if (this.swing > 0) return false;
         this.swingType = SERVE_NORMAL;
         this.swing = 1;
-        console.log("[startServe] Set swing = 1.");
         const params = SERVEPARAM.find(p => p[0] === this.swingType);
         if (params) {
             this.spin.x = params[(spinCategory - 1) * 2 + 1];
@@ -346,38 +344,20 @@ export class Player {
 
     private _updateSwing(ball: Ball) {
         if (this.swing <= 0) return;
-
-        console.log(`[_updateSwing] swing: ${this.swing}, swingType: ${this.swingType}`);
-
         const swingParams = stype.get(this.swingType);
-        if (!swingParams) {
-            console.log("[_updateSwing] No swing params, resetting swing.");
-            this.swing = 0;
-            return;
-        }
+        if (!swingParams) { this.swing = 0; return; }
         if (this.canServe(ball)) {
-            if (ball.velocity.y < 0) {
-                this.swing++;
-                console.log(`[_updateSwing] Serving, ball falling, incremented swing to ${this.swing}`);
-            }
+            if (ball.velocity.y < 0) { this.swing++; }
         } else {
             if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
                 ball.toss(this, swingParams.tossV);
             }
             this.swing++;
         }
-        if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) {
-            console.log("[_updateSwing] Hitting ball.");
-            this.hitBall(ball);
-        }
+        if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) { this.hitBall(ball); }
         if (this.swing >= swingParams.swingLength) {
-            console.log("[_updateSwing] Swing finished.");
             this.swing = 0;
-            if (this.swingType >= SERVE_MIN) {
-                this.swingType = SWING_NORMAL;
-            }
-            this.setState('IDLE');
-            console.log("[_updateSwing] Set state to IDLE.");
+            if (this.swingType >= SERVE_MIN) { this.swingType = SWING_NORMAL; }
         }
     }
 
