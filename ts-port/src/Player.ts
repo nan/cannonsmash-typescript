@@ -98,9 +98,7 @@ export class Player {
 
         this.mixer = new THREE.AnimationMixer(model);
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
-        console.log('Loaded animation clips:');
         gltf.animations.forEach((clip) => {
-            console.log(`- ${clip.name}`);
             this.animationClips[clip.name] = clip;
         });
     }

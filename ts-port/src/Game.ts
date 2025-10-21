@@ -167,14 +167,9 @@ export class Game {
             this.player1.changeServeType();
         }
 
-        console.log(`[handleInput] ball.status: ${this.ball.status}, WAITING_FOR_SERVE: ${BallStatus.WAITING_FOR_SERVE}`);
-        console.log(`[handleInput] getService(): ${this.getService()}, player1.side: ${this.player1.side}`);
-
         // Check if it's player 1's turn to serve
         if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
-            console.log("[handleInput] Serve condition met.");
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
-                console.log("[handleInput] Left click detected, calling startServe.");
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
                 this.player1.startServe(2);
@@ -224,69 +219,56 @@ export class Game {
             return;
         }
 
-        // The core game logic update
-        this.player1.update(deltaTime, this.ball, this);
-        this.player2.update(deltaTime, this.ball, this);
-        this.ball.update(deltaTime, this);
-
-        // --- Scoring Logic ---
-        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
-            this.awardPoint();
-            // Stop animations for both players once a point is decided
-            this.player1.stopAllAnimations();
-            this.player2.stopAllAnimations();
-        }
-
+        // --- Handle Mode-Specific Logic ---
         if (this.isDemo) {
-            // --- Demo Mode ---
             // Circling camera logic
             this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
             const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
             const z = Math.cos(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
             this.camera.position.set(x, DEMO_CAMERA_HEIGHT, z);
-            this.camera.lookAt(0, TABLE_HEIGHT, 0); // Look at table height
+            this.camera.lookAt(0, TABLE_HEIGHT, 0);
 
-            // Reset the ball if it's dead for too long, to keep the demo going
+            // Reset the ball if it's dead for too long to keep the demo going.
             if (this.ball.status < 0) {
                 this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
             }
-
         } else {
-            // --- Active Play Mode ---
-            this.handleInput();
-
-            // Pre-serve logic
+            // Pre-serve logic must run BEFORE input handling to prevent animation conflicts.
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
                 this.ball.reset(server);
-
-                // Set both players to their idle animation while waiting.
                 this.player1.setIdleAnimation();
                 this.player2.setIdleAnimation();
-
-                // This logic only applies to the human player, so keep it separate.
                 if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
             }
 
+            this.handleInput();
             this.cameraManager.update();
-
-            // Update target indicator position
             this.field.targetIndicator.position.x = this.player1.targetPosition.x;
-            this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
+            this.field.targetIndicator.position.z = this.player1.targetPosition.y;
 
-            // --- Trajectory Visualizer Logic ---
-            if (this.ball.justHitBySide === -1) { // AI just hit the ball
+            if (this.ball.justHitBySide === -1) {
                 this.trajectoryVisualizer.show(this.ball, this.player1);
-                this.ball.justHitBySide = 0; // Consume the event
-            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) { // Player hit or rally ended
+                this.ball.justHitBySide = 0;
+            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) {
                 this.trajectoryVisualizer.hide();
-                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0; // Consume the event
+                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0;
             }
-
-
             inputManager.update();
+        }
+
+        // --- Core Game Logic (runs in both modes) ---
+        this.player1.update(deltaTime, this.ball, this);
+        this.player2.update(deltaTime, this.ball, this);
+        this.ball.update(deltaTime, this);
+
+        // --- Scoring Logic (runs in both modes) ---
+        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
+            this.awardPoint();
+            this.player1.stopAllAnimations();
+            this.player2.stopAllAnimations();
         }
 
         // This must be the last thing in the update loop
