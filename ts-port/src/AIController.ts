@@ -74,11 +74,12 @@ export class AIController {
             const targetPos = this.predictedHitPosition;
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
-            const isStable = Math.abs(playerVel.x) < AI_SERVE_STABLE_VELOCITY_THRESHOLD && Math.abs(playerVel.z) < AI_SERVE_STABLE_VELOCITY_THRESHOLD;
             const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
 
             // 3. If ready, perform the serve.
-            if (isStable && isAtPosition && this.player.swing === 0) {
+            // The 'isStable' check is removed to make the serve trigger more reliably,
+            // as small residual movements were preventing it.
+            if (isAtPosition && this.player.swing === 0) {
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
                 const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
