@@ -182,7 +182,7 @@ export class Player {
             this.spin.x = 0;
             this.spin.y = 0;
         }
-        this.playAnimation('Fdrive', false);
+        this.playAnimation('Fnormal', false);
         return true;
     }
 
