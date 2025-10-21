@@ -256,13 +256,17 @@ export class Game {
                 this.trajectoryVisualizer.hide();
                 if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0;
             }
-            inputManager.update();
         }
 
         // --- Core Game Logic (runs in both modes) ---
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
         this.ball.update(deltaTime, this);
+
+        // Input manager must be updated at the end of the frame, after all input has been processed.
+        if (!this.isDemo) {
+            inputManager.update();
+        }
 
         // --- Scoring Logic (runs in both modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
