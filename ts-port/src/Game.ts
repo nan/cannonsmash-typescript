@@ -167,9 +167,14 @@ export class Game {
             this.player1.changeServeType();
         }
 
+        console.log(`[handleInput] ball.status: ${this.ball.status}, WAITING_FOR_SERVE: ${BallStatus.WAITING_FOR_SERVE}`);
+        console.log(`[handleInput] getService(): ${this.getService()}, player1.side: ${this.player1.side}`);
+
         // Check if it's player 1's turn to serve
         if (this.ball.status === BallStatus.WAITING_FOR_SERVE && this.getService() === this.player1.side) {
+            console.log("[handleInput] Serve condition met.");
             if (inputManager.isMouseButtonJustPressed(0)) { // Left click
+                console.log("[handleInput] Left click detected, calling startServe.");
                 this.player1.startServe(1);
             } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
                 this.player1.startServe(2);
