@@ -83,12 +83,26 @@ export class AIController {
             // For serving, the AI should always position itself relative to the center.
             const idealServePosX = targetPos.x - this.RACKET_OFFSET_X;
 
-            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
+            console.log(`[AI Serve Debug] Frame Update`);
+            console.log(`[AI Serve Debug] playerPos: { x: ${playerPos.x.toFixed(4)}, z: ${playerPos.z.toFixed(4)} }`);
+            console.log(`[AI Serve Debug] targetPos: { x: ${targetPos.x.toFixed(4)}, y: ${targetPos.y.toFixed(4)} }`);
+            console.log(`[AI Serve Debug] idealServePosX: ${idealServePosX.toFixed(4)}`);
+
+            const xDiff = Math.abs(playerPos.x - idealServePosX);
+            const zDiff = Math.abs(playerPos.z - targetPos.y);
+            console.log(`[AI Serve Debug] xDiff: ${xDiff.toFixed(4)}, zDiff: ${zDiff.toFixed(4)}`);
+            console.log(`[AI Serve Debug] AI_SERVE_POSITION_TOLERANCE: ${AI_SERVE_POSITION_TOLERANCE}`);
+
+            const isAtPosition = xDiff < AI_SERVE_POSITION_TOLERANCE && zDiff < AI_SERVE_POSITION_TOLERANCE;
+            console.log(`[AI Serve Debug] isAtPosition: ${isAtPosition}`);
+            console.log(`[AI Serve Debug] this.player.swing: ${this.player.swing}`);
+            console.log(`[AI Serve Debug] isServing flag: ${this.isServing}`);
 
             // 3. If ready, perform the serve.
             // The 'isStable' check is removed to make the serve trigger more reliably,
             // as small residual movements were preventing it.
             if (isAtPosition && this.player.swing === 0) {
+                console.log("[AI Serve Debug] SERVING NOW!");
                 this.isServing = true; // Set the flag to prevent re-serving in the next frame.
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
