@@ -72,31 +72,24 @@ export class AIController {
             const playerVel = this.player.velocity;
             const playerPos = this.player.mesh.position;
             const targetPos = this.predictedHitPosition;
-            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
+            // The side adjustment was incorrect for serving, causing the AI to move to the wrong spot.
+            // For serving, the AI should always position itself relative to the center.
+            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X;
 
-            console.log(`[AI Serve Debug] playerPos: { x: ${playerPos.x.toFixed(4)}, z: ${playerPos.z.toFixed(4)} }`);
-            console.log(`[AI Serve Debug] targetPos: { x: ${targetPos.x.toFixed(4)}, y: ${targetPos.y.toFixed(4)} }`);
-            console.log(`[AI Serve Debug] idealServePosX: ${idealServePosX.toFixed(4)}`);
-
-            const xDiff = Math.abs(playerPos.x - idealServePosX);
-            const zDiff = Math.abs(playerPos.z - targetPos.y);
-            console.log(`[AI Serve Debug] xDiff: ${xDiff.toFixed(4)}, zDiff: ${zDiff.toFixed(4)}`);
-            console.log(`[AI Serve Debug] AI_SERVE_POSITION_TOLERANCE: ${AI_SERVE_POSITION_TOLERANCE}`);
-
-            const isAtPosition = xDiff < AI_SERVE_POSITION_TOLERANCE && zDiff < AI_SERVE_POSITION_TOLERANCE;
-            console.log(`[AI Serve Debug] isAtPosition: ${isAtPosition}`);
-            console.log(`[AI Serve Debug] this.player.swing: ${this.player.swing}`);
-
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
 
             // 3. If ready, perform the serve.
             // The 'isStable' check is removed to make the serve trigger more reliably,
             // as small residual movements were preventing it.
             if (isAtPosition && this.player.swing === 0) {
-                console.log("[AI Serve Debug] SERVING NOW!");
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
                 const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
                 this.player.targetPosition.set(targetX, targetZ);
+
+                // Manually change the ball status to prevent an infinite serve loop.
+                // The AI would otherwise re-evaluate and serve again in the next frame.
+                this.ball.status = BallStatus.TOSS_P2;
 
                 // Start a specific serve type, similar to C++'s StartServe(3)
                 this.player.startServe(3);
