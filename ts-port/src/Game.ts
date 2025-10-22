@@ -273,10 +273,18 @@ export class Game {
             this.awardPoint();
             this.player1.stopAllAnimations();
             this.player2.stopAllAnimations();
+            this._resetBallAfterPoint();
         }
 
         // This must be the last thing in the update loop
         this.prevBallStatus = this.ball.status;
+    }
+
+    private _resetBallAfterPoint() {
+        setTimeout(() => {
+            const server = this.getService() === 1 ? this.player1 : this.player2;
+            this.ball.reset(server);
+        }, 1500); // Add a 1.5-second delay before the next serve
     }
 
     // --- State Management ---
