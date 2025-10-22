@@ -30,6 +30,8 @@ export class AIController {
     private prevBallStatus: number = 0;
     // C++版の _hitX に相当。予測したボールの打点（2Dベクトル）。
     private predictedHitPosition = new THREE.Vector2();
+    // A state flag to prevent the AI from getting stuck in a serve loop.
+    private isServing = false;
 
     // AIの挙動を制御する定数
     private readonly HOME_POSITION_X = 0.0;
@@ -61,8 +63,13 @@ export class AIController {
      * @param deltaTime フレーム間の経過時間
      */
     public update(deltaTime: number, game: Game) { // game is passed here now
+        // Reset the serving flag if the ball is no longer in a pre-serve state.
+        if (this.ball.status < 0) {
+            this.isServing = false;
+        }
+
         // --- Serve Logic ---
-        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side && !this.isServing) {
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -82,14 +89,11 @@ export class AIController {
             // The 'isStable' check is removed to make the serve trigger more reliably,
             // as small residual movements were preventing it.
             if (isAtPosition && this.player.swing === 0) {
+                this.isServing = true; // Set the flag to prevent re-serving in the next frame.
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
                 const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
                 this.player.targetPosition.set(targetX, targetZ);
-
-                // Manually change the ball status to prevent an infinite serve loop.
-                // The AI would otherwise re-evaluate and serve again in the next frame.
-                this.ball.status = BallStatus.TOSS_P2;
 
                 // Start a specific serve type, similar to C++'s StartServe(3)
                 this.player.startServe(3);
