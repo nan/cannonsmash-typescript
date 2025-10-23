@@ -237,8 +237,16 @@ export class Game {
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
                 this.ball.reset(server);
-                this.player1.setIdleAnimation();
-                this.player2.setIdleAnimation();
+
+                // Only set idle animations if the players are not already swinging.
+                // This prevents the idle animation from overriding the serve animation.
+                if (this.player1.swing === 0) {
+                    this.player1.setIdleAnimation();
+                }
+                if (this.player2.swing === 0) {
+                    this.player2.setIdleAnimation();
+                }
+
                 if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
