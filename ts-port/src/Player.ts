@@ -146,15 +146,14 @@ export class Player {
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
 
-            // When a non-looping animation finishes, return to IDLE state.
+            // For non-looping animations, automatically return to the IDLE state upon completion.
+            // The `{ once: true }` option ensures the listener is automatically removed after execution.
             if (!loop) {
-                const listener = (event: any) => {
+                this.mixer.addEventListener('finished', (event: any) => {
                     if (event.action === newAction) {
                         this.setState('IDLE');
-                        this.mixer.removeEventListener('finished', listener);
                     }
-                };
-                this.mixer.addEventListener('finished', listener);
+                }, { once: true });
             }
 
             if (this.currentAction) {

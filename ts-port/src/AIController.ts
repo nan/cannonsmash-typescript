@@ -79,11 +79,10 @@ export class AIController {
             const playerVel = this.player.velocity;
             const playerPos = this.player.mesh.position;
             const targetPos = this.predictedHitPosition;
-            // The side adjustment was incorrect for serving, causing the AI to move to the wrong spot.
-            // For serving, the AI should always position itself relative to the center.
-            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X;
 
-            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
+            // Simplified the position check. The core logic for ideal position is in _updateMovement.
+            // We just need to check if the player has arrived at the predicted target.
+            const isAtPosition = Math.abs(playerPos.x - targetPos.x) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
 
             // 3. If ready, perform the serve.
             // The 'isStable' check is removed to make the serve trigger more reliably,

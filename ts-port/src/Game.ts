@@ -221,6 +221,7 @@ export class Game {
 
         // --- Handle Mode-Specific Logic ---
         if (this.isDemo) {
+            // --- Demo Mode Logic ---
             // Circling camera logic
             this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
             const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
@@ -233,6 +234,8 @@ export class Game {
                 this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
             }
         } else {
+            this.handleInput();
+
             // Pre-serve logic must run BEFORE input handling to prevent animation conflicts.
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
@@ -252,7 +255,6 @@ export class Game {
                 }
             }
 
-            this.handleInput();
             this.cameraManager.update();
             this.field.targetIndicator.position.x = this.player1.targetPosition.x;
             this.field.targetIndicator.position.z = this.player1.targetPosition.y;
