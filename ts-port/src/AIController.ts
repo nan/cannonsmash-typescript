@@ -30,8 +30,6 @@ export class AIController {
     private prevBallStatus: number = 0;
     // C++版の _hitX に相当。予測したボールの打点（2Dベクトル）。
     private predictedHitPosition = new THREE.Vector2();
-    // A state flag to prevent the AI from getting stuck in a serve loop.
-    private isServing = false;
 
     // AIの挙動を制御する定数
     private readonly HOME_POSITION_X = 0.0;
@@ -63,13 +61,8 @@ export class AIController {
      * @param deltaTime フレーム間の経過時間
      */
     public update(deltaTime: number, game: Game) { // game is passed here now
-        // Reset the serving flag if the ball is no longer in a pre-serve state.
-        if (this.ball.status < 0) {
-            this.isServing = false;
-        }
-
         // --- Serve Logic ---
-        if (this.player.canServe(this.ball) && !this.isServing) {
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side) {
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -79,16 +72,13 @@ export class AIController {
             const playerVel = this.player.velocity;
             const playerPos = this.player.mesh.position;
             const targetPos = this.predictedHitPosition;
+            const idealServePosX = targetPos.x - this.RACKET_OFFSET_X * this.player.side;
 
-            // Simplified the position check. The core logic for ideal position is in _updateMovement.
-            // We just need to check if the player has arrived at the predicted target.
-            const isAtPosition = Math.abs(playerPos.x - targetPos.x) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
+            const isStable = Math.abs(playerVel.x) < AI_SERVE_STABLE_VELOCITY_THRESHOLD && Math.abs(playerVel.z) < AI_SERVE_STABLE_VELOCITY_THRESHOLD;
+            const isAtPosition = Math.abs(playerPos.x - idealServePosX) < AI_SERVE_POSITION_TOLERANCE && Math.abs(playerPos.z - targetPos.y) < AI_SERVE_POSITION_TOLERANCE;
 
             // 3. If ready, perform the serve.
-            // The 'isStable' check is removed to make the serve trigger more reliably,
-            // as small residual movements were preventing it.
-            if (isAtPosition && this.player.swing === 0) {
-                this.isServing = true; // Set the flag to prevent re-serving in the next frame.
+            if (isStable && isAtPosition && this.player.swing === 0) {
                 // Set a specific target for the serve
                 const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
                 const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
@@ -134,9 +124,15 @@ export class AIController {
         // AIがラケットでボールを捉えるための、理想的なX座標を計算 (C++: mx)
         const racketOffsetX = this.RACKET_OFFSET_X * this.player.side;
         let idealRacketX;
-        const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
-        const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
-        idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        // C++: if ( theBall.GetStatus() == 8 || ... )
+        if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
+            // For serving, always use the forehand side for positioning.
+            idealRacketX = playerPos.x + racketOffsetX;
+        } else {
+            const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
+            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
+            idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+        }
 
         // スイングの特定フレームでは、移動計算を停止して体を安定させる
         if (this.player.swing > this.PLANTED_SWING_START_FRAME && this.player.swing <= this.PLANTED_SWING_END_FRAME) {

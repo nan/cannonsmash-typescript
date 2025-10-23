@@ -219,75 +219,74 @@ export class Game {
             return;
         }
 
-        // --- Handle Mode-Specific Logic ---
+        // The core game logic update
+        this.player1.update(deltaTime, this.ball, this);
+        this.player2.update(deltaTime, this.ball, this);
+        this.ball.update(deltaTime, this);
+
+        // --- Scoring Logic ---
+        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
+            this.awardPoint();
+            // Stop animations for both players once a point is decided
+            this.player1.stopAllAnimations();
+            this.player2.stopAllAnimations();
+        }
+
         if (this.isDemo) {
-            // --- Demo Mode Logic ---
+            // --- Demo Mode ---
             // Circling camera logic
             this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
             const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
             const z = Math.cos(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
             this.camera.position.set(x, DEMO_CAMERA_HEIGHT, z);
-            this.camera.lookAt(0, TABLE_HEIGHT, 0);
+            this.camera.lookAt(0, TABLE_HEIGHT, 0); // Look at table height
 
-            // Reset the ball if it's dead for too long to keep the demo going.
+            // Reset the ball if it's dead for too long, to keep the demo going
             if (this.ball.status < 0) {
                 this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
             }
+
         } else {
-            // Pre-serve logic must run BEFORE input handling to prevent animation conflicts.
+            // --- Active Play Mode ---
+            this.handleInput();
+
+            // Pre-serve logic
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
+                console.log(`[Game.ts] WAITING_FOR_SERVE check. P1 swing: ${this.player1.swing}, P2 swing: ${this.player2.swing}`);
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
                 this.ball.reset(server);
 
+                // Set both players to their idle animation while waiting.
+                this.player1.setIdleAnimation();
+                this.player2.setIdleAnimation();
+
+                // This logic only applies to the human player, so keep it separate.
                 if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
             }
 
-            this.handleInput();
             this.cameraManager.update();
+
+            // Update target indicator position
             this.field.targetIndicator.position.x = this.player1.targetPosition.x;
-            this.field.targetIndicator.position.z = this.player1.targetPosition.y;
+            this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
 
-            if (this.ball.justHitBySide === -1) {
+            // --- Trajectory Visualizer Logic ---
+            if (this.ball.justHitBySide === -1) { // AI just hit the ball
                 this.trajectoryVisualizer.show(this.ball, this.player1);
-                this.ball.justHitBySide = 0;
-            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) {
+                this.ball.justHitBySide = 0; // Consume the event
+            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) { // Player hit or rally ended
                 this.trajectoryVisualizer.hide();
-                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0;
+                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0; // Consume the event
             }
-        }
 
-        // --- Core Game Logic (runs in both modes) ---
-        this.player1.update(deltaTime, this.ball, this);
-        this.player2.update(deltaTime, this.ball, this);
-        this.ball.update(deltaTime, this);
 
-        // Input manager must be updated at the end of the frame, after all input has been processed.
-        if (!this.isDemo) {
             inputManager.update();
-        }
-
-        // --- Scoring Logic (runs in both modes) ---
-        if (this.prevBallStatus >= 0 && this.ball.status < 0) {
-            this.awardPoint();
-            this._resetBallAfterPoint();
         }
 
         // This must be the last thing in the update loop
         this.prevBallStatus = this.ball.status;
-    }
-
-    private _resetBallAfterPoint() {
-        this.player1.stopAllAnimations();
-        this.player2.stopAllAnimations();
-        this.player1.setIdleAnimation();
-        this.player2.setIdleAnimation();
-
-        setTimeout(() => {
-            const server = this.getService() === 1 ? this.player1 : this.player2;
-            this.ball.reset(server);
-        }, 1500); // Add a 1.5-second delay before the next serve
     }
 
     // --- State Management ---

@@ -98,7 +98,9 @@ export class Player {
 
         this.mixer = new THREE.AnimationMixer(model);
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
+        console.log('Loaded animation clips:');
         gltf.animations.forEach((clip) => {
+            console.log(`- ${clip.name}`);
             this.animationClips[clip.name] = clip;
         });
     }
@@ -130,11 +132,13 @@ export class Player {
     }
 
     public setIdleAnimation() {
+        console.log(`[Player.ts side ${this.side}] Setting IDLE animation.`);
         // Use the 'Default' animation for the idle/waiting state.
         this.playAnimation('Default', true);
     }
 
     public playAnimation(name: string, loop = true) {
+        console.log(`Playing animation: ${name}`);
         if (!this.mixer) return;
 
         if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
@@ -145,16 +149,6 @@ export class Player {
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
-
-            // For non-looping animations, automatically return to the IDLE state upon completion.
-            // The `{ once: true }` option ensures the listener is automatically removed after execution.
-            if (!loop) {
-                this.mixer.addEventListener('finished', (event: any) => {
-                    if (event.action === newAction) {
-                        this.setState('IDLE');
-                    }
-                }, { once: true });
-            }
 
             if (this.currentAction) {
                 this.currentAction.fadeOut(0.2);
@@ -179,6 +173,7 @@ export class Player {
 
     public startServe(spinCategory: number) {
         if (this.swing > 0) return false;
+        console.log(`[Player.ts side ${this.side}] Starting SERVE animation (Fnormal).`);
         this.swingType = SERVE_NORMAL;
         this.swing = 1;
         const params = SERVEPARAM.find(p => p[0] === this.swingType);
@@ -189,7 +184,7 @@ export class Player {
             this.spin.x = 0;
             this.spin.y = 0;
         }
-        this.playAnimation('Fnormal', false);
+        this.playAnimation('Fdrive', false);
         return true;
     }
 
@@ -355,6 +350,7 @@ export class Player {
         if (this.swing >= swingParams.swingLength) {
             this.swing = 0;
             if (this.swingType >= SERVE_MIN) { this.swingType = SWING_NORMAL; }
+            this.setState('IDLE');
         }
     }
 
