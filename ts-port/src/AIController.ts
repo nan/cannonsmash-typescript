@@ -69,7 +69,7 @@ export class AIController {
         }
 
         // --- Serve Logic ---
-        if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side && !this.isServing) {
+        if (this.player.canServe(this.ball) && !this.isServing) {
             // 1. Set the target to the home position for serving. This ensures the AI
             // moves to the correct spot before attempting to serve.
             this.predictedHitPosition.x = this.HOME_POSITION_X;

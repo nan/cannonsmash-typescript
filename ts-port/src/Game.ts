@@ -234,27 +234,17 @@ export class Game {
                 this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
             }
         } else {
-            this.handleInput();
-
             // Pre-serve logic must run BEFORE input handling to prevent animation conflicts.
             if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
                 const server = this.getService() === this.player1.side ? this.player1 : this.player2;
                 this.ball.reset(server);
-
-                // Only set idle animations if the players are not already swinging.
-                // This prevents the idle animation from overriding the serve animation.
-                if (this.player1.swing === 0) {
-                    this.player1.setIdleAnimation();
-                }
-                if (this.player2.swing === 0) {
-                    this.player2.setIdleAnimation();
-                }
 
                 if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
                     this.player1.swingType = SERVE_NORMAL;
                 }
             }
 
+            this.handleInput();
             this.cameraManager.update();
             this.field.targetIndicator.position.x = this.player1.targetPosition.x;
             this.field.targetIndicator.position.z = this.player1.targetPosition.y;
@@ -281,8 +271,6 @@ export class Game {
         // --- Scoring Logic (runs in both modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.awardPoint();
-            this.player1.stopAllAnimations();
-            this.player2.stopAllAnimations();
             this._resetBallAfterPoint();
         }
 
@@ -291,6 +279,11 @@ export class Game {
     }
 
     private _resetBallAfterPoint() {
+        this.player1.stopAllAnimations();
+        this.player2.stopAllAnimations();
+        this.player1.setIdleAnimation();
+        this.player2.setIdleAnimation();
+
         setTimeout(() => {
             const server = this.getService() === 1 ? this.player1 : this.player2;
             this.ball.reset(server);
