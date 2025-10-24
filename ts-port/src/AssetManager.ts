@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFAnimationPointerExtension } from '@needle-tools/three-animation-pointer';
 import { DATLoader } from './DATLoader';
 // A structure to hold all game assets
 export interface GameAssets {
@@ -36,7 +37,9 @@ class AssetManager {
     private async loadPlayerModel(): Promise<GLTF> {
         const path = 'player.glb'; // The file is in the public folder
         return new Promise<GLTF>((resolve, reject) => {
-            this.gltfLoader.load(path, (gltf) => {
+            const loader = new GLTFLoader(this.manager);
+            loader.register((parser) => new GLTFAnimationPointerExtension(parser));
+            loader.load(path, (gltf) => {
                 console.log('AssetManager: Player model loaded successfully.');
                 resolve(gltf);
             }, undefined, (error) => {

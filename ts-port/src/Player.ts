@@ -59,8 +59,8 @@ export class Player {
             console.error("Player model not found in assets!");
         }
 
-        if (this.animationClips['Fnormal']) {
-            this.playAnimation('Fnormal', true);
+        if (this.animationClips['Default']) {
+            this.playAnimation('Default', true);
         } else if (Object.keys(this.animationClips).length > 0) {
             this.playAnimation(Object.keys(this.animationClips)[0], true);
         }
@@ -115,7 +115,7 @@ export class Player {
         switch (this.state) {
             case 'IDLE':
                 // Default to Fnormal for the idle animation.
-                this.playAnimation('Fnormal', true);
+                this.playAnimation('Default', true);
                 break;
             // Other states are mainly for triggering one-shot animations,
             // which is handled directly in the swing/serve methods.
