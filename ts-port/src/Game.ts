@@ -5,24 +5,27 @@ import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT, KEY_MAP_X, KEY_MAP_Y } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, KEY_MAP_X, KEY_MAP_Y } from './constants';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 import { UIManager } from './UIManager';
 import { BallStatus } from './Ball';
+import type { IGameMode } from './modes/IGameMode';
+import { DemoMode } from './modes/DemoMode';
+import { PlayMode } from './modes/PlayMode';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
 
 export class Game {
-    private scene: THREE.Scene;
-    private camera: THREE.PerspectiveCamera;
+    public scene: THREE.Scene;
+    public camera: THREE.PerspectiveCamera;
     private assets: GameAssets;
     public player1!: Player;
     public player2!: Player;
-    private ball!: Ball;
-    private field!: Field;
-    private cameraManager!: CameraManager;
-    private trajectoryVisualizer!: TrajectoryVisualizer;
+    public ball!: Ball;
+    public field!: Field;
+    public cameraManager!: CameraManager;
+    public trajectoryVisualizer!: TrajectoryVisualizer;
     private scoreboardElement: HTMLElement;
     private prevBallStatus = 0;
 
@@ -32,10 +35,9 @@ export class Game {
     private game1 = 0;
     private game2 = 0;
     private gameMode: GameMode = '11PTS';
-    private isDemo = true;
+    private currentMode!: IGameMode;
     private isPaused = false;
     private isGameOver = false;
-    private demoCameraAngle = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
         this.scene = scene;
@@ -110,7 +112,7 @@ export class Game {
     }
 
     private resetGame(isDemo: boolean) {
-        this.isDemo = isDemo;
+        this.currentMode = isDemo ? new DemoMode() : new PlayMode();
         this.isPaused = false;
         this.isGameOver = false;
 
@@ -162,7 +164,7 @@ export class Game {
         this.cameraManager = new CameraManager(this.camera, this.player1, this.ball);
     }
 
-    private handleInput() {
+    public handleInput() {
         // --- Serve controls ---
         if (inputManager.isKeyJustPressed(' ')) {
             this.player1.changeServeType();
@@ -220,73 +222,24 @@ export class Game {
             return;
         }
 
-        // The core game logic update
+        // The core game logic update (common to all modes)
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
         this.ball.update(deltaTime, this);
 
-        // --- Scoring Logic ---
+        // --- Scoring Logic (common to all modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.awardPoint();
         }
 
-        if (this.isDemo) {
-            // --- Demo Mode ---
-            // Circling camera logic
-            this.demoCameraAngle += deltaTime * DEMO_CAMERA_SPEED;
-            const x = Math.sin(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
-            const z = Math.cos(this.demoCameraAngle) * DEMO_CAMERA_RADIUS;
-            this.camera.position.set(x, DEMO_CAMERA_HEIGHT, z);
-            this.camera.lookAt(0, TABLE_HEIGHT, 0); // Look at table height
-
-            // Reset the ball if it's dead for too long, to keep the demo going
-            if (this.ball.status < 0) {
-                this.ball.reset(this.getService() === 1 ? this.player1 : this.player2);
-            }
-
-        } else {
-            // --- Active Play Mode ---
-            this.handleInput();
-
-            // Pre-serve logic
-            if (this.ball.status === BallStatus.WAITING_FOR_SERVE) {
-                const server = this.getService() === this.player1.side ? this.player1 : this.player2;
-                this.ball.reset(server);
-
-                // This logic only applies to the human player, so keep it separate.
-                if (server === this.player1 && this.player1.swingType < SERVE_MIN) {
-                    this.player1.swingType = SERVE_NORMAL;
-                }
-            }
-
-            this.cameraManager.update();
-
-            // Update target indicator position
-            this.field.targetIndicator.position.x = this.player1.targetPosition.x;
-            this.field.targetIndicator.position.z = this.player1.targetPosition.y; // y from 2d vec maps to z in 3d
-
-            // --- Trajectory Visualizer Logic ---
-            if (this.ball.justHitBySide === -1) { // AI just hit the ball
-                this.trajectoryVisualizer.show(this.ball, this.player1);
-                this.ball.justHitBySide = 0; // Consume the event
-            } else if (this.ball.justHitBySide === 1 || this.ball.status < 0) { // Player hit or rally ended
-                this.trajectoryVisualizer.hide();
-                if (this.ball.justHitBySide === 1) this.ball.justHitBySide = 0; // Consume the event
-            }
-
-
-            inputManager.update();
-        }
+        // Delegate mode-specific logic to the current state object
+        this.currentMode.update(deltaTime, this);
 
         // This must be the last thing in the update loop
         this.prevBallStatus = this.ball.status;
     }
 
     // --- State Management ---
-
-    public getIsDemo(): boolean {
-        return this.isDemo;
-    }
 
     public getIsPaused(): boolean {
         return this.isPaused;
