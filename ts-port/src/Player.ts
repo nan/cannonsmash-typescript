@@ -106,6 +106,14 @@ export class Player {
         gltf.animations.forEach((clip) => {
             this.animationClips[clip.name] = clip;
         });
+
+        // Add a listener for when animations finish.
+        this.mixer.addEventListener('finished', (e) => {
+            // If the finished animation was not set to loop, transition to IDLE.
+            if (e.action.getClip().duration > 0 && e.action.loop !== THREE.LoopRepeat) {
+                this.setState('IDLE');
+            }
+        });
     }
 
     public setState(newState: PlayerState) {
@@ -131,9 +139,11 @@ export class Player {
     public playAnimation(name: string, loop = true) {
         if (!this.mixer) return;
 
-        if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
+        // Allow restarting a non-looping animation if it has finished.
+        if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning() && loop) {
             return;
         }
+
         const clip = this.animationClips[name];
         if (clip) {
             const newAction = this.mixer.clipAction(clip);
