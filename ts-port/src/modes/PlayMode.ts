@@ -1,5 +1,4 @@
-import type { Game } from '../Game';
-import { IGameMode } from './IGameMode';
+import type { Game, IGameMode } from '../Game';
 import { inputManager } from '../InputManager';
 import { BallStatus } from '../Ball';
 import { SERVE_MIN, SERVE_NORMAL } from '../constants';

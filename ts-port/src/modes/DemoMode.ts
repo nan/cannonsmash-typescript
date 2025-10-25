@@ -1,5 +1,4 @@
-import type { Game } from '../Game';
-import { IGameMode } from './IGameMode';
+import type { Game, IGameMode } from '../Game';
 import { DEMO_CAMERA_SPEED, DEMO_CAMERA_RADIUS, DEMO_CAMERA_HEIGHT, TABLE_HEIGHT } from '../constants';
 import * as THREE from 'three';
 
