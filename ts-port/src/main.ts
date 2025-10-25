@@ -73,7 +73,7 @@ async function main() {
       uiManager.showGameScreen();
     } else {
       // Lock was lost
-      if (!game.getIsDemo()) {
+      if (!game.isDemo()) {
         game.pause();
         uiManager.showPauseScreen();
       }
@@ -81,9 +81,14 @@ async function main() {
   });
 
   document.addEventListener('keyup', (event) => {
-    if (event.key === 'Escape' && game.getIsPaused()) {
-      game.returnToDemo();
-      uiManager.showDemoScreen();
+    if (event.key === 'Escape') {
+      if (document.pointerLockElement === canvas) {
+        // If pointer is locked, pressing Esc should release it, which triggers the pause screen
+        document.exitPointerLock();
+      } else if (game.getIsPaused()) {
+        // If the game is paused (and pointer is not locked), pressing Esc should resume
+        canvas.requestPointerLock();
+      }
     }
   });
 

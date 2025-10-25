@@ -257,6 +257,10 @@ export class Game {
         return this.isPaused;
     }
 
+    public isDemo(): boolean {
+        return this.currentMode instanceof DemoMode;
+    }
+
     public start(): void {
         this.resetGame(false);
     }
