@@ -86,8 +86,8 @@ async function main() {
         // If pointer is locked, pressing Esc should release it, which triggers the pause screen
         document.exitPointerLock();
       } else if (game.getIsPaused()) {
-        // If the game is paused (and pointer is not locked), pressing Esc should resume
-        canvas.requestPointerLock();
+        // If the game is paused, pressing Esc again should return to the demo screen.
+        game.returnToDemo();
       }
     }
   });

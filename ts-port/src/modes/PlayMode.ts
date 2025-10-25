@@ -1,7 +1,7 @@
 import type { Game, IGameMode } from '../Game';
 import { inputManager } from '../InputManager';
 import { BallStatus } from '../Ball';
-import { SERVE_MIN, SERVE_NORMAL } from '../constants';
+import { SERVE_MIN, SERVE_NORMAL } from '../Player';
 
 /**
  * Handles the game logic when the game is in active play.
