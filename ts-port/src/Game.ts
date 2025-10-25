@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
-import { Player, SERVE_MIN, SERVE_NORMAL } from './Player';
+import { Player } from './Player';
+import { SERVE_MIN, SERVE_NORMAL } from './SwingTypes';
 import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';

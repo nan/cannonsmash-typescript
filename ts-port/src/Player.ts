@@ -8,43 +8,13 @@ import {
 import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
-import { stype } from './SwingTypes';
-
-// Player swing types from Player.h
-export const SWING_NORMAL = 0;
-export const SWING_POKE = 1;
-export const SWING_SMASH = 2;
-export const SWING_DRIVE = 3;
-export const SWING_CUT = 4;
-export const SWING_BLOCK = 5;
+import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, SwingType } from './SwingTypes';
 
 // Player spin constants
 export const SPIN_NORMAL = 0.4;
 export const SPIN_POKE = -0.8;
 export const SPIN_DRIVE = 0.8;
 export const SPIN_SMASH = 0.2;
-
-export const SERVE_MIN = 65536;
-export const SERVE_MAX = SERVE_MIN + 3;
-
-export const SERVE_NORMAL = SERVE_MIN + 0;
-export const SERVE_POKE = SERVE_MIN + 1;
-export const SERVE_SIDESPIN1 = SERVE_MIN + 2;
-export const SERVE_SIDESPIN2 = SERVE_MIN + 3;
-
-// Corresponds to struct swingType in Player.h
-export interface SwingType {
-  type: number;
-  toss: number;
-  backswing: number;
-  hitStart: number;
-  hitEnd: number;
-  swingEnd: number;
-  swingLength: number;
-  hitX: number;
-  hitY: number;
-  tossV: number;
-}
 
 
 // Corresponds to SERVEPARAM in Player.h

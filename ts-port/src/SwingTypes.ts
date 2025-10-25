@@ -1,5 +1,32 @@
-import { SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2 } from './Player';
-import type { SwingType } from './Player';
+// Player swing types from Player.h
+export const SWING_NORMAL = 0;
+export const SWING_POKE = 1;
+export const SWING_SMASH = 2;
+export const SWING_DRIVE = 3;
+export const SWING_CUT = 4;
+export const SWING_BLOCK = 5;
+
+export const SERVE_MIN = 65536;
+export const SERVE_MAX = SERVE_MIN + 3;
+
+export const SERVE_NORMAL = SERVE_MIN + 0;
+export const SERVE_POKE = SERVE_MIN + 1;
+export const SERVE_SIDESPIN1 = SERVE_MIN + 2;
+export const SERVE_SIDESPIN2 = SERVE_MIN + 3;
+
+// Corresponds to struct swingType in Player.h
+export interface SwingType {
+  type: number;
+  toss: number;
+  backswing: number;
+  hitStart: number;
+  hitEnd: number;
+  swingEnd: number;
+  swingLength: number;
+  hitX: number;
+  hitY: number;
+  tossV: number;
+}
 
 // Corresponds to stype map in Player.cpp
 export const stype: Map<number, SwingType> = new Map([
