@@ -143,11 +143,9 @@ export class Player {
     public playAnimation(name: string, loop = true) {
         if (!this.mixer) return;
 
-        // Allow restarting a non-looping animation if it has finished.
-        if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning() && loop) {
+        if (this.currentAction?.getClip()?.name === name && this.currentAction.isRunning()) {
             return;
         }
-
         const clip = this.animationClips[name];
         if (clip) {
             const newAction = this.mixer.clipAction(clip);
