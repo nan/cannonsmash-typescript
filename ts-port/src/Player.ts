@@ -6,8 +6,7 @@ import {
     AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z,
     STATUS_MAX, RUN_SPEED, RUN_PENALTY, SWING_PENALTY, WALK_SPEED, WALK_BONUS, ACCEL_LIMIT, ACCEL_PENALTY
 } from './constants';
-import { Ball } from './Ball';
-import { BallStatus } from './BallStatus';
+import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';

@@ -14,7 +14,7 @@ import {
     AI_TARGET_X_ZONE_FACTORS, AI_TARGET_X_MAX_FACTOR
 } from './constants';
 import type { Game } from './Game';
-import { BallStatus } from './BallStatus';
+import { BallStatus } from './Ball';
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。

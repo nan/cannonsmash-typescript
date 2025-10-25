@@ -9,7 +9,7 @@ import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, DEMO_
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 import { UIManager } from './UIManager';
-import { BallStatus } from './BallStatus';
+import { BallStatus } from './Ball';
 
 type GameMode = '5PTS' | '11PTS' | '21PTS';
 
