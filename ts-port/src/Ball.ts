@@ -27,7 +27,8 @@ export enum BallStatus {
 
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FALLBACK_SERVE_VELOCITY } from './constants';
+import { stype } from './SwingTypes';
+import { TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FALLBACK_SERVE_VELOCITY } from './constants';
 import type { Game } from './Game';
 
 const BALL_RADIUS = 0.02;
