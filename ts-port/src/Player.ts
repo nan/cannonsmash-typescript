@@ -59,8 +59,8 @@ export class Player {
             console.error("Player model not found in assets!");
         }
 
-        if (this.animationClips['Fnormal']) {
-            this.playAnimation('Fnormal', true);
+        if (this.animationClips['Default']) {
+            this.playAnimation('Default', true);
         } else if (Object.keys(this.animationClips).length > 0) {
             this.playAnimation(Object.keys(this.animationClips)[0], true);
         }
@@ -106,6 +106,18 @@ export class Player {
         gltf.animations.forEach((clip) => {
             this.animationClips[clip.name] = clip;
         });
+
+        // Add a listener for when animations finish.
+        this.mixer.addEventListener('finished', (e) => {
+            // If the finished animation was not set to loop, transition to IDLE.
+            if (e.action.getClip().duration > 0 && e.action.loop !== THREE.LoopRepeat) {
+                this.swing = 0;
+                if (this.swingType >= SERVE_MIN) {
+                    this.swingType = SWING_NORMAL;
+                }
+                this.setState('IDLE');
+            }
+        });
     }
 
     public setState(newState: PlayerState) {
@@ -115,7 +127,7 @@ export class Player {
         switch (this.state) {
             case 'IDLE':
                 // Default to Fnormal for the idle animation.
-                this.playAnimation('Fnormal', true);
+                this.playAnimation('Default', true);
                 break;
             // Other states are mainly for triggering one-shot animations,
             // which is handled directly in the swing/serve methods.
@@ -344,9 +356,7 @@ export class Player {
         }
         if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) { this.hitBall(ball); }
         if (this.swing >= swingParams.swingLength) {
-            this.swing = 0;
-            if (this.swingType >= SERVE_MIN) { this.swingType = SWING_NORMAL; }
-            this.setState('IDLE');
+            this.swing = 0; // Still need to reset swing here for safety, but state change is handled by event.
         }
     }
 
