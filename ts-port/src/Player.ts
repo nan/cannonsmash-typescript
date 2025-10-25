@@ -111,6 +111,10 @@ export class Player {
         this.mixer.addEventListener('finished', (e) => {
             // If the finished animation was not set to loop, transition to IDLE.
             if (e.action.getClip().duration > 0 && e.action.loop !== THREE.LoopRepeat) {
+                this.swing = 0;
+                if (this.swingType >= SERVE_MIN) {
+                    this.swingType = SWING_NORMAL;
+                }
                 this.setState('IDLE');
             }
         });
@@ -354,9 +358,7 @@ export class Player {
         }
         if (this.swing >= swingParams.hitStart && this.swing <= swingParams.hitEnd) { this.hitBall(ball); }
         if (this.swing >= swingParams.swingLength) {
-            this.swing = 0;
-            if (this.swingType >= SERVE_MIN) { this.swingType = SWING_NORMAL; }
-            this.setState('IDLE');
+            this.swing = 0; // Still need to reset swing here for safety, but state change is handled by event.
         }
     }
 

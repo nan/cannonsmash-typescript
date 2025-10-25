@@ -150,8 +150,7 @@ export class Game {
         this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
         // The Player class now handles its own internal rotation.
         // The AI player's direction is handled by its model's orientation within the Player class.
-        this.player1.mesh.rotation.y = Math.PI;
-        this.player2.mesh.rotation.y = 0;
+        this.player2.mesh.rotation.y = Math.PI;
 
         // Ensure status is reset at the start of a new game for a clean slate.
         this.player1.resetStatus();
