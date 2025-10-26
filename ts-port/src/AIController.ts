@@ -33,9 +33,19 @@ const AI_TARGET_DEPTH_DEEP_DENOMINATOR = 16;
 // Rally Targeting: X-coordinate zones
 const AI_TARGET_X_MAX_FACTOR = 7/16;
 // Corresponds to `switch(RAND(8))` in the original C++ code.
-const AI_TARGET_X_ZONE_FACTORS = [
+const AI_TARGET_X_ZONE_FACTors = [
     -AI_TARGET_X_MAX_FACTOR, -5/16, -3/16, -1/16, 1/16, 3/16, 5/16, AI_TARGET_X_MAX_FACTOR
 ];
+
+// --- AI Behavior Constants ---
+const AI_SERVE_SPIN_CATEGORY = 3;
+const AI_TIME_TO_HIT_ADJUSTMENT = 0.02;
+const AI_MIN_SWING_FRAME_DELAY = 1;
+
+// --- AI Prediction Constants ---
+const AI_PREDICTION_INVALID_HEIGHT = -1.0;
+const AI_PREDICTION_MAX_FRAMES = 500;
+const AI_PREDICTION_TIME_STEP = 0.02; // 50Hz simulation
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -106,7 +116,7 @@ export class AIController {
                 this.player.targetPosition.set(targetX, targetZ);
 
                 // Start a specific serve type, similar to C++'s StartServe(3)
-                this.player.startServe(3);
+                this.player.startServe(AI_SERVE_SPIN_CATEGORY);
                 return; // Don't do anything else this frame
             }
         }
@@ -139,7 +149,7 @@ export class AIController {
         // ボールが返球されるまでのおおよその時間を計算 (C++: hitT)
         let timeToHit = -1.0;
         if (this.ball.velocity.z !== 0.0) {
-            timeToHit = (this.predictedHitPosition.y - this.ball.mesh.position.z) / this.ball.velocity.z - 0.02;
+            timeToHit = (this.predictedHitPosition.y - this.ball.mesh.position.z) / this.ball.velocity.z - AI_TIME_TO_HIT_ADJUSTMENT;
         }
 
         // AIがラケットでボールを捉えるための、理想的なX座標を計算 (C++: mx)
@@ -222,7 +232,7 @@ export class AIController {
         if (!swingParams) return;
 
         const hitFrames = swingParams.hitStart;
-        if (hitFrames <= 1) return; // Animation delay is required for this logic.
+        if (hitFrames <= AI_MIN_SWING_FRAME_DELAY) return; // Animation delay is required for this logic.
 
         // 2. Simulate the ball's state 'hitFrames' into the future.
         const simBall = this.ball.clone();
@@ -296,11 +306,11 @@ export class AIController {
      */
     private getBallTop(): { maxHeight: number; position: THREE.Vector2 } {
         const simBall = this.ball.clone();
-        let maxHeight = -1.0;
+        let maxHeight = AI_PREDICTION_INVALID_HEIGHT;
         const peakPosition = new THREE.Vector2();
 
         // 最大500フレーム（10秒）先までシミュレーション
-        for (let i = 0; i < 500; i++) {
+        for (let i = 0; i < AI_PREDICTION_MAX_FRAMES; i++) {
             // ボールが自コートでバウンドした後の状態かチェック
             if ((simBall.status === BallStatus.RALLY_TO_AI && this.player.side === -1) ||
                 (simBall.status === BallStatus.RALLY_TO_HUMAN && this.player.side === 1)) {
@@ -313,11 +323,11 @@ export class AIController {
             }
             // 1フレーム分の物理演算を進める
             const oldPos = simBall.mesh.position.clone();
-            simBall._updatePhysics(0.02); // 50Hz
+            simBall._updatePhysics(AI_PREDICTION_TIME_STEP); // 50Hz
             simBall.checkCollision(oldPos);
 
             // ボールがデッド状態になったらシミュレーション終了
-            if (simBall.status === -1) {
+            if (simBall.status === BallStatus.DEAD) {
                 break;
             }
         }

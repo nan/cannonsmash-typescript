@@ -6,6 +6,14 @@ import { TABLE_LENGTH, TABLE_HEIGHT } from './constants';
 export const CAMERA_FOV = 60;
 export const CAMERA_EYE_OFFSET = new THREE.Vector3(0.0, 0.6, 0.0);
 
+// --- Camera Behavior Constants ---
+const CAMERA_VIEW_ANGLE_THRESHOLD_DEG = 25;
+const CAMERA_LOOKAT_LERP_FACTOR = 0.02;
+const CAMERA_Z_OFFSET_FACTOR = 1.5;
+const CAMERA_MAX_Z_OFFSET = 2.5;
+const CAMERA_MIN_LOOKAT_Y = 0.0;
+
+
 export class CameraManager {
     private camera: THREE.PerspectiveCamera;
     private player: Player;
@@ -37,10 +45,10 @@ export class CameraManager {
 
         // A simplified version of the "is ball going out of view" check
         // The original C++ code is more complex. This captures the spirit.
-        if (angle > (Math.PI / 180 * 25) && ballPos.z < playerPos.z) {
-             this.lookAtTarget.lerp(ballPos, 0.02);
+        if (angle > (Math.PI / 180 * CAMERA_VIEW_ANGLE_THRESHOLD_DEG) && ballPos.z < playerPos.z) {
+             this.lookAtTarget.lerp(ballPos, CAMERA_LOOKAT_LERP_FACTOR);
         } else {
-             this.lookAtTarget.lerp(tx, 0.02);
+             this.lookAtTarget.lerp(tx, CAMERA_LOOKAT_LERP_FACTOR);
         }
         // --- End of Player::MoveLookAt logic ---
 
@@ -50,13 +58,13 @@ export class CameraManager {
 
         // Smoothly pull the camera back as the player moves away from the net.
         // This replaces a discontinuous if/else block that caused a camera jump.
-        const zOffset = Math.min(playerPos.z / 1.5, 2.5);
+        const zOffset = Math.min(playerPos.z / CAMERA_Z_OFFSET_FACTOR, CAMERA_MAX_Z_OFFSET);
         srcX.z += zOffset;
 
         this.camera.position.copy(srcX);
 
         // Clamp the lookAtTarget to prevent it from going below the ground
-        this.lookAtTarget.y = Math.max(this.lookAtTarget.y, 0.0);
+        this.lookAtTarget.y = Math.max(this.lookAtTarget.y, CAMERA_MIN_LOOKAT_Y);
 
         this.camera.lookAt(this.lookAtTarget);
     }

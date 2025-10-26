@@ -16,6 +16,11 @@ import { PlayMode } from './modes/PlayMode';
 import { ScoreManager, type IGameScoringContext } from './ScoreManager';
 import { InputController, type IGameInputContext } from './InputController';
 
+// --- Game Setup Constants ---
+const PLAYER_INITIAL_Y = 0.77;
+const PLAYER_Z_OFFSET = 0.2;
+const BALL_INITIAL_Y_OFFSET = 0.1;
+
 
 /**
  * Defines the contract for all game modes.
@@ -93,8 +98,8 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
 
         // Position them
-        this.player1.mesh.position.set(0, 0.77, TABLE_LENGTH / 2 + 0.2);
-        this.player2.mesh.position.set(0, 0.77, -(TABLE_LENGTH / 2 + 0.2));
+        this.player1.mesh.position.set(0, PLAYER_INITIAL_Y, TABLE_LENGTH / 2 + PLAYER_Z_OFFSET);
+        this.player2.mesh.position.set(0, PLAYER_INITIAL_Y, -(TABLE_LENGTH / 2 + PLAYER_Z_OFFSET));
         // The Player class now handles its own internal rotation.
         // The AI player's direction is handled by its model's orientation within the Player class.
         this.player1.mesh.rotation.y = Math.PI;
@@ -104,7 +109,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.player1.resetStatus();
         this.player2.resetStatus();
 
-        this.ball.mesh.position.set(0, TABLE_HEIGHT + 0.1, 0);
+        this.ball.mesh.position.set(0, TABLE_HEIGHT + BALL_INITIAL_Y_OFFSET, 0);
 
         this.cameraManager = new CameraManager(this.camera, this.player1, this.ball);
     }
