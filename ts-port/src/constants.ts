@@ -11,7 +11,4 @@ export const AREAYSIZE = 12.0;
 
 export const AREAZSIZE = 6.0;
 
-
-
-
-
+export const TICK = 0.01; // Original fixed time step

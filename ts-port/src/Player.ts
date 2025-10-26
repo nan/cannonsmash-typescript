@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT,
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, TICK,
 } from './constants';
-import { Ball, BallStatus, TICK } from './Ball';
+import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';

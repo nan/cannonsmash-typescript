@@ -28,13 +28,12 @@ export enum BallStatus {
 import * as THREE from 'three';
 import type { Player } from './Player';
 import { stype } from './SwingTypes';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, TICK } from './constants';
 import type { Game } from './Game';
 
 // Physics constants from ttinc.h
 const PHY = 0.15; // Air resistance coefficient
 const GRAVITY = (spin: number) => 9.8 + spin * 5; // Gravity combined with Magnus effect
-export const TICK = 0.01; // Original fixed time step
 const TABLE_E = 0.8; // Bounciness of the table
 
 // Fallback serve velocity if calculation fails
