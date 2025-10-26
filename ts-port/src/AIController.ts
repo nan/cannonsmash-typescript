@@ -33,7 +33,7 @@ const AI_TARGET_DEPTH_DEEP_DENOMINATOR = 16;
 // Rally Targeting: X-coordinate zones
 const AI_TARGET_X_MAX_FACTOR = 7/16;
 // Corresponds to `switch(RAND(8))` in the original C++ code.
-const AI_TARGET_X_ZONE_FACTors = [
+const AI_TARGET_X_ZONE_FACTORS = [
     -AI_TARGET_X_MAX_FACTOR, -5/16, -3/16, -1/16, 1/16, 3/16, 5/16, AI_TARGET_X_MAX_FACTOR
 ];
 
