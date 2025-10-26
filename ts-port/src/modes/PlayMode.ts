@@ -9,8 +9,6 @@ import { SERVE_MIN, SERVE_NORMAL } from '../SwingTypes';
  */
 export class PlayMode implements IGameMode {
     public update(deltaTime: number, game: Game): void {
-        game.handleInput();
-
         // Pre-serve logic
         if (game.ball.status === BallStatus.WAITING_FOR_SERVE) {
             const server = game.getService() === game.player1.side ? game.player1 : game.player2;
