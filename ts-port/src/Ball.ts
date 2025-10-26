@@ -552,7 +552,6 @@ export class Ball {
                 const requiredHeight = (TABLE_HEIGHT + NET_HEIGHT) + (1.0 - level) * SERVE_CALC_NET_CLEARANCE_BASE;
 
                 if (heightAtNet > requiredHeight) {
-                    console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
                     const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
                     if (horizontalSpeedSq > bestHorizontalSpeedSq) {
                         bestHorizontalSpeedSq = horizontalSpeedSq;
