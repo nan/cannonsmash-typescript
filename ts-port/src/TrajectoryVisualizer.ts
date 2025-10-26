@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { SWING_NORMAL, TICK, stype } from './constants';
+import { TICK } from './constants';
+import { stype, SWING_NORMAL } from './SwingTypes';
 
 const MAX_TRAJECTORY_POINTS = 300;
 const OPTIMAL_HIT_MARKER_COLOR = 0xff0000;

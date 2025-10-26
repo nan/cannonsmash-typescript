@@ -3,15 +3,66 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, SERVE_MIN, SERVE_NORMAL, SERVE_MAX, SERVEPARAM, stype, SWING_NORMAL, TABLE_HEIGHT, SWING_DRIVE, SWING_CUT, TABLE_WIDTH, NET_HEIGHT, SWING_POKE, SWING_SMASH, SPIN_NORMAL, SPIN_POKE, SPIN_DRIVE, SPIN_SMASH, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z,
-    STATUS_MAX, RUN_SPEED, RUN_PENALTY, SWING_PENALTY, WALK_SPEED, WALK_BONUS, ACCEL_LIMIT, ACCEL_PENALTY
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, TICK,
 } from './constants';
-import { Ball } from './Ball';
-import { BallStatus } from './BallStatus';
+import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
+import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
+
+// Player spin constants
+export const SPIN_NORMAL = 0.4;
+export const SPIN_POKE = -0.8;
+export const SPIN_DRIVE = 0.8;
+export const SPIN_SMASH = 0.2;
+
+
+// Corresponds to SERVEPARAM in Player.h
+export const SERVEPARAM: number[][] = [
+    [SERVE_NORMAL,     0.0, 0.0,  0.0,  0.1,  0.0,  0.2],
+    [SERVE_POKE,       0.0, 0.0,  0.0, -0.3,  0.0, -0.6],
+    [SERVE_SIDESPIN1, -0.6, 0.2, -0.8,  0.0, -0.6, -0.2],
+    [SERVE_SIDESPIN2,  0.6, 0.2,  0.8,  0.0,  0.6, -0.2],
+    [-1,               0.0, 0.0,  0.0,  0.0,  0.0,  0.0]
+];
+
+// --- Status System Constants (from Player.h) ---
+export const STATUS_MAX = 200;
+export const RUN_SPEED = 2.0;
+export const RUN_PENALTY = -1;
+export const SWING_PENALTY = -1;
+export const WALK_SPEED = 1.0;
+export const WALK_BONUS = 1;
+export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EASY, NORMAL, HARD, TSUBORISH}
+export const ACCEL_PENALTY = -1;
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// Player movement sensitivity when using Pointer Lock
+const PLAYER_MOVE_SENSITIVITY_X = 0.003;
+const PLAYER_MOVE_SENSITIVITY_Z = 0.003;
+
+// --- Player Constants ---
+const PLAYER_MODEL_Y_OFFSET = -0.8;
+const HUMAN_PLAYER_OPACITY = 0.2;
+const ANIMATION_FADE_DURATION = 0.2;
+
+const PREDICTION_INVALID_HEIGHT = -1.0;
+const PREDICTION_MAX_FRAMES = 500;
+const PREDICTION_TIME_STEP = 0.02; // 50 Hz simulation for prediction
+const SHORT_SIMULATION_TIME_STEP = 0.01; // 100 Hz for short-term swing prediction
+const SHORT_SIMULATION_FRAMES_SWING = 10;
+const SHORT_SIMULATION_FRAMES_PREDICT = 20;
+
+const PLAYER_FALLBACK_Z_OFFSET = 0.5;
+const PLAYER_VELOCITY_LERP_FACTOR = 0.1;
+const AUTO_MOVE_DISTANCE_THRESHOLD = 0.05;
+
+const AI_ERROR_POSITION_SENSITIVITY = 0.3;
+const AI_ERROR_MAX_ANGLE_RAD = Math.PI / 12;
+
+const SERVE_HIT_LEVEL = 0.9;
+
 
 export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 
@@ -71,7 +122,7 @@ export class Player {
         const model = SkeletonUtils.clone(gltf.scene);
 
         model.scale.set(1.0, 1.0, 1.0);
-        model.position.y = -0.8;
+        model.position.y = PLAYER_MODEL_Y_OFFSET;
         model.rotation.y = 0; // Adjust rotation to face the table
 
         this.mesh.add(model);
@@ -88,13 +139,13 @@ export class Player {
                         meshChild.material = meshChild.material.map(mat => {
                             const newMat = mat.clone();
                             newMat.transparent = true;
-                            newMat.opacity = 0.2;
+                            newMat.opacity = HUMAN_PLAYER_OPACITY;
                             return newMat;
                         });
                     } else {
                         const newMat = meshChild.material.clone();
                         newMat.transparent = true;
-                        newMat.opacity = 0.2;
+                        newMat.opacity = HUMAN_PLAYER_OPACITY;
                         meshChild.material = newMat;
                     }
                 }
@@ -153,9 +204,9 @@ export class Player {
             newAction.clampWhenFinished = !loop;
 
             if (this.currentAction) {
-                this.currentAction.fadeOut(0.2);
+                this.currentAction.fadeOut(ANIMATION_FADE_DURATION);
             }
-            newAction.reset().fadeIn(0.2).play();
+            newAction.reset().fadeIn(ANIMATION_FADE_DURATION).play();
 
             this.currentAction = newAction;
         } else {
@@ -211,9 +262,9 @@ export class Player {
 
     public getPredictedSwing(ball: Ball): { swingType: number, spinCategory: number } {
         const tmpBall = ball.clone();
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < SHORT_SIMULATION_FRAMES_PREDICT; i++) {
             const oldPos = tmpBall.mesh.position.clone();
-            tmpBall._updatePhysics(0.01);
+            tmpBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
             tmpBall.checkCollision(oldPos);
         }
         const isForehand = (this.mesh.position.x - tmpBall.mesh.position.x) * this.side < 0;
@@ -226,9 +277,9 @@ export class Player {
         if (this.swing > 0) return false;
         const isForehand = spinCategory === 3;
         const tmpBall = ball.clone();
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < SHORT_SIMULATION_FRAMES_SWING; i++) {
             const oldPos = tmpBall.mesh.position.clone();
-            tmpBall._updatePhysics(0.01);
+            tmpBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
             tmpBall.checkCollision(oldPos);
         }
         this.swingType = this.determineSwingType(tmpBall, isForehand);
@@ -269,8 +320,7 @@ export class Player {
 
     public hitBall(ball: Ball) {
         if (this.canServe(ball)) {
-            const level = 0.9;
-            const velocity = ball.targetToVS(this, this.targetPosition, level, this.spin);
+            const velocity = ball.targetToVS(this, this.targetPosition, SERVE_HIT_LEVEL, this.spin);
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
@@ -294,10 +344,10 @@ export class Player {
     public predictOptimalPlayerPosition(ball: Ball): { position: THREE.Vector3; isBounceHit: boolean; trajectory: THREE.Vector3[]; hitIndex: number; } {
         const simBall = ball.clone();
         const trajectory: THREE.Vector3[] = [];
-        let maxHeight = -1.0;
+        let maxHeight = PREDICTION_INVALID_HEIGHT;
         const peakPosition = new THREE.Vector3();
         let hitIndex = -1;
-        for (let i = 0; i < 500; i++) {
+        for (let i = 0; i < PREDICTION_MAX_FRAMES; i++) {
             trajectory.push(simBall.mesh.position.clone());
             if ((simBall.status === BallStatus.RALLY_TO_HUMAN && this.side === 1) || (simBall.status === BallStatus.RALLY_TO_AI && this.side === -1)) {
                 if (simBall.mesh.position.y > maxHeight) {
@@ -309,14 +359,14 @@ export class Player {
                 }
             }
             const oldPos = simBall.mesh.position.clone();
-            simBall._updatePhysics(0.02);
+            simBall._updatePhysics(PREDICTION_TIME_STEP);
             simBall.checkCollision(oldPos);
             if (simBall.status < 0) { break; }
         }
         if (hitIndex !== -1) {
             return { position: peakPosition, isBounceHit: true, trajectory, hitIndex };
         } else {
-            const fallbackPosition = new THREE.Vector3(0, 0, this.side * (TABLE_LENGTH / 2 + 0.5));
+            const fallbackPosition = new THREE.Vector3(0, 0, this.side * (TABLE_LENGTH / 2 + PLAYER_FALLBACK_Z_OFFSET));
             return { position: fallbackPosition, isBounceHit: false, trajectory, hitIndex: -1 };
         }
     }
@@ -329,14 +379,14 @@ export class Player {
     }
 
     public autoMove(ball: Ball) {
-        if (!this.canHitBall(ball)) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1); return; }
+        if (!this.canHitBall(ball)) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
         const prediction = this.predictOptimalPlayerPosition(ball);
-        if (!prediction || !prediction.position) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1); return; }
+        if (!prediction || !prediction.position) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
         const targetPosition = prediction.position;
         this.predictedHitPosition.copy(targetPosition);
         const direction = new THREE.Vector3(targetPosition.x - this.mesh.position.x, 0, targetPosition.y - this.mesh.position.z);
         const distance = direction.length();
-        if (distance < 0.05) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1); return; }
+        if (distance < AUTO_MOVE_DISTANCE_THRESHOLD) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
         const maxSpeed = this.isOpponentHit(ball) ? this.RALLY_MAX_SPEED : this.POSITIONING_MAX_SPEED;
         let targetVelocity = direction.normalize().multiplyScalar(maxSpeed);
         this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
@@ -374,7 +424,7 @@ export class Player {
             }
             if (!manualMove) {
                 if (this.shouldAutoMove()) { this.autoMove(ball); }
-                else { this.velocity.lerp(new THREE.Vector3(0, 0, 0), 0.1); }
+                else { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); }
             }
         } else {
             if (this.aiController) { this.aiController.update(deltaTime, game); }
@@ -396,10 +446,10 @@ export class Player {
     private addError(v: THREE.Vector3, ball: Ball) {
         const playerPos = this.mesh.position;
         const ballPos = ball.mesh.position;
-        const xDiff = (Math.abs(playerPos.x - ballPos.x) - 0.3) / 0.3;
-        const yDiff = (playerPos.z - ballPos.z) / 0.3;
+        const xDiff = (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY;
+        const yDiff = (playerPos.z - ballPos.z) / AI_ERROR_POSITION_SENSITIVITY;
         let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
-        radDiff *= (this.statusMax - this.status) / this.statusMax * (Math.PI / 12);
+        radDiff *= (this.statusMax - this.status) / this.statusMax * AI_ERROR_MAX_ANGLE_RAD;
         const vl = v.length();
         if (vl === 0) return;
         const n1 = new THREE.Vector3();

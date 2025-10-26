@@ -1,10 +1,75 @@
+/**
+ * Represents the status of the ball during the game.
+ * These values are ported from the original C++ implementation's logic.
+ */
+export enum BallStatus {
+    /** The ball is dead and the point is over. */
+    DEAD = -1,
+    /** Ball is in rally, heading towards Player 2 (AI), after bouncing on Player 1's side. */
+    RALLY_TO_AI = 0,
+    /** Ball is in rally, heading towards Player 1 (Human), after bouncing on Player 2's side. */
+    RALLY_TO_HUMAN = 1,
+    /** Ball was hit by AI, now heading towards Player 1's side for a bounce. */
+    IN_PLAY_TO_HUMAN = 2,
+    /** Ball was hit by Human, now heading towards Player 2's side for a bounce. */
+    IN_PLAY_TO_AI = 3,
+    /** Ball was served by Player 1, heading towards Player 2's side for a bounce. */
+    SERVE_TO_AI = 4,
+    /** Ball was served by Player 2, heading towards Player 1's side for a bounce. */
+    SERVE_TO_HUMAN = 5,
+    /** Ball is being tossed for a serve by Player 1. */
+    TOSS_P1 = 6,
+    /** Ball is being tossed for a serve by Player 2. */
+    TOSS_P2 = 7,
+    /** Ball is waiting for the player to initiate a serve. */
+    WAITING_FOR_SERVE = 8,
+}
+
 import * as THREE from 'three';
 import type { Player } from './Player';
-import { stype, TABLE_HEIGHT, PHY, GRAVITY, TICK, TABLE_E, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, FALLBACK_SERVE_VELOCITY } from './constants';
+import { stype } from './SwingTypes';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, TICK } from './constants';
 import type { Game } from './Game';
-import { BallStatus } from './BallStatus';
 
+// --- Physics Constants ---
+const PHY = 0.15; // Air resistance coefficient
+const GRAVITY_BASE = 9.8;
+const MAGNUS_FORCE_FACTOR = 5;
+const GRAVITY = (spin: number) => GRAVITY_BASE + spin * MAGNUS_FORCE_FACTOR;
+const TABLE_E = 0.8; // Bounciness of the table
 const BALL_RADIUS = 0.02;
+
+// --- Collision Constants ---
+const NET_COLLISION_VELOCITY_X_FACTOR = 0.5;
+const NET_COLLISION_VELOCITY_Z_FACTOR = -0.2;
+const NET_COLLISION_SPIN_X_FACTOR = -0.8;
+const NET_COLLISION_SPIN_Y_FACTOR = -0.8;
+const NET_COLLISION_Z_OFFSET = 0.001;
+const TABLE_COLLISION_SPIN_X_FACTOR = 0.95;
+const TABLE_COLLISION_SPIN_Y_FACTOR = 0.8;
+
+// --- Game Logic Constants ---
+const BALL_DEAD_TIMEOUT_FRAMES = 100;
+const BALL_RESET_Y_OFFSET = 0.15;
+
+// --- Calculation & Precision Constants ---
+const UNREACHABLE_TIME = 10000;
+const TIME_PRECISION_THRESHOLD = 0.001;
+const VELOCITY_PRECISION_THRESHOLD = 1e-6;
+
+// --- Serve Calculation Constants ---
+const SERVE_CALC_V_MIN = 0.1;
+const SERVE_CALC_V_MAX = 30.0;
+const SERVE_CALC_ITERATIONS = 20;
+const SERVE_CALC_PRECISION = 0.001;
+const SERVE_CALC_HEIGHT_TOLERANCE = 0.05;
+const SERVE_CALC_NET_CLEARANCE_BASE = 0.1;
+
+// --- Fallback Calculation Constants ---
+const FALLBACK_VELOCITY_BASE_SPEED = 7;
+const FALLBACK_VELOCITY_DISTANCE_FACTOR = 3;
+const FALLBACK_VELOCITY_Y_BASE = 1.0;
+const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
 
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
@@ -48,7 +113,7 @@ export class Ball {
         // Handle the reset timer for a dead ball
         if (this.status < 0) { // DEAD is -1, so this check is fine
             this.status--;
-            if (this.status < -100) {
+            if (this.status < -BALL_DEAD_TIMEOUT_FRAMES) {
                 const server = game.getService() === game.player1.side ? game.player1 : game.player2;
                 this.reset(server);
                 // Once reset, we skip the physics for this frame
@@ -79,7 +144,7 @@ export class Ball {
         this.velocity.z = (oldVel.x * Math.sin(rot) + oldVel.z * Math.cos(rot)) * exp_phy_t;
         this.velocity.y = (oldVel.y + GRAVITY(oldSpin.y) / PHY) * exp_phy_t - GRAVITY(oldSpin.y) / PHY;
 
-        if (Math.abs(oldSpin.x) < 0.001) {
+        if (Math.abs(oldSpin.x) < TIME_PRECISION_THRESHOLD) {
             this.mesh.position.x = oldPos.x + oldVel.x / PHY - oldVel.x / PHY * exp_phy_t;
             this.mesh.position.z = oldPos.z + oldVel.z / PHY - oldVel.z / PHY * exp_phy_t;
         } else {
@@ -106,14 +171,14 @@ export class Ball {
                     collisionY > 0 && collisionY < TABLE_HEIGHT + NET_HEIGHT) {
 
                     // Apply physics
-                    this.velocity.x *= 0.5;
-                    this.velocity.z *= -0.2;
-                    this.spin.x *= -0.8;
-                    this.spin.y *= -0.8;
+                    this.velocity.x *= NET_COLLISION_VELOCITY_X_FACTOR;
+                    this.velocity.z *= NET_COLLISION_VELOCITY_Z_FACTOR;
+                    this.spin.x *= NET_COLLISION_SPIN_X_FACTOR;
+                    this.spin.y *= NET_COLLISION_SPIN_Y_FACTOR;
 
                     // Set the ball's position directly to the point of impact, plus a small epsilon
                     // to push it off the net plane and prevent an infinite collision loop.
-                    const epsilon = Math.sign(this.velocity.z) * 0.001;
+                    const epsilon = Math.sign(this.velocity.z) * NET_COLLISION_Z_OFFSET;
                     this.mesh.position.set(collisionX, collisionY, epsilon);
 
                     // Collision handled, but we don't return, so floor collision can still be checked.
@@ -132,8 +197,8 @@ export class Ball {
 
             this.mesh.position.y = TABLE_HEIGHT + BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
-            this.spin.x *= 0.95;
-            this.spin.y *= 0.8;
+            this.spin.x *= TABLE_COLLISION_SPIN_X_FACTOR;
+            this.spin.y *= TABLE_COLLISION_SPIN_Y_FACTOR;
             // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
             if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
                 switch(this.status) {
@@ -171,8 +236,8 @@ export class Ball {
         if (this.mesh.position.y < BALL_RADIUS && this.velocity.y < 0) {
             this.mesh.position.y = BALL_RADIUS;
             this.velocity.y *= -TABLE_E;
-            this.spin.x *= 0.8;
-            this.spin.y *= 0.8;
+            this.spin.x *= TABLE_COLLISION_SPIN_Y_FACTOR; // Using the same as table bounce for simplicity
+            this.spin.y *= TABLE_COLLISION_SPIN_Y_FACTOR;
             this.ballDead();
         }
     }
@@ -210,7 +275,7 @@ export class Ball {
             this.mesh.position.x = playerPos.x - serveParams.hitX;
             this.mesh.position.z = playerPos.z + serveParams.hitY;
         }
-        this.mesh.position.y = TABLE_HEIGHT + 0.15;
+        this.mesh.position.y = TABLE_HEIGHT + BALL_RESET_Y_OFFSET;
         this.velocity.set(0, 0, 0);
         this.spin.set(0, 0);
         this.status = BallStatus.WAITING_FOR_SERVE;
@@ -234,7 +299,7 @@ export class Ball {
         // So, target.y in this function corresponds to the z coordinate.
         const targetLen = target.length();
 
-        if (Math.abs(spin.x) < 0.001) { // No side spin
+        if (Math.abs(spin.x) < TIME_PRECISION_THRESHOLD) { // No side spin
             if (targetLen > 0) {
                 vOut.x = target.x / targetLen * velocity;
                 vOut.z = target.y / targetLen * velocity;
@@ -245,13 +310,13 @@ export class Ball {
 
             const expr = 1 - PHY * targetLen / velocity;
             if (expr <= 0) {
-                return 100000; // Unreachable
+                return UNREACHABLE_TIME; // Unreachable
             }
             return -Math.log(expr) / PHY;
         } else { // With side spin
             const val = targetLen * spin.x / (2 * velocity);
             if (Math.abs(val) > 1) {
-                return 100000; // Unreachable, cannot compute asin
+                return UNREACHABLE_TIME; // Unreachable, cannot compute asin
             }
             const theta = Math.asin(val);
             const cosTheta = Math.cos(-theta);
@@ -268,7 +333,7 @@ export class Ball {
 
             const expr = 1 - 2 * PHY / spin.x * theta;
             if (expr <= 0) {
-                return 100000; // Unreachable
+                return UNREACHABLE_TIME; // Unreachable
             }
             return -Math.log(expr) / PHY;
         }
@@ -283,7 +348,7 @@ export class Ball {
      * @returns The required initial vertical velocity (Vy).
      */
     private _getVz0ToReachTarget(targetHeight: number, spin: THREE.Vector2, t: number): number {
-        if (t > 0.001) {
+        if (t > TIME_PRECISION_THRESHOLD) {
             const g = GRAVITY(spin.y);
             const result = (PHY * targetHeight + g * t) / (1 - Math.exp(-PHY * t)) - g / PHY;
             return result;
@@ -305,9 +370,9 @@ export class Ball {
     private _getTimeToReachY(targetZ: number, currentPos: THREE.Vector2, spin: THREE.Vector2, v: THREE.Vector3): { time: number; targetX: number } {
         const vHorizontal = new THREE.Vector2(v.x, v.z);
 
-        if (Math.abs(spin.x) < 0.001) { // No side spin
+        if (Math.abs(spin.x) < TIME_PRECISION_THRESHOLD) { // No side spin
             let targetX = 0;
-            if (Math.abs(v.z) > 1e-6) {
+            if (Math.abs(v.z) > VELOCITY_PRECISION_THRESHOLD) {
                  targetX = currentPos.x + v.x / v.z * (targetZ - currentPos.y);
             } else {
                  targetX = currentPos.x;
@@ -325,7 +390,7 @@ export class Ball {
             const dzSq = (targetZ - center.y) * (targetZ - center.y);
 
             if (radiusSq < dzSq) {
-                return { time: 100000, targetX: 0 };
+                return { time: UNREACHABLE_TIME, targetX: 0 };
             }
 
             const dx = Math.sqrt(radiusSq - dzSq);
@@ -367,13 +432,13 @@ export class Ball {
                 continue;
             }
 
-            let vMin = 0.1;
-            let vMax = 30.0;
+            let vMin = SERVE_CALC_V_MIN;
+            let vMax = SERVE_CALC_V_MAX;
             let finalHeight = 0;
             let finalBoundX = 0;
 
-            for(let v_iter = 0; v_iter < 20; v_iter++) {
-                if (vMax - vMin < 0.001) {
+            for(let v_iter = 0; v_iter < SERVE_CALC_ITERATIONS; v_iter++) {
+                if (vMax - vMin < SERVE_CALC_PRECISION) {
                     break;
                 };
                 const vHorizontal = (vMin + vMax) / 2;
@@ -382,8 +447,8 @@ export class Ball {
                 let xMax = TABLE_WIDTH / 2;
                 let boundX = 0;
 
-                for (let x_iter = 0; x_iter < 20; x_iter++) {
-                    if (xMax - xMin < 0.001) {
+                for (let x_iter = 0; x_iter < SERVE_CALC_ITERATIONS; x_iter++) {
+                    if (xMax - xMin < SERVE_CALC_PRECISION) {
                         break;
                     }
                     boundX = (xMin + xMax) / 2;
@@ -392,7 +457,7 @@ export class Ball {
                     const initialVelocityGuess = new THREE.Vector3();
                     const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocityGuess);
 
-                    if (timeToBound > 99999) {
+                    if (timeToBound >= UNREACHABLE_TIME) {
                         // This path is impossible, short-circuit
                         xMax = boundX; // Assume we need to aim more to the center
                         continue;
@@ -403,12 +468,12 @@ export class Ball {
                     const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
                     velAtBound.x = (initialVelocityGuess.x * Math.cos(rot) - initialVelocityGuess.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
                     velAtBound.z = (initialVelocityGuess.x * Math.sin(rot) + initialVelocityGuess.z * Math.cos(rot)) * Math.exp(-PHY * timeToBound);
-                    const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
+                    const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
                     const velAfterBounce = velAtBound.clone();
                     const vCurrentXY = Math.hypot(velAfterBounce.x, velAfterBounce.z);
                     if (vCurrentXY > 0) {
-                        velAfterBounce.x += velAfterBounce.x / vCurrentXY * spinAtBound.y * 0.8;
-                        velAfterBounce.z += velAfterBounce.z / vCurrentXY * spinAtBound.y * 0.8;
+                        velAfterBounce.x += velAfterBounce.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+                        velAfterBounce.z += velAfterBounce.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
                     }
 
                     const result = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounce);
@@ -429,7 +494,7 @@ export class Ball {
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
                 const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
-                const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
+                const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
                 const velAtBound = new THREE.Vector3();
                 const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
                 velAtBound.x = (initialVelocity.x * Math.cos(rot) - initialVelocity.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
@@ -437,8 +502,8 @@ export class Ball {
                 const velAfterBounceXZ = velAtBound.clone();
                  const vCurrentXY = Math.hypot(velAfterBounceXZ.x, velAfterBounceXZ.z);
                  if (vCurrentXY > 0) {
-                    velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY * spinAtBound.y * 0.8;
-                    velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY * spinAtBound.y * 0.8;
+                    velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+                    velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
                  }
                 const timeBounceToTarget = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounceXZ).time;
                 const gAfterBounce = GRAVITY(spinAfterBounce.y);
@@ -453,7 +518,7 @@ export class Ball {
                 }
             }
 
-            if (Math.abs(finalHeight - TABLE_HEIGHT) > 0.05) {
+            if (Math.abs(finalHeight - TABLE_HEIGHT) > SERVE_CALC_HEIGHT_TOLERANCE) {
                 continue;
             }
 
@@ -464,7 +529,7 @@ export class Ball {
             initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
             const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
-            const spinAfterBounce = new THREE.Vector2(spinAtBound.x * 0.95, spinAtBound.y * 0.8);
+            const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
             const velAtBound = new THREE.Vector3();
             const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
             velAtBound.x = (initialVelocity.x * Math.cos(rot) - initialVelocity.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
@@ -472,22 +537,21 @@ export class Ball {
             const velAfterBounceXZ = velAtBound.clone();
             const vCurrentXY_ = Math.hypot(velAfterBounceXZ.x, velAfterBounceXZ.z);
             if (vCurrentXY_ > 0) {
-                velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY_ * spinAtBound.y * 0.8;
-                velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY_ * spinAtBound.y * 0.8;
+                velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY_ * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+                velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY_ * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
             }
             const timeToNet = this._getTimeToReachY(0, boundPoint, spinAfterBounce, velAfterBounceXZ).time;
 
-            if (timeToNet < 1000) {
+            if (timeToNet < UNREACHABLE_TIME) {
                 const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
                 const velAfterBounceY = velAtBoundY * -TABLE_E;
                 const gAfterBounce = GRAVITY(spinAfterBounce.y);
                 const exp_phy_t_net = Math.exp(-PHY * timeToNet);
                 const heightAtNet = (TABLE_HEIGHT) +
                     (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t_net) - gAfterBounce / PHY * timeToNet;
-                const requiredHeight = (TABLE_HEIGHT + NET_HEIGHT) + (1.0 - level) * 0.1;
+                const requiredHeight = (TABLE_HEIGHT + NET_HEIGHT) + (1.0 - level) * SERVE_CALC_NET_CLEARANCE_BASE;
 
                 if (heightAtNet > requiredHeight) {
-                    console.log(`[Prediction] Found valid trajectory. Predicted height at net: ${heightAtNet.toFixed(3)}. Initial velocity: { x: ${initialVelocity.x.toFixed(2)}, y: ${initialVelocity.y.toFixed(2)}, z: ${initialVelocity.z.toFixed(2)} }`);
                     const horizontalSpeedSq = initialVelocity.x * initialVelocity.x + initialVelocity.z * initialVelocity.z;
                     if (horizontalSpeedSq > bestHorizontalSpeedSq) {
                         bestHorizontalSpeedSq = horizontalSpeedSq;
@@ -512,9 +576,9 @@ export class Ball {
     private _calculateSimpleFallbackVelocity(relativeTarget: THREE.Vector2, distance: number): THREE.Vector3 {
         console.warn("calculateRallyHitVelocity: Could not find a valid trajectory. Using simple fallback.");
         const direction = new THREE.Vector3(relativeTarget.x, 0, relativeTarget.y).normalize();
-        const fallbackSpeed = 7 + distance * 3;
+        const fallbackSpeed = FALLBACK_VELOCITY_BASE_SPEED + distance * FALLBACK_VELOCITY_DISTANCE_FACTOR;
         const fallbackVelocity = direction.multiplyScalar(fallbackSpeed);
-        fallbackVelocity.y = 1.0 + distance * 0.8;
+        fallbackVelocity.y = FALLBACK_VELOCITY_Y_BASE + distance * FALLBACK_VELOCITY_Y_DISTANCE_FACTOR;
         return fallbackVelocity;
     }
 
@@ -531,7 +595,7 @@ export class Ball {
             // Use the PASSED IN spin parameter
             const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
 
-            if (timeToTarget > 99999) {
+            if (timeToTarget >= UNREACHABLE_TIME) {
                 continue; // This speed is not enough to reach the target
             }
 
