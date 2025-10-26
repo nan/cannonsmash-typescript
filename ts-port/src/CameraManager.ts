@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { Player } from './Player';
 import { Ball } from './Ball';
-import { TABLE_LENGTH, TABLE_HEIGHT, CAMERA_EYE_OFFSET } from './constants';
+import { TABLE_LENGTH, TABLE_HEIGHT } from './constants';
+
+export const CAMERA_FOV = 60;
+export const CAMERA_EYE_OFFSET = new THREE.Vector3(0.0, 0.6, 0.0);
 
 export class CameraManager {
     private camera: THREE.PerspectiveCamera;

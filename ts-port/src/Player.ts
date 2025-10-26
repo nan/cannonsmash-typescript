@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, PLAYER_MOVE_SENSITIVITY_X, PLAYER_MOVE_SENSITIVITY_Z,
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT,
 } from './constants';
-import { Ball, BallStatus } from './Ball';
+import { Ball, BallStatus, TICK } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
@@ -37,6 +37,10 @@ export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EA
 export const ACCEL_PENALTY = -1;
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// Player movement sensitivity when using Pointer Lock
+const PLAYER_MOVE_SENSITIVITY_X = 0.003;
+const PLAYER_MOVE_SENSITIVITY_Z = 0.003;
 
 export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
 

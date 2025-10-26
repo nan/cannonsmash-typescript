@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { TABLE_LENGTH, TABLE_WIDTH, TABLE_HEIGHT, TABLE_THICK, NET_HEIGHT, AREAXSIZE, AREAYSIZE, AREAZSIZE } from './constants';
 
+// Lighting Constants
+const DIR_LIGHT_COLOR = 0xFFFFFF;
+const DIR_LIGHT_INTENSITY = 3;
+const DIR_LIGHT_POSITION = new THREE.Vector3(-1, 2, 4);
+const AMB_LIGHT_COLOR = 0x404040;
+const AMB_LIGHT_INTENSITY = 2;
+
 export class Field {
     public mesh: THREE.Group;
     public targetIndicator: THREE.Mesh;
@@ -9,6 +16,7 @@ export class Field {
     constructor() {
         this.mesh = new THREE.Group();
 
+        this.createLighting();
         this.createFloor();
         this.createWalls();
         this.createTable();
@@ -145,5 +153,14 @@ export class Field {
         const net = new THREE.Mesh(netGeometry, netMaterial);
         net.position.set(0, TABLE_HEIGHT + (NET_HEIGHT / 2), 0);
         this.mesh.add(net);
+    }
+
+    private createLighting() {
+        const directionalLight = new THREE.DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY);
+        directionalLight.position.copy(DIR_LIGHT_POSITION);
+        this.mesh.add(directionalLight);
+
+        const ambientLight = new THREE.AmbientLight(AMB_LIGHT_COLOR, AMB_LIGHT_INTENSITY);
+        this.mesh.add(ambientLight);
     }
 }
