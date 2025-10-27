@@ -1,8 +1,8 @@
 // ts-port/src/ScoreManager.test.ts
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ScoreManager, IGameScopingContext } from './ScoreManager';
-import { BallStatus } from './Ball';
+import { ScoreManager, IGameScopingContext } from '../../src/ScoreManager';
+import { BallStatus } from '../../src/Ball';
 
 // Mock the DOM environment for Node.js
 import { JSDOM } from 'jsdom';

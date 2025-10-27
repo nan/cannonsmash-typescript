@@ -9,7 +9,7 @@
 
 ## ユニットテストの実行
 
-ユニットテストは、テスト対象のソースファイルと同じ階層に `.test.ts` という拡張子で配置されています（例: `ScoreManager.test.ts`）。
+ユニットテストは `ts-port/tests/unit/` ディレクトリに `.test.ts` という拡張子で配置されています（例: `tests/unit/ScoreManager.test.ts`）。
 
 すべてのユニットテストを一度だけ実行するには：
 ```bash
@@ -28,11 +28,11 @@ npm run test:ui
 
 ## エンドツーエンド（E2E）テストの実行
 
-E2Eテストは `ts-port/tests/` ディレクトリに `.spec.ts` という拡張子で配置されています。`playwright.config.ts` の設定により、テスト実行前にVite開発サーバーが自動的に起動します。
+E2Eテストは `ts-port/tests/` 直下に `.spec.ts` という拡張子で配置されています（例: `tests/smoke.spec.ts`）。`playwright.config.ts` の設定により、テスト実行前にVite開発サーバーが自動的に起動します。
 
 すべてのE2Eテストを実行するには：
 ```bash
-npx playwright test
+npm run test:e2e
 ```
 
 最後に実行されたE2EテストのHTMLレポートを表示するには：
@@ -40,10 +40,8 @@ npx playwright test
 npx playwright show-report
 ```
 
-## すべてのテストを実行
+## CIとローカルでのテスト
 
-ユニットテストとE2Eテストの両方を含むテストスイート全体を順次実行するには、メインのテストコマンドを使用します。これは、変更をコミットする前にすべてが正しく動作していることを確認するために実行すべきコマンドです。
+`npm test` コマンドはユニットテストのみを実行します。これは高速なフィードバックサイクルを目的としています。E2Eテストは時間がかかるため、`npm run test:e2e` を使って明示的に実行します。
 
-```bash
-npm test
-```
+変更をコミットする前やCI環境では、両方のテストを実行して、アプリケーション全体の健全性を確認することを推奨します。
