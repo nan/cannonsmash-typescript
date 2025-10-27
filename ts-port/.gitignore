@@ -16,6 +16,10 @@ dist-ssr
 # Temporary files for verification
 jules-scratch/
 
+# Test results
+playwright-report/
+test-results/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

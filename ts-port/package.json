@@ -6,15 +6,23 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:unit": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@needle-tools/three-animation-pointer": "^1.0.7",
     "three": "^0.165.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/three": "^0.164.0",
+    "@vitest/ui": "^4.0.3",
+    "jsdom": "^27.0.1",
     "typescript": "~5.8.3",
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "vitest": "^4.0.3"
   }
 }
