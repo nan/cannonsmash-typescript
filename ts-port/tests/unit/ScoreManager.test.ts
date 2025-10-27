@@ -4,15 +4,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ScoreManager, IGameScopingContext } from '../../src/ScoreManager';
 import { BallStatus } from '../../src/Ball';
 
-// Mock the DOM environment for Node.js
-import { JSDOM } from 'jsdom';
-const dom = new JSDOM('<!doctype html><html><body><div id="scoreboard"></div></body></html>');
-global.document = dom.window.document;
-global.document.exitPointerLock = vi.fn();
-global.window = dom.window as unknown as Window & typeof globalThis;
-global.CustomEvent = dom.window.CustomEvent;
-
-
 // Mock IGameScoringContext
 const createMockContext = (): IGameScoringContext => ({
   player1: { resetStatus: vi.fn() },
@@ -26,9 +17,10 @@ describe('ScoreManager', () => {
 
   beforeEach(() => {
     context = createMockContext();
-    // Reset the DOM element content before each test
-    const scoreboard = document.getElementById('scoreboard')!;
-    scoreboard.innerText = '';
+    // Vitest's JSDOM environment is empty by default, so create the scoreboard element for each test.
+    document.body.innerHTML = '<div id="scoreboard"></div>';
+    // Mock exitPointerLock as it's not implemented in JSDOM
+    document.exitPointerLock = vi.fn();
     scoreManager = new ScoreManager(context);
     vi.useFakeTimers(); // Mock setTimeout
   });
