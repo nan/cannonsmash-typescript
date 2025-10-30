@@ -158,6 +158,9 @@ export class Game implements IGameScoringContext, IGameInputContext {
         // --- Scoring Logic (common to all modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.scoreManager.awardPoint(this.prevBallStatus);
+            // If the ball is dead, force both players back to IDLE state.
+            this.player1.setState('IDLE');
+            this.player2.setState('IDLE');
         }
 
         // Delegate mode-specific logic to the current state object
