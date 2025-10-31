@@ -64,11 +64,12 @@ const AI_ERROR_MAX_ANGLE_RAD = Math.PI / 12;
 const SERVE_HIT_LEVEL = 0.9;
 
 
-export type PlayerState = 'IDLE' | 'SWING_DRIVE' | 'SWING_CUT';
+export type PlayerState = 'IDLE' | 'BACKSWING' | 'SWING_DRIVE' | 'SWING_CUT';
 
 export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
+    public isInBackswing = false;
     public velocity = new THREE.Vector3();
     private prevVelocity = new THREE.Vector3();
     public targetPosition: THREE.Vector2;
@@ -163,6 +164,7 @@ export class Player {
             // If the finished animation was not set to loop, transition to IDLE.
             if (e.action.getClip().duration > 0 && e.action.loop !== THREE.LoopRepeat) {
                 this.swing = 0;
+                this.isInBackswing = false;
                 if (this.swingType >= SERVE_MIN) {
                     this.swingType = SWING_NORMAL;
                 }
@@ -177,8 +179,12 @@ export class Player {
 
         switch (this.state) {
             case 'IDLE':
+                this.isInBackswing = false;
                 // Default to Fnormal for the idle animation.
                 this.playAnimation('Default', true);
+                break;
+            case 'BACKSWING':
+                // This state is managed by the backswing logic, no animation change needed here.
                 break;
             // Other states are mainly for triggering one-shot animations,
             // which is handled directly in the swing/serve methods.
@@ -293,7 +299,13 @@ export class Player {
     }
 
     public startSwing(ball: Ball, spinCategory: number) {
-        if (this.swing > 0) return false;
+        if (this.swing > 0 || this.isInBackswing) return false;
+        return this.startBackswing(ball, spinCategory);
+    }
+
+    public startBackswing(ball: Ball, spinCategory: number) {
+        if (this.swing > 0 || this.isInBackswing) return false;
+
         const isForehand = spinCategory === 3;
         const tmpBall = ball.clone();
         for (let i = 0; i < SHORT_SIMULATION_FRAMES_SWING; i++) {
@@ -304,25 +316,37 @@ export class Player {
         this.swingType = this.determineSwingType(tmpBall, isForehand);
         let animationName: string;
         switch (this.swingType) {
-            case SWING_DRIVE:
-                animationName = 'Fdrive'; // Only forehand drive exists in the provided list
-                break;
-            case SWING_SMASH:
-                animationName = 'Fsmash'; // Only forehand smash
-                break;
-            case SWING_CUT:
-                animationName = isForehand ? 'Fcut' : 'Bcut';
-                break;
-            case SWING_POKE:
-                animationName = isForehand ? 'Fpeck' : 'Bpeck';
-                break;
+            case SWING_DRIVE: animationName = 'Fdrive'; break;
+            case SWING_SMASH: animationName = 'Fsmash'; break;
+            case SWING_CUT: animationName = isForehand ? 'Fcut' : 'Bcut'; break;
+            case SWING_POKE: animationName = isForehand ? 'Fpeck' : 'Bpeck'; break;
             case SWING_NORMAL:
-            default:
-                animationName = isForehand ? 'Fnormal' : 'Bnormal';
-                break;
+            default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
         }
+
+        this.setState('BACKSWING');
+        this.isInBackswing = true;
         this.swing = 1;
         this.playAnimation(animationName, false);
+
+        // Pause the animation at the peak of the backswing
+        if (this.currentAction) {
+            this.currentAction.paused = true;
+            // Estimate backswing peak at 40% of the animation. This is a guess.
+            const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
+            this.currentAction.time = backswingPeakTime;
+        }
+
+        return true;
+    }
+
+    public startForwardswing() {
+        if (!this.isInBackswing || !this.currentAction) return false;
+
+        this.isInBackswing = false;
+        this.currentAction.paused = false;
+
+        // The rest of the swing logic is handled by _updateSwing
         return true;
     }
 
@@ -413,8 +437,13 @@ export class Player {
 
     private _updateSwing(ball: Ball) {
         if (this.swing <= 0) return;
+
+        // Do not update the swing counter if we are in the backswing phase (animation is paused)
+        if (this.isInBackswing) return;
+
         const swingParams = stype.get(this.swingType);
         if (!swingParams) { this.swing = 0; return; }
+
         if (this.canServe(ball)) {
             if (ball.velocity.y < 0) { this.swing++; }
         } else {

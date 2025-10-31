@@ -133,6 +133,25 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.handleInput();
 
         // The core game logic update (common to all modes)
+        // --- Automatic Backswing Logic ---
+        const backswingThreshold = 3.0; // Distance from player to ball to trigger backswing
+        const ballPos = this.ball.mesh.position;
+        const playerPos = this.player1.mesh.position;
+        const distanceToBall = ballPos.distanceTo(playerPos);
+
+        if (
+            this.player1.state === 'IDLE' &&
+            this.player1.canInitiateSwing(this.ball) &&
+            distanceToBall < backswingThreshold &&
+            this.ball.velocity.z > 0 // Ball is moving towards the player
+        ) {
+            // Determine swing type and spin category automatically for the backswing
+            const predictedSwing = this.player1.getPredictedSwing(this.ball);
+            this.player1.startBackswing(this.ball, predictedSwing.spinCategory);
+        }
+
+
+        // The core game logic update (common to all modes)
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
         this.ball.update(deltaTime, this);
@@ -140,6 +159,9 @@ export class Game implements IGameScoringContext, IGameInputContext {
         // --- Scoring Logic (common to all modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
             this.scoreManager.awardPoint(this.prevBallStatus);
+            // If the ball is dead, force both players back to IDLE state.
+            this.player1.setState('IDLE');
+            this.player2.setState('IDLE');
         }
 
         // Delegate mode-specific logic to the current state object
