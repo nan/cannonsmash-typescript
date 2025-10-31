@@ -132,9 +132,10 @@ export class AIController {
         this._updateMovement();
 
         // 3. スイング開始の判断
-        // player.canInitiateSwing() を使うことで、ボールがバウンドする前でもスイング準備に入れるようにする
-        if (this.player.swing === 0 && this.player.canInitiateSwing(this.ball)) {
-            this.trySwing();
+        if (this.player.isInBackswing) {
+            this.tryForwardSwing();
+        } else if (this.player.swing === 0 && this.player.canInitiateSwing(this.ball)) {
+            this.tryBackswing();
         }
     }
 
@@ -224,7 +225,7 @@ export class AIController {
      * C++版のComPenAttackController::Think()内のスイング判断ロジックを移植したもの。
      * 未来予測を行い、適切なタイミングでスイングを開始する。
      */
-    private trySwing() {
+    private tryBackswing() {
         // 1. Ask the player object to predict the best swing for the situation.
         const { swingType, spinCategory } = this.player.getPredictedSwing(this.ball);
 
@@ -274,7 +275,25 @@ export class AIController {
 
             // 6. Initiate the swing.
             this.setRallyTarget(simBall);
-            this.player.startSwing(this.ball, spinCategory);
+            this.player.startBackswing(this.ball, spinCategory);
+        }
+    }
+
+    /**
+     * AI is in the backswing state, waiting for the right moment to hit.
+     * This method checks the current ball position and triggers the forward swing if it's optimal.
+     */
+    private tryForwardSwing() {
+        const playerPos = this.player.mesh.position;
+        const ballPos = this.ball.mesh.position;
+        const playerBallZDiff = (playerPos.z - ballPos.z) * this.player.side;
+
+        // Check if the ball is within the ideal hitting zone right now.
+        if (playerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
+            playerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
+
+            // It's time to hit!
+            this.player.startForwardswing();
         }
     }
 
