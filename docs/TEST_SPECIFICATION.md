@@ -92,7 +92,36 @@
 | **IC-04** | **サーブ実行（サーブ権なし）** | サーブ権がプレイヤー1にない。 | 1. `inputManager`で左マウスクリックをシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.startServe()`が呼び出されないこと。 |
 | **IC-05** | **ターゲット位置更新** | - | 1. `inputManager`でターゲット指定キー（例: 'w'）が押された状態をシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.targetPosition.set()`が、キーに対応する座標で呼び出されること。 |
 
-### 1.7. AIController (`tests/unit/AIController.test.ts`)
+### 1.7. InputManager (`tests/unit/InputManager.test.ts`)
+
+**テスト対象:** `InputManager`シングルトンの低レベルな入力状態管理
+
+| テストケースID | テスト内容 | 前提条件 | 手順 | 期待される結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **IM-01** | **キー押下状態の検知** | - | 1. `keydown`イベントを発行する。 | 1. `isKeyPressed()`が`true`を返すこと。 |
+| **IM-02** | **キー押下（直後）の検知** | - | 1. `keydown`イベントを発行する。<br>2. `update()`を呼び出す。 | 1. 最初のフレームで`isKeyJustPressed()`が`true`を返すこと。<br>2. `update()`後の次のフレームで`isKeyJustPressed()`が`false`を返すこと。 |
+| **IM-03** | **キー解放** | キーが押下されている。 | 1. `keyup`イベントを発行する。 | 1. `isKeyPressed()`が`false`を返すこと。 |
+| **IM-04** | **マウスクリック状態の検知** | - | 1. `mousedown`イベントを発行する。 | 1. `isMouseButtonDown()`が`true`を返すこと。 |
+| **IM-05** | **マウスクリック（直後）の検知** | - | 1. `mousedown`イベントを発行する。<br>2. `update()`を呼び出す。 | 1. 最初のフレームで`isMouseButtonJustPressed()`が`true`を返すこと。<br>2. `update()`後の次のフレームで`isMouseButtonJustPressed()`が`false`を返すこと。 |
+| **IM-06** | **ポインターロック状態の更新** | - | 1. `document.pointerLockElement`をモックし、`pointerlockchange`イベントを発行する。 | 1. `isPointerLocked`プロパティが正しく更新されること。 |
+| **IM-07** | **マウス移動量の追跡** | ポインターロックが有効である。 | 1. `mousemove`イベントを発行する。 | 1. `getMouseMovement()`がイベントで渡された移動量 (`movementX`, `movementY`) を返すこと。 |
+| **IM-08** | **マウス移動量の追跡（ロックなし）** | ポインターロックが無効である。 | 1. `mousemove`イベントを発行する。 | 1. `getMouseMovement()`が`(0, 0)`を返すこと。 |
+
+### 1.8. Field (`tests/unit/Field.test.ts`)
+
+**テスト対象:** `Field`クラスの3Dオブジェクト（テーブル、壁、照明など）の構築ロジック
+
+| テストケースID | テスト内容 | 前提条件 | 手順 | 期待される結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **FL-01** | **初期化** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. メインとなる`THREE.Group`が作成され、`field.mesh`に割り当てられること。 |
+| **FL-02** | **ターゲットインジケータの作成** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. `field.targetIndicator`が`THREE.Mesh`として作成され、メイングループに追加されること。 |
+| **FL-03** | **トップレベルコンポーネントの追加** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. 照明、床、壁、テーブル、ネット、インジケータなど、すべての主要コンポーネントがメインの`field.mesh`に直接追加されること。 |
+| **FL-04** | **照明の作成** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. `DirectionalLight`と`AmbientLight`が1つずつ作成され、シーンに追加されること。 |
+| **FL-05** | **床と壁の作成** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. 床用に1つ、壁用に4つの`PlaneGeometry`が作成されること。 |
+| **FL-06** | **テーブルコンポーネントの構築** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. テーブル専用の`THREE.Group`が作成されること。<br>2. 天板、5本の線、4本の脚がすべてテーブルグループに追加されること。 |
+| **FL-07** | **ネットの作成** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. ネットを表す`THREE.Mesh`が作成され、メイングループに追加されること。 |
+
+### 1.9. AIController (`tests/unit/AIController.test.ts`)
 
 **テスト対象:** `AIController`クラスの意思決定ロジック（移動、サーブ、返球）
 
