@@ -80,7 +80,19 @@
 | **CM-03** | **カメラのZ位置調整** | プレイヤーがテーブルから遠ざかる。 | 1. `update()`を呼び出す。 | 1. カメラのZ位置が、プレイヤーの位置に応じて後方にオフセットされること。 |
 | **CM-04** | **注視点クランプ** | ボールが地面より下に移動する。 | 1. `update()`を呼び出す。 | 1. カメラの注視点のY座標が、最低値（0.0）にクランプされること。 |
 
-### 1.6. AIController (`tests/unit/AIController.test.ts`)
+### 1.6. InputController (`tests/unit/InputController.test.ts`)
+
+**テスト対象:** `InputController`クラスのユーザー入力（キーボード・マウス）処理ロジック
+
+| テストケースID | テスト内容 | 前提条件 | 手順 | 期待される結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **IC-01** | **サーブタイプ変更** | - | 1. `inputManager`でスペースキーが押された状態をシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.changeServeType()`が呼び出されること。 |
+| **IC-02** | **サーブ実行** | ボールの状態が`WAITING_FOR_SERVE`であり、サーブ権がプレイヤー1にある。 | 1. `inputManager`で左マウスクリックをシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.startServe(1)`が呼び出されること。 |
+| **IC-03** | **フォワードスイング** | プレイヤーがバックスイング中 (`isInBackswing`が`true`) である。 | 1. `inputManager`で任意の（左・中・右）マウスクリックをシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.startForwardswing()`が呼び出されること。 |
+| **IC-04** | **サーブ実行（サーブ権なし）** | サーブ権がプレイヤー1にない。 | 1. `inputManager`で左マウスクリックをシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.startServe()`が呼び出されないこと。 |
+| **IC-05** | **ターゲット位置更新** | - | 1. `inputManager`でターゲット指定キー（例: 'w'）が押された状態をシミュレートする。<br>2. `handleInput()`を呼び出す。 | 1. `player1.targetPosition.set()`が、キーに対応する座標で呼び出されること。 |
+
+### 1.7. AIController (`tests/unit/AIController.test.ts`)
 
 **テスト対象:** `AIController`クラスの意思決定ロジック（移動、サーブ、返球）
 
