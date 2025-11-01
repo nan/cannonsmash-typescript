@@ -121,6 +121,16 @@
 | **FL-06** | **テーブルコンポーネントの構築** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. テーブル専用の`THREE.Group`が作成されること。<br>2. 天板、5本の線、4本の脚がすべてテーブルグループに追加されること。 |
 | **FL-07** | **ネットの作成** | - | 1. `Field`の新しいインスタンスを作成する。 | 1. ネットを表す`THREE.Mesh`が作成され、メイングループに追加されること。 |
 
+### 1.9. UIManager (`tests/unit/UIManager.test.ts`)
+
+**テスト対象:** `UIManager`クラスの画面（デモ、一時停止、ゲーム）表示切り替えロジック
+
+| テストケースID | テスト内容 | 前提条件 | 手順 | 期待される結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **UI-01** | **デモ画面の表示** | - | 1. `showDemoScreen()`を呼び出す。 | 1. `demoScreen`要素から`hidden`クラスが削除されること。<br>2. `pauseScreen`要素に`hidden`クラスが追加されること。 |
+| **UI-02** | **一時停止画面の表示** | - | 1. `showPauseScreen()`を呼び出す。 | 1. `demoScreen`要素に`hidden`クラスが追加されること。<br>2. `pauseScreen`要素から`hidden`クラスが削除されること。 |
+| **UI-03** | **ゲーム画面の表示** | - | 1. `showGameScreen()`を呼び出す。 | 1. `demoScreen`と`pauseScreen`の両方の要素に`hidden`クラスが追加されること。 |
+
 ### 1.10. ゲームモード (`tests/unit/modes/`)
 
 #### 1.10.1. DemoMode (`DemoMode.test.ts`)
