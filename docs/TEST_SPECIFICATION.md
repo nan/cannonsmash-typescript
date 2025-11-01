@@ -156,7 +156,18 @@
 | **PM-05** | **軌道ビジュアライザー制御** | - | 1. ボールの`justHitBySide`や`status`プロパティを様々な値に設定する。<br>2. `update()`を呼び出す。 | 1. AIが打った直後は`show()`が呼ばれること。<br>2. プレイヤーが打った直後、またはラリー終了時は`hide()`が呼ばれること。 |
 | **PM-06** | **入力マネージャー更新** | - | 1. `update()`を呼び出す。 | 1. `inputManager.update()`が呼び出されること。 |
 
-### 1.11. AIController (`tests/unit/AIController.test.ts`)
+### 1.11. TrajectoryVisualizer (`tests/unit/TrajectoryVisualizer.test.ts`)
+
+**テスト対象:** `TrajectoryVisualizer`クラスの軌道予測の視覚化ロジック
+
+| テストケースID | テスト内容 | 前提条件 | 手順 | 期待される結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **TV-01** | **表示（ヒットポイントなし）** | `player.predictOptimalPlayerPosition`が`hitIndex: -1`を返す。 | 1. `show()`を呼び出す。 | 1. 軌道全体が1本の細い線(`THREE.Line`)として描画されること。<br>2. 他の視覚要素（太い線、マーカー）は作成されないこと。 |
+| **TV-02** | **表示（ヒットポイントあり）** | `player.predictOptimalPlayerPosition`が有効な`hitIndex`を返す。 | 1. `show()`を呼び出す。 | 1. タイミングマーカーより前の軌道が太い線(`THREE.TubeGeometry`)で描画されること。<br>2. タイミングマーカーより後の軌道が細い線(`THREE.Line`)で描画されること。<br>3. タイミングマーカー(`THREE.SphereGeometry`)が正しい位置に表示されること。 |
+| **TV-03** | **表示前のクリア処理** | - | 1. `show()`を呼び出す。 | 1. 新しい軌道を描画する前に、`hide()`メソッドが呼び出され、既存の視覚要素がクリアされること。 |
+| **TV-04** | **非表示とリソース解放** | 軌道が表示されている状態。 | 1. `hide()`を呼び出す。 | 1. すべての視覚要素（線、マーカー）がシーンから削除されること。<br>2. 各要素のジオメトリとマテリアルの`dispose()`メソッドが呼び出され、リソースが解放されること。 |
+
+### 1.12. AIController (`tests/unit/AIController.test.ts`)
 
 **テスト対象:** `AIController`クラスの意思決定ロジック（移動、サーブ、返球）
 
