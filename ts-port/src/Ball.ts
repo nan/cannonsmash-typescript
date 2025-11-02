@@ -73,7 +73,7 @@ const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
 
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
-const RALLY_HIT_MIN_SPEED = 5.0;
+const RALLY_HIT_MIN_SPEED = 2.0; // Lowered further for drop shots
 const RALLY_HIT_SPEED_STEP = 0.5;
 const NET_CLEARANCE_MARGIN = 0.05;
 
@@ -585,44 +585,46 @@ export class Ball {
     public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
-
         const relativeTarget = target.clone().sub(initialBallPos2D);
         const distance = relativeTarget.length();
 
-        // By starting from the highest speed and going down, we prioritize the fastest, flattest shot.
-        for (let speed = RALLY_HIT_MAX_SPEED; speed > RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
-            const initialVelocityGuess = new THREE.Vector3();
-            // Use the PASSED IN spin parameter
-            const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
+        const RALLY_HIT_MAX_LAUNCH_ANGLE = Math.PI / 2; // 90 degrees for very high arcs
+        const RALLY_HIT_LAUNCH_ANGLE_STEP = 0.01; // ~0.57 degrees step for high precision
+        const RALLY_HIT_LANDING_TOLERANCE = 0.15;
 
-            if (timeToTarget >= UNREACHABLE_TIME) {
-                continue; // This speed is not enough to reach the target
-            }
+        // Search over a range of vertical launch angles (in radians)
+        for (let launch_angle = -0.2; launch_angle < RALLY_HIT_MAX_LAUNCH_ANGLE; launch_angle += RALLY_HIT_LAUNCH_ANGLE_STEP) {
+            // Search over a range of horizontal speeds
+            for (let speed = RALLY_HIT_MAX_SPEED; speed >= RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
+                const horizontal_v = speed * Math.cos(launch_angle);
+                const vertical_v = speed * Math.sin(launch_angle);
 
-            // Use the PASSED IN spin parameter
-            const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
+                const initialVelocityGuess = new THREE.Vector3();
+                const timeToTarget = this._getTimeToReachTarget(relativeTarget, horizontal_v, spin, initialVelocityGuess);
 
-            // Let's create the full initial velocity vector
-            const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
+                if (timeToTarget >= UNREACHABLE_TIME) {
+                    continue;
+                }
 
-            // Use the PASSED IN spin parameter
-            const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
-
-            // Check if the ball reaches the net before the target
-            if (timeToNet < timeToTarget) {
-                // Use the PASSED IN spin parameter
                 const g = GRAVITY(spin.y);
-                const exp_phy_t_net = Math.exp(-PHY * timeToNet);
-                const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
+                const exp_phy_t_target = Math.exp(-PHY * timeToTarget);
+                const heightAtTarget = initialBallPos.y + (vertical_v + g / PHY) / PHY * (1 - exp_phy_t_target) - g / PHY * timeToTarget;
 
-                // Does it clear the net by a small margin?
-                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN) {
-                    // This is a valid trajectory! Return this velocity.
-                    return v0;
+                if (Math.abs(heightAtTarget - TABLE_HEIGHT) < RALLY_HIT_LANDING_TOLERANCE) {
+                    const v0 = new THREE.Vector3(initialVelocityGuess.x, vertical_v, initialVelocityGuess.z);
+                    const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
+
+                    if (timeToNet < timeToTarget) {
+                        const exp_phy_t_net = Math.exp(-PHY * timeToNet);
+                        const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
+
+                        if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
+                            return v0;
+                        }
+                    }
                 }
             }
         }
-
         return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
     }
 }
