@@ -666,8 +666,12 @@ export class Ball {
             const trajectory = this._findBestTrajectoryForAimPoint(aimTarget, spin, initialBallPos);
 
             if (!trajectory) {
-                // If the inner search can't even find a trajectory for the aim point, we can't continue.
-                break;
+                // If the inner search fails, it's likely because all simulated shots hit the net.
+                // As a recovery strategy, we adjust the aim point to be slightly closer to the player.
+                // This encourages a higher-arcing shot on the next iteration to clear the net.
+                const toPlayerDir = new THREE.Vector2(initialBallPos.x - aimTarget.x, initialBallPos.z - aimTarget.y).normalize();
+                aimTarget.addScaledVector(toPlayerDir, 0.1); // Move aim 10cm closer
+                continue; // Try again with the new aim point
             }
 
             const { velocity, landingPos } = trajectory;
