@@ -70,12 +70,18 @@ const FALLBACK_VELOCITY_BASE_SPEED = 7;
 const FALLBACK_VELOCITY_DISTANCE_FACTOR = 3;
 const FALLBACK_VELOCITY_Y_BASE = 1.0;
 const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
+const FALLBACK_SERVE_VELOCITY = new THREE.Vector3(0, 3, -5);
+
 
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
-const RALLY_HIT_MIN_SPEED = 5.0;
-const RALLY_HIT_SPEED_STEP = 1.0;
+const RALLY_HIT_MIN_SPEED = 0.5; // Lowered further to handle very slow shots like drop shots
+const RALLY_CALC_ITERATIONS = 20; // Renamed from SERVE_CALC_ITERATIONS for clarity
+const RALLY_CALC_PRECISION = 0.001; // Renamed from SERVE_CALC_PRECISION for clarity
 const NET_CLEARANCE_MARGIN = 0.05;
+
+// A constant representing an invalid or unfound velocity
+const INVALID_VELOCITY = new THREE.Vector3(0, 0, 0);
 
 export class Ball {
     public mesh: THREE.Mesh;
@@ -413,119 +419,116 @@ export class Ball {
     }
 
 
+    private _calculateServeFinalState(
+        vHorizontal: number,
+        boundPoint: THREE.Vector2,
+        spin: THREE.Vector2,
+        target: THREE.Vector2,
+        initialBallPos: THREE.Vector3,
+        initialBallPos2D: THREE.Vector2
+    ): { finalHeight: number; finalX: number } {
+        // This is a complex helper function extracted from the original targetToVS.
+        // It simulates the entire serve trajectory for a given initial horizontal speed
+        // and a bounce point, returning the final height and x position at the target Z.
+
+        // Inner binary search for the bounce X position
+        let xMin = -TABLE_WIDTH / 2;
+        let xMax = TABLE_WIDTH / 2;
+        for (let x_iter = 0; x_iter < SERVE_CALC_ITERATIONS; x_iter++) {
+            if (xMax - xMin < SERVE_CALC_PRECISION) break;
+            const boundX = (xMin + xMax) / 2;
+            const currentBoundPoint = new THREE.Vector2(boundX, boundPoint.y);
+            const initialVelocityGuess = new THREE.Vector3();
+            const timeToBound = this._getTimeToReachTarget(currentBoundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocityGuess);
+            if (timeToBound >= UNREACHABLE_TIME) {
+                xMax = boundX;
+                continue;
+            }
+
+            const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
+            const velAtBound = new THREE.Vector3();
+            const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
+            velAtBound.x = (initialVelocityGuess.x * Math.cos(rot) - initialVelocityGuess.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
+            velAtBound.z = (initialVelocityGuess.x * Math.sin(rot) + initialVelocityGuess.z * Math.cos(rot)) * Math.exp(-PHY * timeToBound);
+            const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
+            const velAfterBounce = velAtBound.clone();
+            const vCurrentXY = Math.hypot(velAfterBounce.x, velAfterBounce.z);
+            if (vCurrentXY > 0) {
+                velAfterBounce.x += velAfterBounce.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+                velAfterBounce.z += velAfterBounce.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+            }
+            const { targetX } = this._getTimeToReachY(target.y, currentBoundPoint, spinAfterBounce, velAfterBounce);
+            if (targetX < target.x) xMin = boundX;
+            else xMax = boundX;
+        }
+        const finalBoundX = (xMin + xMax) / 2;
+        const finalBoundPoint = new THREE.Vector2(finalBoundX, boundPoint.y);
+
+        // Now calculate the final height
+        const initialVelocity = new THREE.Vector3();
+        const timeToBound = this._getTimeToReachTarget(finalBoundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
+        if (timeToBound >= UNREACHABLE_TIME) return { finalHeight: -1, finalX: -1 };
+
+        initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
+        const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
+        const velAfterBounceY = velAtBoundY * -TABLE_E;
+        const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
+        const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
+        const velAtBound = new THREE.Vector3();
+        const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
+        velAtBound.x = (initialVelocity.x * Math.cos(rot) - initialVelocity.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
+        velAtBound.z = (initialVelocity.x * Math.sin(rot) + initialVelocity.z * Math.cos(rot)) * Math.exp(-PHY * timeToBound);
+        const velAfterBounceXZ = velAtBound.clone();
+        const vCurrentXY = Math.hypot(velAfterBounceXZ.x, velAfterBounceXZ.z);
+        if (vCurrentXY > 0) {
+            velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+            velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
+        }
+        const timeBounceToTarget = this._getTimeToReachY(target.y, finalBoundPoint, spinAfterBounce, velAfterBounceXZ).time;
+        if (timeBounceToTarget >= UNREACHABLE_TIME) return { finalHeight: -1, finalX: -1 };
+
+        const gAfterBounce = GRAVITY(spinAfterBounce.y);
+        const exp_phy_t1 = Math.exp(-PHY * timeBounceToTarget);
+        const finalHeight = (TABLE_HEIGHT) + (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
+        return { finalHeight, finalX: finalBoundX };
+    }
+
+
     public targetToVS(player: Player, target: THREE.Vector2, level: number, spin: THREE.Vector2): THREE.Vector3 {
-        // This is a port of the complex serve calculation from the original C++ code (Ball::TargetToVS).
-        // It iteratively searches for an initial velocity that makes the ball land at the target.
         const initialBallPos = this.mesh.position;
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
-
-        let bestVelocity = new THREE.Vector3();
+        let bestVelocity = INVALID_VELOCITY.clone();
         let bestHorizontalSpeedSq = -1;
 
-        // The loop for the Z-coordinate of the first bounce.
-        // It iterates over the entire half of the table, with a step of TICK, to find the optimal bounce point.
-        // This logic is ported from the original C++ implementation.
         const halfTableL = TABLE_LENGTH / 2;
         for (let boundZ = -halfTableL; boundZ < halfTableL; boundZ += TICK) {
-            // This condition ensures we only check for bounces on the server's side of the table.
-            if (boundZ * player.side <= 0) {
-                continue;
-            }
+            if (boundZ * player.side <= 0) continue;
 
+            // --- Binary search for vHorizontal ---
             let vMin = SERVE_CALC_V_MIN;
             let vMax = SERVE_CALC_V_MAX;
-            let finalHeight = 0;
             let finalBoundX = 0;
+            let finalHeight = 0;
 
             for(let v_iter = 0; v_iter < SERVE_CALC_ITERATIONS; v_iter++) {
-                if (vMax - vMin < SERVE_CALC_PRECISION) {
-                    break;
-                };
+                if (vMax - vMin < SERVE_CALC_PRECISION) break;
                 const vHorizontal = (vMin + vMax) / 2;
-
-                let xMin = -TABLE_WIDTH / 2;
-                let xMax = TABLE_WIDTH / 2;
-                let boundX = 0;
-
-                for (let x_iter = 0; x_iter < SERVE_CALC_ITERATIONS; x_iter++) {
-                    if (xMax - xMin < SERVE_CALC_PRECISION) {
-                        break;
-                    }
-                    boundX = (xMin + xMax) / 2;
-                    const boundPoint = new THREE.Vector2(boundX, boundZ);
-
-                    const initialVelocityGuess = new THREE.Vector3();
-                    const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocityGuess);
-
-                    if (timeToBound >= UNREACHABLE_TIME) {
-                        // This path is impossible, short-circuit
-                        xMax = boundX; // Assume we need to aim more to the center
-                        continue;
-                    }
-
-                    const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
-                    const velAtBound = new THREE.Vector3();
-                    const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
-                    velAtBound.x = (initialVelocityGuess.x * Math.cos(rot) - initialVelocityGuess.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
-                    velAtBound.z = (initialVelocityGuess.x * Math.sin(rot) + initialVelocityGuess.z * Math.cos(rot)) * Math.exp(-PHY * timeToBound);
-                    const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
-                    const velAfterBounce = velAtBound.clone();
-                    const vCurrentXY = Math.hypot(velAfterBounce.x, velAfterBounce.z);
-                    if (vCurrentXY > 0) {
-                        velAfterBounce.x += velAfterBounce.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
-                        velAfterBounce.z += velAfterBounce.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
-                    }
-
-                    const result = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounce);
-                    const finalTargetX = result.targetX;
-
-                    if (finalTargetX < target.x) {
-                        xMin = boundX;
-                    } else {
-                        xMax = boundX;
-                    }
-                }
-                finalBoundX = (xMin + xMax) / 2;
-
-                const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
-                const initialVelocity = new THREE.Vector3();
-                const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
-                initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
-                const velAtBoundY = (initialVelocity.y + GRAVITY(spin.y) / PHY) * Math.exp(-PHY * timeToBound) - GRAVITY(spin.y) / PHY;
-                const velAfterBounceY = velAtBoundY * -TABLE_E;
-                const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
-                const spinAfterBounce = new THREE.Vector2(spinAtBound.x * TABLE_COLLISION_SPIN_X_FACTOR, spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR);
-                const velAtBound = new THREE.Vector3();
-                const rot = spin.x / PHY * (1 - Math.exp(-PHY * timeToBound));
-                velAtBound.x = (initialVelocity.x * Math.cos(rot) - initialVelocity.z * Math.sin(rot)) * Math.exp(-PHY * timeToBound);
-                velAtBound.z = (initialVelocity.x * Math.sin(rot) + initialVelocity.z * Math.cos(rot)) * Math.exp(-PHY * timeToBound);
-                const velAfterBounceXZ = velAtBound.clone();
-                 const vCurrentXY = Math.hypot(velAfterBounceXZ.x, velAfterBounceXZ.z);
-                 if (vCurrentXY > 0) {
-                    velAfterBounceXZ.x += velAfterBounceXZ.x / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
-                    velAfterBounceXZ.z += velAfterBounceXZ.z / vCurrentXY * spinAtBound.y * TABLE_COLLISION_SPIN_Y_FACTOR;
-                 }
-                const timeBounceToTarget = this._getTimeToReachY(target.y, boundPoint, spinAfterBounce, velAfterBounceXZ).time;
-                const gAfterBounce = GRAVITY(spinAfterBounce.y);
-                const exp_phy_t1 = Math.exp(-PHY * timeBounceToTarget);
-                finalHeight = (TABLE_HEIGHT) +
-                    (velAfterBounceY + gAfterBounce / PHY) / PHY * (1 - exp_phy_t1) - gAfterBounce / PHY * timeBounceToTarget;
-
-                if (finalHeight > TABLE_HEIGHT) {
-                    vMax = vHorizontal;
-                } else {
-                    vMin = vHorizontal;
-                }
+                const result = this._calculateServeFinalState(vHorizontal, new THREE.Vector2(0, boundZ), spin, target, initialBallPos, initialBallPos2D);
+                finalHeight = result.finalHeight;
+                finalBoundX = result.finalX;
+                if (finalHeight > TABLE_HEIGHT) vMax = vHorizontal;
+                else vMin = vHorizontal;
             }
+             // --- End Binary search ---
 
-            if (Math.abs(finalHeight - TABLE_HEIGHT) > SERVE_CALC_HEIGHT_TOLERANCE) {
-                continue;
-            }
+            if (Math.abs(finalHeight - TABLE_HEIGHT) > SERVE_CALC_HEIGHT_TOLERANCE) continue;
 
+            const vHorizontal = (vMin + vMax) / 2;
             const boundPoint = new THREE.Vector2(finalBoundX, boundZ);
             const initialVelocity = new THREE.Vector3();
-            const vHorizontal = (vMin + vMax) / 2;
             const timeToBound = this._getTimeToReachTarget(boundPoint.clone().sub(initialBallPos2D), vHorizontal, spin, initialVelocity);
+            if (timeToBound >= UNREACHABLE_TIME) continue;
+
             initialVelocity.y = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToBound);
 
             const spinAtBound = spin.clone().multiplyScalar(Math.exp(-PHY * timeToBound));
@@ -562,15 +565,13 @@ export class Ball {
         }
 
         if (bestHorizontalSpeedSq > 0) {
-            // We found a solution. Return it.
             return bestVelocity;
-        } else {
-            // FALLBACK IMPLEMENTATION if no solution was found
-            console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
-            const fallbackVelocity = FALLBACK_SERVE_VELOCITY.clone();
-            fallbackVelocity.z *= player.side;
-            return fallbackVelocity;
         }
+
+        console.warn("targetToVS: Could not find a valid serve velocity. Using fallback.");
+        const fallbackVelocity = FALLBACK_SERVE_VELOCITY.clone();
+        fallbackVelocity.z *= player.side;
+        return fallbackVelocity;
     }
 
     private _calculateSimpleFallbackVelocity(relativeTarget: THREE.Vector2, distance: number): THREE.Vector3 {
@@ -589,40 +590,73 @@ export class Ball {
         const relativeTarget = target.clone().sub(initialBallPos2D);
         const distance = relativeTarget.length();
 
-        // By starting from the highest speed and going down, we prioritize the fastest, flattest shot.
-        for (let speed = RALLY_HIT_MAX_SPEED; speed > RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
+        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+
+        type CheckResult = THREE.Vector3 | 'UNREACHABLE' | null;
+
+        const checkSpeed = (speed: number): CheckResult => {
             const initialVelocityGuess = new THREE.Vector3();
-            // Use the PASSED IN spin parameter
             const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
 
             if (timeToTarget >= UNREACHABLE_TIME) {
-                continue; // This speed is not enough to reach the target
+                return 'UNREACHABLE';
             }
 
-            // Use the PASSED IN spin parameter
             const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
-
-            // Let's create the full initial velocity vector
             const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
-
-            // Use the PASSED IN spin parameter
             const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
 
-            // Check if the ball reaches the net before the target
             if (timeToNet < timeToTarget) {
-                // Use the PASSED IN spin parameter
                 const g = GRAVITY(spin.y);
                 const exp_phy_t_net = Math.exp(-PHY * timeToNet);
                 const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
-
-                // Does it clear the net by a small margin?
-                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN) {
-                    // This is a valid trajectory! Return this velocity.
+                if (heightAtNet > requiredNetClearance) {
                     return v0;
                 }
             }
+            return null; // Hits the net
+        };
+
+        let low = RALLY_HIT_MIN_SPEED;
+        let high = RALLY_HIT_MAX_SPEED;
+        let bestSolution: THREE.Vector3 | null = null;
+
+        for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
+            const midSpeed = (low + high) / 2;
+            if (midSpeed <= low || midSpeed >= high) break;
+
+            const result = checkSpeed(midSpeed);
+
+            if (result === 'UNREACHABLE') {
+                // Too slow, target is unreachable. Need more speed.
+                low = midSpeed;
+            } else if (result === null) {
+                // Too fast, hit the net. Need less speed.
+                high = midSpeed;
+            } else {
+                // Success! This is a valid trajectory.
+                // It becomes our current best, and we try for an even faster shot.
+                bestSolution = result;
+                low = midSpeed;
+            }
+
+            if (high - low < RALLY_CALC_PRECISION) {
+                break;
+            }
         }
 
+        // Final check: If the loop ended, but the last known 'bestSolution' was from a much
+        // slower speed, it's possible 'low' is now a valid, faster speed. Let's check it.
+        if (bestSolution) {
+             const finalCheck = checkSpeed(low);
+             if (finalCheck instanceof THREE.Vector3) {
+                 return finalCheck;
+             }
+             return bestSolution;
+        }
+
+
+        // If no solution found at all, fallback.
         return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
     }
 }
