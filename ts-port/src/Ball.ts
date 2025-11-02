@@ -74,7 +74,7 @@ const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
 const RALLY_HIT_MIN_SPEED = 5.0;
-const RALLY_HIT_SPEED_STEP = 1.0;
+const RALLY_HIT_SPEED_STEP = 0.5;
 const NET_CLEARANCE_MARGIN = 0.05;
 
 export class Ball {
