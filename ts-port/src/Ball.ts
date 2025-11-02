@@ -73,8 +73,8 @@ const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
 
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
-const RALLY_HIT_MIN_SPEED = 2.0; // Lowered further for drop shots
-const RALLY_HIT_SPEED_STEP = 0.5;
+const RALLY_HIT_MIN_SPEED = 5.0;
+const RALLY_HIT_SPEED_STEP = 1.0;
 const NET_CLEARANCE_MARGIN = 0.05;
 
 export class Ball {
@@ -582,49 +582,110 @@ export class Ball {
         return fallbackVelocity;
     }
 
-    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
-        const initialBallPos = this.mesh.position.clone();
+    private _findBestTrajectoryForAimPoint(
+        aimTarget: THREE.Vector2,
+        spin: THREE.Vector2,
+        initialBallPos: THREE.Vector3
+    ): { velocity: THREE.Vector3; landingPos: THREE.Vector3 } | null {
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
-        const relativeTarget = target.clone().sub(initialBallPos2D);
-        const distance = relativeTarget.length();
+        const relativeAimTarget = aimTarget.clone().sub(initialBallPos2D);
 
-        const RALLY_HIT_MAX_LAUNCH_ANGLE = Math.PI / 2; // 90 degrees for very high arcs
-        const RALLY_HIT_LAUNCH_ANGLE_STEP = 0.01; // ~0.57 degrees step for high precision
-        const RALLY_HIT_LANDING_TOLERANCE = 0.15;
+        const RALLY_HIT_MAX_LAUNCH_ANGLE = Math.PI / 2;
+        const RALLY_HIT_LAUNCH_ANGLE_STEP = 0.02;
+        const RALLY_HIT_MIN_SPEED = 4.0;
+        const RALLY_HIT_SPEED_STEP = 1.0;
 
-        // Search over a range of vertical launch angles (in radians)
-        for (let launch_angle = -0.2; launch_angle < RALLY_HIT_MAX_LAUNCH_ANGLE; launch_angle += RALLY_HIT_LAUNCH_ANGLE_STEP) {
-            // Search over a range of horizontal speeds
-            for (let speed = RALLY_HIT_MAX_SPEED; speed >= RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
-                const horizontal_v = speed * Math.cos(launch_angle);
+        // Find the single best trajectory for the given aim point without checking tolerance.
+        // We want the one that lands closest to the aim point.
+        let bestVelocity: THREE.Vector3 | null = null;
+        let bestLandingPos: THREE.Vector3 | null = null;
+        let minDistanceSq = Infinity;
+
+        for (let speed = RALLY_HIT_MAX_SPEED; speed >= RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
+            for (let launch_angle = 0; launch_angle < RALLY_HIT_MAX_LAUNCH_ANGLE; launch_angle += RALLY_HIT_LAUNCH_ANGLE_STEP) {
+                const horizontal_v_mag = speed * Math.cos(launch_angle);
                 const vertical_v = speed * Math.sin(launch_angle);
+                const direction = relativeAimTarget.clone().normalize();
+                const horizontal_v = new THREE.Vector3(direction.x, 0, direction.y).multiplyScalar(horizontal_v_mag);
+                const initialVelocity = new THREE.Vector3(horizontal_v.x, vertical_v, horizontal_v.z);
 
-                const initialVelocityGuess = new THREE.Vector3();
-                const timeToTarget = this._getTimeToReachTarget(relativeTarget, horizontal_v, spin, initialVelocityGuess);
+                const simBall = new Ball();
+                simBall.mesh.position.copy(initialBallPos);
+                simBall.velocity.copy(initialVelocity);
+                simBall.spin.copy(spin);
 
-                if (timeToTarget >= UNREACHABLE_TIME) {
-                    continue;
+                let passedNet = false;
+                let heightAtNet = 0;
+                let landingPos: THREE.Vector3 | null = null;
+
+                for (let j = 0; j < 250; j++) {
+                    const oldPos = simBall.mesh.position.clone();
+                    simBall._updatePhysics(TICK);
+
+                    if (oldPos.z >= 0 && simBall.mesh.position.z < 0) {
+                        passedNet = true;
+                        const t = oldPos.z / (oldPos.z - simBall.mesh.position.z);
+                        heightAtNet = oldPos.y + (simBall.mesh.position.y - oldPos.y) * t;
+                    }
+
+                    if (simBall.velocity.y < 0 && simBall.mesh.position.y <= TABLE_HEIGHT && simBall.mesh.position.z < 0) {
+                        if (passedNet && heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
+                            const t = (oldPos.y - TABLE_HEIGHT) / (oldPos.y - simBall.mesh.position.y);
+                            landingPos = oldPos.clone().lerp(simBall.mesh.position, t);
+                        }
+                        break;
+                    }
+                    if (simBall.mesh.position.y < -1) break;
                 }
 
-                const g = GRAVITY(spin.y);
-                const exp_phy_t_target = Math.exp(-PHY * timeToTarget);
-                const heightAtTarget = initialBallPos.y + (vertical_v + g / PHY) / PHY * (1 - exp_phy_t_target) - g / PHY * timeToTarget;
-
-                if (Math.abs(heightAtTarget - TABLE_HEIGHT) < RALLY_HIT_LANDING_TOLERANCE) {
-                    const v0 = new THREE.Vector3(initialVelocityGuess.x, vertical_v, initialVelocityGuess.z);
-                    const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
-
-                    if (timeToNet < timeToTarget) {
-                        const exp_phy_t_net = Math.exp(-PHY * timeToNet);
-                        const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
-
-                        if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT) {
-                            return v0;
-                        }
+                if (landingPos) {
+                    const distanceSq = new THREE.Vector2(landingPos.x, landingPos.z).distanceToSquared(aimTarget);
+                    if (distanceSq < minDistanceSq) {
+                        minDistanceSq = distanceSq;
+                        bestVelocity = initialVelocity;
+                        bestLandingPos = landingPos;
                     }
                 }
             }
         }
-        return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
+
+        if (bestVelocity && bestLandingPos) {
+            return { velocity: bestVelocity, landingPos: bestLandingPos };
+        }
+        return null;
+    }
+
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+        const initialBallPos = this.mesh.position.clone();
+        const RALLY_HIT_LANDING_TOLERANCE = 0.1;
+        const MAX_ITERATIONS = 5;
+
+        let aimTarget = target.clone();
+
+        for (let i = 0; i < MAX_ITERATIONS; i++) {
+            const trajectory = this._findBestTrajectoryForAimPoint(aimTarget, spin, initialBallPos);
+
+            if (!trajectory) {
+                // If the inner search can't even find a trajectory for the aim point, we can't continue.
+                break;
+            }
+
+            const { velocity, landingPos } = trajectory;
+            const errorVector = target.clone().sub(new THREE.Vector2(landingPos.x, landingPos.z));
+
+            if (errorVector.length() < RALLY_HIT_LANDING_TOLERANCE) {
+                // Success! The ball landed close enough to the real target.
+                return velocity;
+            }
+
+            // Refine the aim point for the next iteration by adding the error.
+            // This corrects for the curve/drift from the last shot.
+            aimTarget.add(errorVector);
+        }
+
+        // If the loop finishes without converging, use the fallback.
+        const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
+        const relativeTarget = target.clone().sub(initialBallPos2D);
+        return this._calculateSimpleFallbackVelocity(relativeTarget, relativeTarget.length());
     }
 }
