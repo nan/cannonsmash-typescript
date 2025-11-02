@@ -73,8 +73,9 @@ const FALLBACK_VELOCITY_Y_DISTANCE_FACTOR = 0.8;
 
 // Constants for the rally hit calculation
 const RALLY_HIT_MAX_SPEED = 30.0;
-const RALLY_HIT_MIN_SPEED = 2.0; // Lowered from 5.0 to search for slower, higher-arc shots
-const RALLY_HIT_SPEED_STEP = 1.0;
+const RALLY_HIT_MIN_SPEED = 0.5; // Lowered further to handle very slow shots like drop shots
+const RALLY_CALC_ITERATIONS = 20; // Renamed from SERVE_CALC_ITERATIONS for clarity
+const RALLY_CALC_PRECISION = 0.001; // Renamed from SERVE_CALC_PRECISION for clarity
 const NET_CLEARANCE_MARGIN = 0.05;
 
 export class Ball {
@@ -589,40 +590,73 @@ export class Ball {
         const relativeTarget = target.clone().sub(initialBallPos2D);
         const distance = relativeTarget.length();
 
-        // By starting from the highest speed and going down, we prioritize the fastest, flattest shot.
-        for (let speed = RALLY_HIT_MAX_SPEED; speed > RALLY_HIT_MIN_SPEED; speed -= RALLY_HIT_SPEED_STEP) {
+        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+
+        type CheckResult = THREE.Vector3 | 'UNREACHABLE' | null;
+
+        const checkSpeed = (speed: number): CheckResult => {
             const initialVelocityGuess = new THREE.Vector3();
-            // Use the PASSED IN spin parameter
             const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
 
             if (timeToTarget >= UNREACHABLE_TIME) {
-                continue; // This speed is not enough to reach the target
+                return 'UNREACHABLE';
             }
 
-            // Use the PASSED IN spin parameter
             const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
-
-            // Let's create the full initial velocity vector
             const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
-
-            // Use the PASSED IN spin parameter
             const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
 
-            // Check if the ball reaches the net before the target
             if (timeToNet < timeToTarget) {
-                // Use the PASSED IN spin parameter
                 const g = GRAVITY(spin.y);
                 const exp_phy_t_net = Math.exp(-PHY * timeToNet);
                 const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
-
-                // Does it clear the net by a small margin?
-                if (heightAtNet > TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN) {
-                    // This is a valid trajectory! Return this velocity.
+                if (heightAtNet > requiredNetClearance) {
                     return v0;
                 }
             }
+            return null; // Hits the net
+        };
+
+        let low = RALLY_HIT_MIN_SPEED;
+        let high = RALLY_HIT_MAX_SPEED;
+        let bestSolution: THREE.Vector3 | null = null;
+
+        for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
+            const midSpeed = (low + high) / 2;
+            if (midSpeed <= low || midSpeed >= high) break;
+
+            const result = checkSpeed(midSpeed);
+
+            if (result === 'UNREACHABLE') {
+                // Too slow, target is unreachable. Need more speed.
+                low = midSpeed;
+            } else if (result === null) {
+                // Too fast, hit the net. Need less speed.
+                high = midSpeed;
+            } else {
+                // Success! This is a valid trajectory.
+                // It becomes our current best, and we try for an even faster shot.
+                bestSolution = result;
+                low = midSpeed;
+            }
+
+            if (high - low < RALLY_CALC_PRECISION) {
+                break;
+            }
         }
 
+        // Final check: If the loop ended, but the last known 'bestSolution' was from a much
+        // slower speed, it's possible 'low' is now a valid, faster speed. Let's check it.
+        if (bestSolution) {
+             const finalCheck = checkSpeed(low);
+             if (finalCheck instanceof THREE.Vector3) {
+                 return finalCheck;
+             }
+             return bestSolution;
+        }
+
+
+        // If no solution found at all, fallback.
         return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
     }
 }
