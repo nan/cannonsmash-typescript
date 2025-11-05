@@ -3,10 +3,10 @@ import { TABLE_LENGTH, TABLE_WIDTH, TABLE_HEIGHT, TABLE_THICK, NET_HEIGHT, AREAX
 
 // --- Lighting Constants ---
 const DIR_LIGHT_COLOR = 0xFFFFFF;
-const DIR_LIGHT_INTENSITY = 3;
+const DIR_LIGHT_INTENSITY = 5;
 const DIR_LIGHT_POSITION = new THREE.Vector3(-1, 2, 4);
 const AMB_LIGHT_COLOR = 0x404040;
-const AMB_LIGHT_INTENSITY = 2;
+const AMB_LIGHT_INTENSITY = 4;
 
 // --- Field Element Constants ---
 const FLOOR_TEXTURE_REPEAT = 4;
