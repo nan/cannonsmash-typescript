@@ -128,6 +128,33 @@ export class Player {
 
         this.mesh.add(model);
 
+        // Convert all materials to MeshStandardMaterial to ensure they react to lighting
+        model.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const meshChild = child as THREE.Mesh;
+
+                const convertMaterial = (oldMat: THREE.Material): THREE.MeshStandardMaterial => {
+                    const newMat = new THREE.MeshStandardMaterial();
+                    // Copy essential properties from the old material
+                    if ((oldMat as any).color) {
+                        newMat.color.copy((oldMat as any).color);
+                    }
+                    if ((oldMat as any).map) {
+                        newMat.map = (oldMat as any).map;
+                    }
+                    // Ensure the new material is not transparent by default
+                    newMat.transparent = false;
+                    return newMat;
+                };
+
+                if (Array.isArray(meshChild.material)) {
+                    meshChild.material = meshChild.material.map(convertMaterial);
+                } else {
+                    meshChild.material = convertMaterial(meshChild.material);
+                }
+            }
+        });
+
         // Make the human player (side 1) semi-transparent
         if (this.side === 1) {
             model.traverse((child) => {
