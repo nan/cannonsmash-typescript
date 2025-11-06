@@ -6,7 +6,7 @@ const DIR_LIGHT_COLOR = 0xFFFFFF;
 const DIR_LIGHT_INTENSITY = 3;
 const DIR_LIGHT_POSITION = new THREE.Vector3(-1, 2, 4);
 const AMB_LIGHT_COLOR = 0x404040;
-const AMB_LIGHT_INTENSITY = 2;
+const AMB_LIGHT_INTENSITY = 5;
 
 // --- Field Element Constants ---
 const FLOOR_TEXTURE_REPEAT = 4;
