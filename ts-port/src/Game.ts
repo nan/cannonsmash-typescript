@@ -49,16 +49,18 @@ export class Game implements IGameScoringContext, IGameInputContext {
     public trajectoryVisualizer!: TrajectoryVisualizer;
     private scoreManager!: ScoreManager;
     private inputController!: InputController;
+    private uiManager?: UIManager;
     private prevBallStatus = 0;
 
     // Game state properties
     private currentMode!: IGameMode;
     private isPaused = false;
 
-    constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets) {
+    constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets, uiManager?: UIManager) {
         this.scene = scene;
         this.camera = camera;
         this.assets = assets;
+        this.uiManager = uiManager;
         this.trajectoryVisualizer = new TrajectoryVisualizer(this.scene);
         this.scoreManager = new ScoreManager(this);
         this.inputController = new InputController(this);
@@ -195,6 +197,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
 
     public returnToDemo(): void {
         this.resetGame(true);
+        this.uiManager?.showDemoScreen();
     }
 
 }
