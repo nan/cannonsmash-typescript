@@ -20,14 +20,12 @@ async function main() {
   camera.position.set(0, 1.2, 2.5);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x333333);
+  scene.background = new THREE.Color(0xaaaaaa);
 
   // --- Asset and Game Loading ---
   console.log("Loading assets...");
   const assets = await assetManager.loadAll();
   console.log("Assets loaded!");
-
-  const game = new Game(scene, camera, assets);
 
   // --- UI and Event Handling Setup ---
   const demoScreen = document.getElementById('demo-screen');
@@ -39,6 +37,8 @@ async function main() {
   }
 
   const uiManager = new UIManager(demoScreen, pauseScreen);
+
+  const game = new Game(scene, camera, assets, uiManager);
 
   // --- Event Listeners ---
 
