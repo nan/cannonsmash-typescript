@@ -26,7 +26,7 @@ export enum BallStatus {
 }
 
 import * as THREE from 'three';
-import type { Player } from './Player';
+import { type Player, ShotPower } from './Player';
 import { stype } from './SwingTypes';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, TICK } from './constants';
 import type { Game } from './Game';
@@ -583,80 +583,197 @@ export class Ball {
         return fallbackVelocity;
     }
 
-    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+    /**
+     * Calculates the time of flight to reach a specific vertical distance with a given initial vertical velocity.
+     * This is the inverse of `_getVz0ToReachTarget` and is solved using binary search.
+     * @param targetHeight The relative vertical distance to travel.
+     * @param vy The initial vertical velocity.
+     * @param spin The ball's spin (only the y-component is used).
+     * @returns The time in seconds.
+     */
+    private _getTimeToReachVerticalTarget(targetHeight: number, vy: number, spin: THREE.Vector2): number {
+        // The function `_getVz0ToReachTarget(h, spin, t)` is monotonically decreasing with respect to t.
+        // We can use binary search to find the `t` that produces the desired `vy`.
+        let low_t = 0.01;
+        let high_t = 5.0; // 5 seconds is a very long time for a single shot
+
+        for (let i = 0; i < RALLY_CALC_ITERATIONS + 10; i++) { // More iterations for better precision
+            if (high_t - low_t < TIME_PRECISION_THRESHOLD) break;
+            const mid_t = (low_t + high_t) / 2;
+            if (mid_t <= low_t || mid_t >= high_t) break;
+
+            const vy_for_midt = this._getVz0ToReachTarget(targetHeight, spin, mid_t);
+
+            // `vy_for_midt` decreases as `mid_t` increases.
+            if (vy_for_midt > vy) {
+                // The calculated `vy` is too high, which means our `t` is too small. Increase the lower bound.
+                low_t = mid_t;
+            } else {
+                // The calculated `vy` is too low, which means our `t` is too large. Decrease the upper bound.
+                high_t = mid_t;
+            }
+        }
+        return (low_t + high_t) / 2;
+    }
+
+    /**
+     * Calculates the horizontal speed required to travel a given horizontal distance in a specific time.
+     * This is the inverse of `_getTimeToReachTarget` and is solved using binary search.
+     * @param relativeTarget The 2D vector representing the horizontal distance to travel.
+     * @param time The required time of flight.
+     * @param spin The ball's spin.
+     * @returns An object containing the speed and the calculated velocity vector, or null if impossible.
+     */
+    private _getSpeedToReachHorizontalTarget(relativeTarget: THREE.Vector2, time: number, spin: THREE.Vector2): { speed: number, v_out: THREE.Vector3 } | null {
+        // The function `_getTimeToReachTarget` is monotonically decreasing with respect to speed.
+        // We can use binary search to find the `speed` that produces the desired `time`.
+        let low_v = RALLY_HIT_MIN_SPEED;
+        let high_v = RALLY_HIT_MAX_SPEED * 2; // Widen search space for safety
+        let last_valid_v_out: THREE.Vector3 | null = null;
+        let final_speed = RALLY_HIT_MIN_SPEED;
+
+        for (let i = 0; i < RALLY_CALC_ITERATIONS + 10; i++) {
+            if (high_v - low_v < RALLY_CALC_PRECISION) break;
+            const mid_v = (low_v + high_v) / 2;
+            if (mid_v <= low_v || mid_v >= high_v) break;
+
+            const v_out = new THREE.Vector3();
+            const time_for_midv = this._getTimeToReachTarget(relativeTarget, mid_v, spin, v_out);
+
+            // `time_for_midv` decreases as `mid_v` increases.
+            if (time_for_midv > time) {
+                // The calculated time is too long, meaning the speed is too low. Increase the lower bound.
+                low_v = mid_v;
+                last_valid_v_out = v_out;
+                final_speed = mid_v;
+            } else {
+                // The calculated time is too short (or unreachable), meaning speed is too high. Decrease the upper bound.
+                high_v = mid_v;
+            }
+        }
+
+        if (!last_valid_v_out) return null;
+
+        // Recalculate v_out with the final speed for accuracy.
+        const final_v_out = new THREE.Vector3();
+        this._getTimeToReachTarget(relativeTarget, final_speed, spin, final_v_out);
+
+        return { speed: final_speed, v_out: final_v_out };
+    }
+
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2, power: ShotPower = ShotPower.Medium): THREE.Vector3 {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
-
         const relativeTarget = target.clone().sub(initialBallPos2D);
         const distance = relativeTarget.length();
 
-        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+        // This function implements the user-specified algorithm for shot power.
+        // 1. Find a baseline velocity (v0) for a shot that just clears the net.
+        // 2. Modify the vertical component (vy) of v0 based on the desired power.
+        // 3. Recalculate the horizontal components (vx, vz) to ensure the ball still lands on target.
 
-        type CheckResult = THREE.Vector3 | 'UNREACHABLE' | null;
+        // STEP 1: Find the baseline velocity. We'll define this as the fastest possible
+        // shot that still clears the net by a small margin.
+        const findBaselineVelocity = (): THREE.Vector3 | null => {
+            const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+            let low = RALLY_HIT_MIN_SPEED;
+            let high = RALLY_HIT_MAX_SPEED;
+            let bestSolution: THREE.Vector3 | null = null;
 
-        const checkSpeed = (speed: number): CheckResult => {
-            const initialVelocityGuess = new THREE.Vector3();
-            const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
+            for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
+                const midSpeed = (low + high) / 2;
+                if (midSpeed <= low || midSpeed >= high) break;
 
-            if (timeToTarget >= UNREACHABLE_TIME) {
-                return 'UNREACHABLE';
-            }
-
-            const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
-            const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
-            const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
-
-            if (timeToNet < timeToTarget) {
-                const g = GRAVITY(spin.y);
-                const exp_phy_t_net = Math.exp(-PHY * timeToNet);
-                const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
-                if (heightAtNet > requiredNetClearance) {
-                    return v0;
+                const initialVelocityGuess = new THREE.Vector3();
+                const timeToTarget = this._getTimeToReachTarget(relativeTarget, midSpeed, spin, initialVelocityGuess);
+                if (timeToTarget >= UNREACHABLE_TIME) {
+                    low = midSpeed; // Too slow
+                    continue;
                 }
+
+                const targetHeight = TABLE_HEIGHT - initialBallPos.y;
+                const requiredVy = this._getVz0ToReachTarget(targetHeight, spin, timeToTarget);
+                const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
+                const { time: timeToNet } = this._getTimeToReachY(0, initialBallPos2D, spin, v0);
+
+                if (timeToNet < timeToTarget) {
+                    const g = GRAVITY(spin.y);
+                    const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - Math.exp(-PHY * timeToNet)) - g / PHY * timeToNet;
+                    if (heightAtNet > requiredNetClearance) {
+                        bestSolution = v0; // This speed is valid, try for a faster one
+                        low = midSpeed;
+                    } else {
+                        high = midSpeed; // Hit the net, too fast
+                    }
+                } else {
+                     low = midSpeed; // Doesn't cross net before target, too slow.
+                }
+                if (high - low < RALLY_CALC_PRECISION) break;
             }
-            return null; // Hits the net
+            return bestSolution;
         };
 
-        let low = RALLY_HIT_MIN_SPEED;
-        let high = RALLY_HIT_MAX_SPEED;
-        let bestSolution: THREE.Vector3 | null = null;
+        const baselineVelocity = findBaselineVelocity();
 
-        for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
-            const midSpeed = (low + high) / 2;
-            if (midSpeed <= low || midSpeed >= high) break;
+        if (!baselineVelocity) {
+            return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
+        }
 
-            const result = checkSpeed(midSpeed);
-
-            if (result === 'UNREACHABLE') {
-                // Too slow, target is unreachable. Need more speed.
-                low = midSpeed;
-            } else if (result === null) {
-                // Too fast, hit the net. Need less speed.
-                high = midSpeed;
-            } else {
-                // Success! This is a valid trajectory.
-                // It becomes our current best, and we try for an even faster shot.
-                bestSolution = result;
-                low = midSpeed;
-            }
-
-            if (high - low < RALLY_CALC_PRECISION) {
+        // STEP 2: Apply a multiplier to the vertical velocity based on the shot power.
+        const vy0 = baselineVelocity.y;
+        let powerMultiplier: number;
+        switch (power) {
+            case ShotPower.Strong:
+                powerMultiplier = 0.95;
                 break;
+            case ShotPower.Medium:
+                powerMultiplier = 0.9;
+                break;
+            case ShotPower.Weak:
+            default:
+                powerMultiplier = 0.8;
+                break;
+        }
+        const vy_new = vy0 * powerMultiplier;
+
+        // STEP 3: With the new `vy_new`, find the time it will take to reach the target height.
+        const targetHeight = TABLE_HEIGHT - initialBallPos.y;
+        const newTimeToTarget = this._getTimeToReachVerticalTarget(targetHeight, vy_new, spin);
+
+        if (newTimeToTarget >= UNREACHABLE_TIME || newTimeToTarget <= 0) {
+            // This can happen if the new vy is too low to ever reach the target height.
+            // Fallback to the original safe velocity.
+            return baselineVelocity;
+        }
+
+        // STEP 4: With the new time, find the required horizontal velocity to land on target.
+        const horizontalResult = this._getSpeedToReachHorizontalTarget(relativeTarget, newTimeToTarget, spin);
+
+        if (!horizontalResult) {
+             // This shouldn't happen if the time calculation was valid, but as a safeguard:
+            return baselineVelocity;
+        }
+
+        // STEP 5: Combine the new horizontal and vertical components for the final velocity.
+        const finalVelocity = new THREE.Vector3(
+            horizontalResult.v_out.x,
+            vy_new,
+            horizontalResult.v_out.z
+        );
+
+        // Final check: Does the new velocity still clear the net? If not, it's invalid.
+        const { time: timeToNet } = this._getTimeToReachY(0, initialBallPos2D, spin, finalVelocity);
+        if (timeToNet < newTimeToTarget) {
+            const g = GRAVITY(spin.y);
+            const heightAtNet = initialBallPos.y + (finalVelocity.y + g / PHY) / PHY * (1 - Math.exp(-PHY * timeToNet)) - g / PHY * timeToNet;
+            if (heightAtNet < TABLE_HEIGHT + NET_HEIGHT) {
+                // The new shot hits the net. This can happen if the original shot was very close to the net
+                // and the new, lower-`vy` trajectory is no longer valid.
+                // In this case, we fall back to the original baseline velocity.
+                return baselineVelocity;
             }
         }
 
-        // Final check: If the loop ended, but the last known 'bestSolution' was from a much
-        // slower speed, it's possible 'low' is now a valid, faster speed. Let's check it.
-        if (bestSolution) {
-             const finalCheck = checkSpeed(low);
-             if (finalCheck instanceof THREE.Vector3) {
-                 return finalCheck;
-             }
-             return bestSolution;
-        }
-
-
-        // If no solution found at all, fallback.
-        return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
+        return finalVelocity;
     }
 }

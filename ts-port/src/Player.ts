@@ -11,6 +11,11 @@ import type { Game } from './Game';
 import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
 
 // Player spin constants
+export enum ShotPower {
+    Weak,
+    Medium,
+    Strong,
+}
 export const SPIN_NORMAL = 0.4;
 export const SPIN_POKE = -0.8;
 export const SPIN_DRIVE = 0.8;
@@ -84,6 +89,7 @@ export class Player {
     public swingType: number = SWING_NORMAL;
     public swing: number = 0;
     public spin = new THREE.Vector2();
+    private shotPower: ShotPower = ShotPower.Medium;
 
     private assets: GameAssets;
     private mixer!: THREE.AnimationMixer;
@@ -367,13 +373,42 @@ export class Player {
         return true;
     }
 
-    public startForwardswing() {
+    public startForwardswing(power: ShotPower) {
         if (!this.isInBackswing || !this.currentAction) return false;
 
+        this.shotPower = power;
         this.isInBackswing = false;
-        this.currentAction.paused = false;
 
-        // The rest of the swing logic is handled by _updateSwing
+        const currentAnimationName = this.currentAction.getClip().name;
+        const isForehand = currentAnimationName.startsWith('F');
+
+        let newAnimationName: string;
+        if (isForehand) {
+            switch (power) {
+                case ShotPower.Weak: newAnimationName = 'Fcut'; break;
+                case ShotPower.Strong: newAnimationName = 'Fdrive'; break;
+                case ShotPower.Medium: default: newAnimationName = 'Fnormal'; break;
+            }
+        } else { // Backhand
+            switch (power) {
+                case ShotPower.Weak: newAnimationName = 'Bcut'; break;
+                // Bdrive animation doesn't exist, so fallback to normal for strong backhand shots.
+                case ShotPower.Strong:
+                case ShotPower.Medium:
+                default:
+                    newAnimationName = 'Bnormal';
+                    break;
+            }
+        }
+
+        // Only switch animations if the determined one is different from the provisional one.
+        if (newAnimationName !== currentAnimationName) {
+            this.playAnimation(newAnimationName, false);
+        } else {
+            // If the animation is the same, just unpause it.
+            this.currentAction.paused = false;
+        }
+
         return true;
     }
 
@@ -394,7 +429,7 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
-            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
+            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin, this.shotPower);
             if (this.isAi) { this.addError(velocity, ball); }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
