@@ -3,7 +3,7 @@
 import { inputManager } from './InputManager';
 import { TABLE_WIDTH, TABLE_LENGTH } from './constants';
 import { BallStatus } from './Ball';
-import type { Player } from './Player';
+import { Player, ShotPower } from './Player';
 import type { Ball } from './Ball';
 
 // An interface to define the dependencies InputController has on the main Game class.
@@ -69,12 +69,12 @@ export class InputController {
         } else {
             // --- Rally hit controls ---
             if (player1.isInBackswing) {
-                if (
-                    inputManager.isMouseButtonJustPressed(0) || // Left click
-                    inputManager.isMouseButtonJustPressed(1) || // Middle click
-                    inputManager.isMouseButtonJustPressed(2)    // Right click
-                ) {
-                    player1.startForwardswing();
+                if (inputManager.isMouseButtonJustPressed(0)) { // Left click
+                    player1.startForwardswing(ShotPower.WEAK, ball);
+                } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click
+                    player1.startForwardswing(ShotPower.MEDIUM, ball);
+                } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click
+                    player1.startForwardswing(ShotPower.STRONG, ball);
                 }
             }
         }

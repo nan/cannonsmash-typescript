@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
-import { Player } from './Player';
+import { Player, ShotPower } from './Player';
 import { stype, SWING_DRIVE, SWING_CUT } from './SwingTypes';
 import {
     TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK
@@ -293,7 +293,7 @@ export class AIController {
             playerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
 
             // It's time to hit!
-            this.player.startForwardswing();
+            this.player.startForwardswing(ShotPower.MEDIUM, this.ball);
         }
     }
 

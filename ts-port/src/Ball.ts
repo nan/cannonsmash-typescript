@@ -26,7 +26,7 @@ export enum BallStatus {
 }
 
 import * as THREE from 'three';
-import type { Player } from './Player';
+import { Player, ShotPower } from './Player';
 import { stype } from './SwingTypes';
 import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, TICK } from './constants';
 import type { Game } from './Game';
@@ -583,14 +583,30 @@ export class Ball {
         return fallbackVelocity;
     }
 
-    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2, shotPower: ShotPower): THREE.Vector3 {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
         const relativeTarget = target.clone().sub(initialBallPos2D);
         const distance = relativeTarget.length();
 
-        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+        let minSpeed = RALLY_HIT_MIN_SPEED;
+        let maxSpeed = RALLY_HIT_MAX_SPEED;
+        let netClearance = NET_CLEARANCE_MARGIN;
+
+        switch (shotPower) {
+            case ShotPower.WEAK:
+                maxSpeed = 10.0;
+                netClearance = 0.1;
+                break;
+            case ShotPower.STRONG:
+                minSpeed = 15.0;
+                maxSpeed = 40.0;
+                netClearance = 0.02;
+                break;
+        }
+
+        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + netClearance;
 
         type CheckResult = THREE.Vector3 | 'UNREACHABLE' | null;
 
@@ -617,8 +633,8 @@ export class Ball {
             return null; // Hits the net
         };
 
-        let low = RALLY_HIT_MIN_SPEED;
-        let high = RALLY_HIT_MAX_SPEED;
+        let low = minSpeed;
+        let high = maxSpeed;
         let bestSolution: THREE.Vector3 | null = null;
 
         for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {

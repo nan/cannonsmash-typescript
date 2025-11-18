@@ -66,6 +66,12 @@ const SERVE_HIT_LEVEL = 0.9;
 
 export type PlayerState = 'IDLE' | 'BACKSWING' | 'SWING_DRIVE' | 'SWING_CUT';
 
+export enum ShotPower {
+    WEAK,
+    MEDIUM,
+    STRONG,
+}
+
 export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
@@ -84,6 +90,7 @@ export class Player {
     public swingType: number = SWING_NORMAL;
     public swing: number = 0;
     public spin = new THREE.Vector2();
+    public shotPower: ShotPower = ShotPower.MEDIUM;
 
     private assets: GameAssets;
     private mixer!: THREE.AnimationMixer;
@@ -332,7 +339,6 @@ export class Player {
 
     public startBackswing(ball: Ball, spinCategory: number) {
         if (this.swing > 0 || this.isInBackswing) return false;
-
         const isForehand = spinCategory === 3;
         const tmpBall = ball.clone();
         for (let i = 0; i < SHORT_SIMULATION_FRAMES_SWING; i++) {
@@ -367,11 +373,39 @@ export class Player {
         return true;
     }
 
-    public startForwardswing() {
+    public startForwardswing(shotPower: ShotPower, ball: Ball) {
         if (!this.isInBackswing || !this.currentAction) return false;
 
+        this.shotPower = shotPower;
         this.isInBackswing = false;
-        this.currentAction.paused = false;
+
+        const isForehand = (this.mesh.position.x - ball.mesh.position.x) * this.side < 0;
+        let animationName: string;
+        switch (shotPower) {
+            case ShotPower.WEAK:
+                animationName = isForehand ? 'Fcut' : 'Bcut';
+                break;
+            case ShotPower.STRONG:
+                animationName = isForehand ? 'Fdrive' : 'Bnormal'; // No Bdrive animation, fallback to Bnormal
+                break;
+            case ShotPower.MEDIUM:
+            default:
+                animationName = isForehand ? 'Fnormal' : 'Bnormal';
+                break;
+        }
+
+        // If the determined animation is different from the one playing, switch it.
+        if (this.currentAction.getClip().name !== animationName) {
+            this.playAnimation(animationName, false);
+        }
+
+        // Resume the (potentially new) animation.
+        if (this.currentAction) {
+            // A rough estimation to start from the peak of the backswing.
+            const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
+            this.currentAction.time = backswingPeakTime;
+            this.currentAction.paused = false;
+        }
 
         // The rest of the swing logic is handled by _updateSwing
         return true;
@@ -394,7 +428,7 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
-            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
+            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin, this.shotPower);
             if (this.isAi) { this.addError(velocity, ball); }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
