@@ -413,11 +413,13 @@ export class Player {
                 const newAction = this.mixer.clipAction(newClip);
                 newAction.setLoop(THREE.LoopOnce, 0);
                 newAction.clampWhenFinished = true;
-                newAction.play();
 
-                // Unpause the old action right before crossfading to ensure a smooth transition.
+                // Manually synchronize time, unpause the old animation, and fade between them.
+                newAction.time = oldAction.time;
                 oldAction.paused = false;
-                oldAction.crossFadeTo(newAction, ANIMATION_FADE_DURATION, true);
+
+                oldAction.fadeOut(ANIMATION_FADE_DURATION);
+                newAction.fadeIn(ANIMATION_FADE_DURATION).play();
 
                 this.currentAction = newAction;
             } else {
