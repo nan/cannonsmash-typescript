@@ -377,9 +377,10 @@ export class Player {
         if (!this.isInBackswing || !this.currentAction) return false;
 
         this.shotPower = power;
-        this.isInBackswing = false;
+        this.isInBackswing = false; // The forward swing is now initiated
 
-        const currentAnimationName = this.currentAction.getClip().name;
+        const oldAction = this.currentAction;
+        const currentAnimationName = oldAction.getClip().name;
         const isForehand = currentAnimationName.startsWith('F');
 
         let newAnimationName: string;
@@ -401,12 +402,29 @@ export class Player {
             }
         }
 
-        // Only switch animations if the determined one is different from the provisional one.
-        if (newAnimationName !== currentAnimationName) {
-            this.playAnimation(newAnimationName, false);
+        // If the animation is the same, just unpause it to continue the swing.
+        if (newAnimationName === currentAnimationName) {
+            oldAction.paused = false;
         } else {
-            // If the animation is the same, just unpause it.
-            this.currentAction.paused = false;
+            // If the animation needs to change, we'll cross-fade to the new one,
+            // warping it to the current time of the old animation.
+            const newClip = this.animationClips[newAnimationName];
+            if (newClip) {
+                const newAction = this.mixer.clipAction(newClip);
+                newAction.setLoop(THREE.LoopOnce, 0);
+                newAction.clampWhenFinished = true;
+                newAction.play();
+
+                // Unpause the old action right before crossfading to ensure a smooth transition.
+                oldAction.paused = false;
+                oldAction.crossFadeTo(newAction, ANIMATION_FADE_DURATION, true);
+
+                this.currentAction = newAction;
+            } else {
+                // As a fallback, if the new animation doesn't exist, just continue the old one.
+                console.warn(`Animation clip not found: "${newAnimationName}". Resuming provisional swing.`);
+                oldAction.paused = false;
+            }
         }
 
         return true;
