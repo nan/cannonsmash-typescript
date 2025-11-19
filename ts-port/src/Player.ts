@@ -380,6 +380,10 @@ export class Player {
         this.isInBackswing = false; // The forward swing is now initiated
 
         const oldAction = this.currentAction;
+        // The fix: Unpause the current (backswing) animation *before* doing anything else.
+        // This prevents the mixer from trying to transition from a paused state, which causes the T-pose bug.
+        oldAction.paused = false;
+
         const currentAnimationName = oldAction.getClip().name;
         const isForehand = currentAnimationName.startsWith('F');
 
@@ -402,30 +406,26 @@ export class Player {
             }
         }
 
-        // If the animation is the same, just unpause it to continue the swing.
+        // If the animation is the same, we've already unpaused it, so we're done.
         if (newAnimationName === currentAnimationName) {
-            oldAction.paused = false;
+            // The action is already unpaused from above.
         } else {
-            // If the animation needs to change, we'll cross-fade to the new one,
-            // warping it to the current time of the old animation.
+            // If the animation needs to change, we'll cross-fade to the new one.
             const newClip = this.animationClips[newAnimationName];
             if (newClip) {
                 const newAction = this.mixer.clipAction(newClip);
                 newAction.setLoop(THREE.LoopOnce, 0);
                 newAction.clampWhenFinished = true;
 
-                // Manually synchronize time, unpause the old animation, and fade between them.
-                newAction.time = oldAction.time;
-                oldAction.paused = false;
-
+                // The old action is already playing. We just need to fade it out
+                // and fade the new one in. The mixer handles synchronization.
                 oldAction.fadeOut(ANIMATION_FADE_DURATION);
                 newAction.fadeIn(ANIMATION_FADE_DURATION).play();
 
                 this.currentAction = newAction;
             } else {
-                // As a fallback, if the new animation doesn't exist, just continue the old one.
+                // As a fallback, if the new animation doesn't exist, we just continue the old one (which is already unpaused).
                 console.warn(`Animation clip not found: "${newAnimationName}". Resuming provisional swing.`);
-                oldAction.paused = false;
             }
         }
 
