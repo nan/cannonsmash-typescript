@@ -368,6 +368,41 @@ export class Player {
         return true;
     }
 
+    public updateBackswing(ball: Ball, spinCategory: number) {
+        if (!this.isInBackswing) return;
+
+        const isForehand = spinCategory === 3;
+        const tmpBall = ball.clone();
+        for (let i = 0; i < SHORT_SIMULATION_FRAMES_SWING; i++) {
+            const oldPos = tmpBall.mesh.position.clone();
+            tmpBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
+            tmpBall.checkCollision(oldPos);
+        }
+        const newSwingType = this.determineSwingType(tmpBall, isForehand);
+        let animationName: string;
+        switch (newSwingType) {
+            case SWING_DRIVE: animationName = 'Fdrive'; break;
+            case SWING_SMASH: animationName = 'Fsmash'; break;
+            case SWING_CUT: animationName = isForehand ? 'Fcut' : 'Bcut'; break;
+            case SWING_POKE: animationName = isForehand ? 'Fpeck' : 'Bpeck'; break;
+            case SWING_NORMAL:
+            default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
+        }
+
+        // If the animation needs to change
+        if (this.swingType !== newSwingType || (this.currentAction && this.currentAction.getClip().name !== animationName)) {
+            this.swingType = newSwingType;
+            this.playAnimation(animationName, false);
+
+            // Pause the animation at the peak of the backswing
+            if (this.currentAction) {
+                this.currentAction.paused = true;
+                const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
+                this.currentAction.time = backswingPeakTime;
+            }
+        }
+    }
+
     public startForwardswing(strength: number = 1.0) {
         if (!this.isInBackswing || !this.currentAction) return false;
 
