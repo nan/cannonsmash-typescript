@@ -39,6 +39,8 @@ async function main() {
   const uiManager = new UIManager(demoScreen, pauseScreen);
 
   const game = new Game(scene, camera, assets, uiManager);
+  // @ts-ignore
+  window.game = game; // Expose for testing
 
   // --- Event Listeners ---
 

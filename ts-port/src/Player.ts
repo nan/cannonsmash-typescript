@@ -11,11 +11,6 @@ import type { Game } from './Game';
 import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
 
 // Player spin constants
-export enum ShotPower {
-    Weak,
-    Medium,
-    Strong,
-}
 export const SPIN_NORMAL = 0.4;
 export const SPIN_POKE = -0.8;
 export const SPIN_DRIVE = 0.8;
@@ -89,7 +84,6 @@ export class Player {
     public swingType: number = SWING_NORMAL;
     public swing: number = 0;
     public spin = new THREE.Vector2();
-    private shotPower: ShotPower = ShotPower.Medium;
 
     private assets: GameAssets;
     private mixer!: THREE.AnimationMixer;
@@ -373,62 +367,13 @@ export class Player {
         return true;
     }
 
-    public startForwardswing(power: ShotPower) {
+    public startForwardswing() {
         if (!this.isInBackswing || !this.currentAction) return false;
 
-        this.shotPower = power;
-        this.isInBackswing = false; // The forward swing is now initiated
+        this.isInBackswing = false;
+        this.currentAction.paused = false;
 
-        const oldAction = this.currentAction;
-        // The fix: Unpause the current (backswing) animation *before* doing anything else.
-        // This prevents the mixer from trying to transition from a paused state, which causes the T-pose bug.
-        oldAction.paused = false;
-
-        const currentAnimationName = oldAction.getClip().name;
-        const isForehand = currentAnimationName.startsWith('F');
-
-        let newAnimationName: string;
-        if (isForehand) {
-            switch (power) {
-                case ShotPower.Weak: newAnimationName = 'Fcut'; break;
-                case ShotPower.Strong: newAnimationName = 'Fdrive'; break;
-                case ShotPower.Medium: default: newAnimationName = 'Fnormal'; break;
-            }
-        } else { // Backhand
-            switch (power) {
-                case ShotPower.Weak: newAnimationName = 'Bcut'; break;
-                // Bdrive animation doesn't exist, so fallback to normal for strong backhand shots.
-                case ShotPower.Strong:
-                case ShotPower.Medium:
-                default:
-                    newAnimationName = 'Bnormal';
-                    break;
-            }
-        }
-
-        // If the animation is the same, we've already unpaused it, so we're done.
-        if (newAnimationName === currentAnimationName) {
-            // The action is already unpaused from above.
-        } else {
-            // If the animation needs to change, we'll cross-fade to the new one.
-            const newClip = this.animationClips[newAnimationName];
-            if (newClip) {
-                const newAction = this.mixer.clipAction(newClip);
-                newAction.setLoop(THREE.LoopOnce, 0);
-                newAction.clampWhenFinished = true;
-
-                // The old action is already playing. We just need to fade it out
-                // and fade the new one in. The mixer handles synchronization.
-                oldAction.fadeOut(ANIMATION_FADE_DURATION);
-                newAction.fadeIn(ANIMATION_FADE_DURATION).play();
-
-                this.currentAction = newAction;
-            } else {
-                // As a fallback, if the new animation doesn't exist, we just continue the old one (which is already unpaused).
-                console.warn(`Animation clip not found: "${newAnimationName}". Resuming provisional swing.`);
-            }
-        }
-
+        // The rest of the swing logic is handled by _updateSwing
         return true;
     }
 
@@ -449,7 +394,7 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
-            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin, this.shotPower);
+            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
             if (this.isAi) { this.addError(velocity, ball); }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
