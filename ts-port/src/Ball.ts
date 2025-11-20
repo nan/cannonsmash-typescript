@@ -659,4 +659,48 @@ export class Ball {
         // If no solution found at all, fallback.
         return this._calculateSimpleFallbackVelocity(relativeTarget, distance);
     }
+
+    /**
+     * Calculates the required 3D velocity to hit the target with a specific horizontal speed.
+     * @param target The target position on the table (2D).
+     * @param speed The desired horizontal speed.
+     * @param spin The spin to apply.
+     * @returns The calculated 3D velocity, or null if unreachable or hits the net.
+     */
+    public calculateVelocityForHorizontalSpeed(target: THREE.Vector2, speed: number, spin: THREE.Vector2): THREE.Vector3 | null {
+        const initialBallPos = this.mesh.position.clone();
+        const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
+        const relativeTarget = target.clone().sub(initialBallPos2D);
+        
+        const initialVelocityGuess = new THREE.Vector3();
+        const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
+
+        if (timeToTarget >= UNREACHABLE_TIME) {
+            return null;
+        }
+
+        const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
+        const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
+        
+        // Check net clearance
+        const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
+        const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
+
+        if (timeToNet < timeToTarget) {
+            const g = GRAVITY(spin.y);
+            const exp_phy_t_net = Math.exp(-PHY * timeToNet);
+            const heightAtNet = initialBallPos.y + (v0.y + g / PHY) / PHY * (1 - exp_phy_t_net) - g / PHY * timeToNet;
+            if (heightAtNet > requiredNetClearance) {
+                return v0;
+            }
+        } else {
+             // Doesn't cross the net plane (e.g. target is on the same side), technically valid if it hits the target?
+             // But for a rally hit, we usually expect it to cross the net.
+             // However, if the target is on the other side, timeToNet should be < timeToTarget.
+             // If timeToNet > timeToTarget, it means the ball hits the target before the net? That's weird for a rally.
+             // Let's assume if it clears the net check or doesn't need to cross it (unlikely for rally), it's valid.
+             return v0;
+        }
+        return null;
+    }
 }

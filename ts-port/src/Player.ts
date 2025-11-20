@@ -19,11 +19,11 @@ export const SPIN_SMASH = 0.2;
 
 // Corresponds to SERVEPARAM in Player.h
 export const SERVEPARAM: number[][] = [
-    [SERVE_NORMAL,     0.0, 0.0,  0.0,  0.1,  0.0,  0.2],
-    [SERVE_POKE,       0.0, 0.0,  0.0, -0.3,  0.0, -0.6],
-    [SERVE_SIDESPIN1, -0.6, 0.2, -0.8,  0.0, -0.6, -0.2],
-    [SERVE_SIDESPIN2,  0.6, 0.2,  0.8,  0.0,  0.6, -0.2],
-    [-1,               0.0, 0.0,  0.0,  0.0,  0.0,  0.0]
+    [SERVE_NORMAL, 0.0, 0.0, 0.0, 0.1, 0.0, 0.2],
+    [SERVE_POKE, 0.0, 0.0, 0.0, -0.3, 0.0, -0.6],
+    [SERVE_SIDESPIN1, -0.6, 0.2, -0.8, 0.0, -0.6, -0.2],
+    [SERVE_SIDESPIN2, 0.6, 0.2, 0.8, 0.0, 0.6, -0.2],
+    [-1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ];
 
 // --- Status System Constants (from Player.h) ---
@@ -84,6 +84,7 @@ export class Player {
     public swingType: number = SWING_NORMAL;
     public swing: number = 0;
     public spin = new THREE.Vector2();
+    public intendedShotStrength: number = 1.0;
 
     private assets: GameAssets;
     private mixer!: THREE.AnimationMixer;
@@ -367,11 +368,12 @@ export class Player {
         return true;
     }
 
-    public startForwardswing() {
+    public startForwardswing(strength: number = 1.0) {
         if (!this.isInBackswing || !this.currentAction) return false;
 
         this.isInBackswing = false;
         this.currentAction.paused = false;
+        this.intendedShotStrength = strength;
 
         // The rest of the swing logic is handled by _updateSwing
         return true;
@@ -394,7 +396,20 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
-            const velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
+            let velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
+
+            // Apply shot strength if it's not a full power shot
+            if (this.intendedShotStrength < 1.0) {
+                const horizontalVelocity = new THREE.Vector2(velocity.x, velocity.z);
+                const currentSpeed = horizontalVelocity.length();
+                const targetSpeed = currentSpeed * this.intendedShotStrength;
+
+                const adjustedVelocity = ball.calculateVelocityForHorizontalSpeed(this.targetPosition, targetSpeed, this.spin);
+                if (adjustedVelocity) {
+                    velocity = adjustedVelocity;
+                }
+            }
+
             if (this.isAi) { this.addError(velocity, ball); }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;

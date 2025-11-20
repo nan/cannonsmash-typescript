@@ -69,12 +69,12 @@ export class InputController {
         } else {
             // --- Rally hit controls ---
             if (player1.isInBackswing) {
-                if (
-                    inputManager.isMouseButtonJustPressed(0) || // Left click
-                    inputManager.isMouseButtonJustPressed(1) || // Middle click
-                    inputManager.isMouseButtonJustPressed(2)    // Right click
-                ) {
-                    player1.startForwardswing();
+                if (inputManager.isMouseButtonJustPressed(0)) { // Left click - Weak
+                    player1.startForwardswing(0.7);
+                } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click - Medium
+                    player1.startForwardswing(0.8);
+                } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click - Strong
+                    player1.startForwardswing(0.9);
                 }
             }
         }
