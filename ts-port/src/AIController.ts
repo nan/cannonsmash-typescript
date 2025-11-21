@@ -3,7 +3,7 @@ import { Ball } from './Ball';
 import { Player } from './Player';
 import { stype, SWING_DRIVE, SWING_CUT } from './SwingTypes';
 import {
-    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK
+    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK, AILevel
 } from './constants';
 import type { Game } from './Game';
 import { BallStatus } from './Ball';
@@ -31,10 +31,10 @@ const AI_TARGET_DEPTH_DEEP_NUMERATOR = 6;
 const AI_TARGET_DEPTH_DEEP_DENOMINATOR = 16;
 
 // Rally Targeting: X-coordinate zones
-const AI_TARGET_X_MAX_FACTOR = 7/16;
+const AI_TARGET_X_MAX_FACTOR = 7 / 16;
 // Corresponds to `switch(RAND(8))` in the original C++ code.
 const AI_TARGET_X_ZONE_FACTORS = [
-    -AI_TARGET_X_MAX_FACTOR, -5/16, -3/16, -1/16, 1/16, 3/16, 5/16, AI_TARGET_X_MAX_FACTOR
+    -AI_TARGET_X_MAX_FACTOR, -5 / 16, -3 / 16, -1 / 16, 1 / 16, 3 / 16, 5 / 16, AI_TARGET_X_MAX_FACTOR
 ];
 
 // --- AI Behavior Constants ---
@@ -56,6 +56,7 @@ export class AIController {
     private player: Player;
     private ball: Ball;
     private opponent: Player;
+    private level: AILevel;
 
     // C++版の _prevBallstatus に相当。ボールの状態変化を検知するために使用。
     private prevBallStatus: number = 0;
@@ -75,11 +76,12 @@ export class AIController {
     private readonly HITTING_ZONE_NEAR_BOUNDARY = -0.6;
     private readonly WAIT_FOR_BETTER_SHOT_MARGIN = 0.01;
 
-    constructor(game: Game, player: Player, ball: Ball, opponent: Player) {
+    constructor(game: Game, player: Player, ball: Ball, opponent: Player, level: AILevel = AILevel.NORMAL) {
         this.game = game;
         this.player = player;
         this.ball = ball;
         this.opponent = opponent;
+        this.level = level;
 
         // 初期位置を設定
         this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -111,7 +113,11 @@ export class AIController {
             // 3. If ready, perform the serve.
             if (isStable && isAtPosition && this.player.swing === 0) {
                 // Set a specific target for the serve
-                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * AI_SERVE_TARGET_X_RANDOM_FACTOR);
+                let randomFactor = AI_SERVE_TARGET_X_RANDOM_FACTOR;
+                if (this.level === AILevel.HARD) {
+                    randomFactor *= 1.5; // Harder serves have more variance/risk
+                }
+                const targetX = (Math.random() - 0.5) * (TABLE_WIDTH * randomFactor);
                 const targetZ = (TABLE_LENGTH / AI_SERVE_TARGET_DEPTH_DIVISOR) * -this.player.side;
                 this.player.targetPosition.set(targetX, targetZ);
 
@@ -360,7 +366,15 @@ export class AIController {
      */
     private setRallyTarget(simBall: Ball) {
         // --- 1. Target X Calculation (based on SetTargetX) ---
-        const width = TABLE_WIDTH / 2; // LEVEL_NORMAL相当
+        let width = TABLE_WIDTH / 2;
+        if (this.level === AILevel.EASY) {
+            width *= 0.6; // Aim more centrally
+        } else if (this.level === AILevel.HARD) {
+            width *= 1.0; // Use full width (corners)
+        } else {
+            width *= 0.8; // Normal
+        }
+
         const randIndex = Math.floor(Math.random() * AI_TARGET_X_ZONE_FACTORS.length);
         let targetX = width * AI_TARGET_X_ZONE_FACTORS[randIndex];
 

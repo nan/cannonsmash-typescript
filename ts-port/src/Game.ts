@@ -6,7 +6,7 @@ import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
 import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH } from './constants';
+import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, AILevel } from './constants';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 import { UIManager } from './UIManager';
@@ -55,6 +55,8 @@ export class Game implements IGameScoringContext, IGameInputContext {
     // Game state properties
     private currentMode!: IGameMode;
     private isPaused = false;
+    private aiLevel: AILevel = AILevel.NORMAL;
+
 
     constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, assets: GameAssets, uiManager?: UIManager) {
         this.scene = scene;
@@ -68,10 +70,12 @@ export class Game implements IGameScoringContext, IGameInputContext {
     }
 
 
-    private resetGame(isDemo: boolean) {
+    private resetGame(isDemo: boolean, aiLevel: AILevel = AILevel.NORMAL) {
         this.currentMode = isDemo ? new DemoMode() : new PlayMode();
         this.isPaused = false;
+        this.aiLevel = aiLevel;
         this.scoreManager.reset();
+
 
         // Clear previous game objects from the scene
         if (this.player1) this.scene.remove(this.player1.mesh);
@@ -84,20 +88,22 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets, isDemo, 1);
+        this.player1 = new Player(this.assets, isDemo, 1, AILevel.NORMAL); // Player 1 is Human (or Demo AI), level doesn't matter much but keep normal
         this.scene.add(this.player1.mesh);
 
-        this.player2 = new Player(this.assets, true, -1); // Player2 is always AI
+        this.player2 = new Player(this.assets, true, -1, this.aiLevel); // Player2 is always AI
         this.scene.add(this.player2.mesh);
+
 
         this.ball = new Ball();
         this.scene.add(this.ball.mesh);
 
         // Create AI controllers where needed
         if (this.player1.isAi) {
-            this.player1.aiController = new AIController(this, this.player1, this.ball, this.player2);
+            this.player1.aiController = new AIController(this, this.player1, this.ball, this.player2, AILevel.NORMAL);
         }
-        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1);
+        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1, this.aiLevel);
+
 
         // Position them
         this.player1.mesh.position.set(0, PLAYER_INITIAL_Y, TABLE_LENGTH / 2 + PLAYER_Z_OFFSET);
@@ -187,9 +193,10 @@ export class Game implements IGameScoringContext, IGameInputContext {
         return this.currentMode instanceof DemoMode;
     }
 
-    public start(): void {
-        this.resetGame(false);
+    public start(aiLevel: AILevel = AILevel.NORMAL): void {
+        this.resetGame(false, aiLevel);
     }
+
 
     public pause(): void {
         this.isPaused = true;
