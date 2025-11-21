@@ -3,6 +3,7 @@ import { assetManager } from './AssetManager';
 import { Game } from './Game';
 import { UIManager } from './UIManager';
 import { CAMERA_FOV } from './CameraManager';
+import { AILevel } from './constants';
 
 async function main() {
   // --- Basic Three.js setup ---
@@ -46,8 +47,15 @@ async function main() {
     uiManager.showDemoScreen();
   });
 
-  demoScreen.addEventListener('click', () => {
-    game.start();
+  demoScreen.addEventListener('click', (event) => {
+    // Prevent starting if clicking on the select element itself
+    if ((event.target as HTMLElement).tagName === 'SELECT' || (event.target as HTMLElement).tagName === 'LABEL') {
+      return;
+    }
+
+    const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
+    const level = parseInt(levelSelect.value) as AILevel;
+    game.start(level);
     uiManager.showGameScreen();
     canvas.requestPointerLock();
   });

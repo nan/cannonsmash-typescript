@@ -12,3 +12,9 @@ export const AREAYSIZE = 12.0;
 export const AREAZSIZE = 6.0;
 
 export const TICK = 0.01; // Original fixed time step
+
+export enum AILevel {
+    EASY = 0,
+    NORMAL = 1,
+    HARD = 2
+}

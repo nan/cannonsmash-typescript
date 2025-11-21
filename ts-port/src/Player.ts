@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, TICK,
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, TICK, AILevel
 } from './constants';
 import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
@@ -34,6 +34,33 @@ export const SWING_PENALTY = -1;
 export const WALK_SPEED = 1.0;
 export const WALK_BONUS = 1;
 export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EASY, NORMAL, HARD, TSUBORISH}
+// We will map AILevel to indices 0, 1, 2 of ACCEL_LIMIT for now.
+// EASY -> 0 (0.8 - loose limit, stable) ? Wait, original code comment says EASY is 0.8.
+// Let's check the logic.
+// if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > ACCEL_LIMIT[3]) { this.addStatus(ACCEL_PENALTY); }
+// The original code used ACCEL_LIMIT[gameLevel].
+// If gameLevel is EASY (0), limit is 0.8 (High limit, hard to exceed -> Stable).
+// If gameLevel is HARD (2), limit is 0.6 (Low limit, easy to exceed -> Unstable).
+// So HARD AI should have a LOWER limit to make it harder?
+// Wait, if AI is HARD, it should be BETTER at playing.
+// If the limit is lower, it gets penalized more easily.
+// So a "Strong" AI should probably have a HIGHER limit (or be immune to it).
+// But the user wants "Strong" AI to be "Stronger".
+// Let's look at the plan:
+// "Weak AI: Uses stricter acceleration limit (e.g., 0.5)... leading to more errors."
+// "Strong AI: Uses looser acceleration limit (e.g., 0.8)..."
+// So:
+// Weak AI -> Low Limit (e.g. 0.5)
+// Strong AI -> High Limit (e.g. 0.8)
+//
+// Existing ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5];
+// Index 0 (0.8) is the most stable.
+// Index 3 (0.5) is the least stable.
+// So we should map:
+// AILevel.EASY -> Index 3 (0.5) [Unstable]
+// AILevel.NORMAL -> Index 1 (0.7) [Normal]
+// AILevel.HARD -> Index 0 (0.8) [Stable]
+
 export const ACCEL_PENALTY = -1;
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
@@ -59,7 +86,8 @@ const PLAYER_VELOCITY_LERP_FACTOR = 0.1;
 const AUTO_MOVE_DISTANCE_THRESHOLD = 0.05;
 
 const AI_ERROR_POSITION_SENSITIVITY = 0.3;
-const AI_ERROR_MAX_ANGLE_RAD = Math.PI / 12;
+// AI_ERROR_MAX_ANGLE_RAD is now dynamic based on level
+
 
 const SERVE_HIT_LEVEL = 0.9;
 
@@ -77,6 +105,7 @@ export class Player {
     public predictedHitPosition = new THREE.Vector2();
     public side: number;
     public aiController?: AIController;
+    public level: AILevel = AILevel.NORMAL;
 
     public status: number;
     public statusMax: number;
@@ -95,10 +124,11 @@ export class Player {
     private readonly RALLY_MAX_SPEED = 4.0;
     private readonly POSITIONING_MAX_SPEED = 1.0;
 
-    constructor(assets: GameAssets, isAi = false, side: number = 1) {
+    constructor(assets: GameAssets, isAi = false, side: number = 1, level: AILevel = AILevel.NORMAL) {
         this.assets = assets;
         this.isAi = isAi;
         this.side = side;
+        this.level = level;
         this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
 
         this.mesh = new THREE.Group();
@@ -574,7 +604,14 @@ export class Player {
         const xDiff = (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY;
         const yDiff = (playerPos.z - ballPos.z) / AI_ERROR_POSITION_SENSITIVITY;
         let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
-        radDiff *= (this.statusMax - this.status) / this.statusMax * AI_ERROR_MAX_ANGLE_RAD;
+        let maxErrorRad = Math.PI / 12; // Default Normal
+        if (this.level === AILevel.EASY) {
+            maxErrorRad = Math.PI / 10; // 18 degrees
+        } else if (this.level === AILevel.HARD) {
+            maxErrorRad = Math.PI / 60; // 3 degrees
+        }
+
+        radDiff *= (this.statusMax - this.status) / this.statusMax * maxErrorRad;
         const vl = v.length();
         if (vl === 0) return;
         const n1 = new THREE.Vector3();
@@ -600,6 +637,19 @@ export class Player {
         this.status = this.statusMax;
     }
 
+    private getAccelLimit(): number {
+        // Map AILevel to ACCEL_LIMIT
+        // EASY -> Unstable -> Low Limit -> Index 3 (0.5)
+        // NORMAL -> Normal -> Index 1 (0.7)
+        // HARD -> Stable -> High Limit -> Index 0 (0.8)
+        switch (this.level) {
+            case AILevel.EASY: return ACCEL_LIMIT[3]; // 0.5
+            case AILevel.NORMAL: return ACCEL_LIMIT[1]; // 0.7
+            case AILevel.HARD: return Infinity; // No penalty for Hard AI
+            default: return ACCEL_LIMIT[1];
+        }
+    }
+
     public update(deltaTime: number, ball: Ball, game: Game) {
         this.prevVelocity.copy(this.velocity);
         this._updateSwing(ball);
@@ -613,7 +663,7 @@ export class Player {
         }
         if (this.velocity.length() > RUN_SPEED) { this.addStatus(RUN_PENALTY); }
         if (this.velocity.length() < WALK_SPEED) { this.addStatus(WALK_BONUS); }
-        if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > ACCEL_LIMIT[3]) { this.addStatus(ACCEL_PENALTY); }
+        if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > this.getAccelLimit()) { this.addStatus(ACCEL_PENALTY); }
         if (ball.status === BallStatus.DEAD || ball.status === BallStatus.WAITING_FOR_SERVE) { this.resetStatus(); }
     }
 }
