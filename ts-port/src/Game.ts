@@ -15,6 +15,7 @@ import { DemoMode } from './modes/DemoMode';
 import { PlayMode } from './modes/PlayMode';
 import { ScoreManager, type IGameScoringContext } from './ScoreManager';
 import { InputController, type IGameInputContext } from './InputController';
+import { PlayerType } from './PlayerTypes';
 
 // --- Game Setup Constants ---
 const PLAYER_INITIAL_Y = 0.77;
@@ -70,7 +71,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
     }
 
 
-    private resetGame(isDemo: boolean, aiLevel: AILevel = AILevel.NORMAL) {
+    private resetGame(isDemo: boolean, aiLevel: AILevel = AILevel.NORMAL, p1Type: PlayerType = PlayerType.SHAKE_DRIVE, p2Type: PlayerType = PlayerType.PEN_DRIVE) {
         this.currentMode = isDemo ? new DemoMode() : new PlayMode();
         this.isPaused = false;
         this.aiLevel = aiLevel;
@@ -88,10 +89,11 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets, isDemo, 1, AILevel.NORMAL); // Player 1 is Human (or Demo AI), level doesn't matter much but keep normal
+        this.player1 = new Player(this.assets, isDemo, 1, AILevel.NORMAL, p1Type); // Player 1 is Human (or Demo AI)
         this.scene.add(this.player1.mesh);
 
-        this.player2 = new Player(this.assets, true, -1, this.aiLevel); // Player2 is always AI
+        // Player2 is always AI.
+        this.player2 = new Player(this.assets, true, -1, this.aiLevel, p2Type);
         this.scene.add(this.player2.mesh);
 
 
@@ -193,8 +195,8 @@ export class Game implements IGameScoringContext, IGameInputContext {
         return this.currentMode instanceof DemoMode;
     }
 
-    public start(aiLevel: AILevel = AILevel.NORMAL): void {
-        this.resetGame(false, aiLevel);
+    public start(aiLevel: AILevel = AILevel.NORMAL, p1Type: PlayerType = PlayerType.SHAKE_DRIVE, p2Type: PlayerType = PlayerType.PEN_DRIVE): void {
+        this.resetGame(false, aiLevel, p1Type, p2Type);
     }
 
 

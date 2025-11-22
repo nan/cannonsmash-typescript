@@ -54,8 +54,14 @@ async function main() {
     }
 
     const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
+    const p1TypeSelect = document.getElementById('p1-type-select') as HTMLSelectElement;
+    const p2TypeSelect = document.getElementById('p2-type-select') as HTMLSelectElement;
+
     const level = parseInt(levelSelect.value) as AILevel;
-    game.start(level);
+    const p1Type = parseInt(p1TypeSelect.value);
+    const p2Type = parseInt(p2TypeSelect.value);
+
+    game.start(level, p1Type, p2Type);
     uiManager.showGameScreen();
     canvas.requestPointerLock();
   });

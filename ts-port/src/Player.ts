@@ -9,12 +9,14 @@ import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
 import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
+import { PlayerType, PLAYER_TYPES, type PlayerAttributes } from './PlayerTypes';
 
 // Player spin constants
 export const SPIN_NORMAL = 0.4;
 export const SPIN_POKE = -0.8;
 export const SPIN_DRIVE = 0.8;
 export const SPIN_SMASH = 0.2;
+export const SPIN_CUT = -0.8;
 
 
 // Corresponds to SERVEPARAM in Player.h
@@ -114,6 +116,8 @@ export class Player {
     public swing: number = 0;
     public spin = new THREE.Vector2();
     public intendedShotStrength: number = 1.0;
+    public playerType: PlayerType;
+    public attributes: PlayerAttributes;
 
     private assets: GameAssets;
     private mixer!: THREE.AnimationMixer;
@@ -124,11 +128,13 @@ export class Player {
     private readonly RALLY_MAX_SPEED = 4.0;
     private readonly POSITIONING_MAX_SPEED = 1.0;
 
-    constructor(assets: GameAssets, isAi = false, side: number = 1, level: AILevel = AILevel.NORMAL) {
+    constructor(assets: GameAssets, isAi = false, side: number = 1, level: AILevel = AILevel.NORMAL, playerType: PlayerType = PlayerType.SHAKE_DRIVE) {
         this.assets = assets;
         this.isAi = isAi;
         this.side = side;
         this.level = level;
+        this.playerType = playerType;
+        this.attributes = PLAYER_TYPES.get(this.playerType) || PLAYER_TYPES.get(PlayerType.SHAKE_DRIVE)!;
         this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
 
         this.mesh = new THREE.Group();
@@ -325,22 +331,101 @@ export class Player {
 
     private determineSwingType(ball: Ball, isForehand: boolean): number {
         this.spin.x = 0.0;
+        let validSwings: number[] = [];
+
+        // 1. Identify valid swings based on physics/geometry
         if (this.canHitBall(ball)) {
             const ballPos = ball.mesh.position;
             const ballSpinY = ball.spin.y;
-            if (Math.abs(ballPos.x) < TABLE_WIDTH / 2 && Math.abs(ballPos.z) < TABLE_LENGTH / 2 && (ballPos.y - TABLE_HEIGHT - NET_HEIGHT) / Math.abs(ballPos.z) < NET_HEIGHT / (TABLE_LENGTH / 2) * 0.5) {
-                if (ballSpinY < 0) { this.spin.y = SPIN_POKE; return SWING_POKE; }
-                else { this.spin.y = SPIN_NORMAL; return SWING_NORMAL; }
-            } else if (ballPos.y < TABLE_HEIGHT + NET_HEIGHT) {
-                if (isForehand) { this.spin.y = SPIN_DRIVE; return SWING_DRIVE; }
-                else {
-                    if (ballSpinY < 0) { this.spin.y = SPIN_POKE; return SWING_POKE; }
-                    else { this.spin.y = SPIN_NORMAL; return SWING_NORMAL; }
+
+            // Zone-based Valid Swings Logic
+            const netTopY = TABLE_HEIGHT + NET_HEIGHT;
+            const tableEndZ = TABLE_LENGTH / 2;
+            const netZ = 0;
+
+            // Calculate diagonal boundary Y at ball's Z
+            // Line from (0, netTopY) to (tableEndZ, TABLE_HEIGHT)
+            // Slope m = (y2 - y1) / (x2 - x1)
+            const slope = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
+            const boundaryY = slope * (Math.abs(ballPos.z) - netZ) + netTopY;
+
+            if (ballPos.y >= netTopY) {
+                // High Area
+                validSwings.push(SWING_SMASH, SWING_DRIVE);
+            } else {
+                if (Math.abs(ballPos.z) <= tableEndZ) {
+                    // Near Areas
+                    if (ballPos.y < boundaryY) {
+                        // Near-Low Area
+                        validSwings.push(SWING_POKE, SWING_NORMAL);
+                    } else {
+                        // Near-Middle Area
+                        validSwings.push(SWING_POKE, SWING_DRIVE, SWING_NORMAL);
+                    }
+                } else {
+                    // Far Areas
+                    if (ballPos.y < boundaryY) {
+                        // Far-Low Area
+                        validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL);
+                    } else {
+                        // Far-Middle Area
+                        validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL, SWING_SMASH);
+                    }
                 }
-            } else if (Math.abs(ballPos.z) < TABLE_LENGTH / 2 + 1.0 && ballPos.y > TABLE_HEIGHT + NET_HEIGHT) {
-                this.spin.y = SPIN_SMASH; return SWING_SMASH;
-            } else { this.spin.y = SPIN_NORMAL; return SWING_NORMAL; }
-        } else { this.spin.y = SPIN_NORMAL; return SWING_NORMAL; }
+            }
+        } else {
+            validSwings.push(SWING_NORMAL);
+        }
+
+        // 2. Select swing based on Player Type and Conditions (Deterministic)
+        let selectedSwing = SWING_NORMAL;
+
+        // Helper to check if a swing is valid
+        const isValid = (s: number) => validSwings.includes(s);
+
+        switch (this.playerType) {
+            case PlayerType.PEN_ATTACK:
+                // Penholder Fast Attack: Aggressive, favors Smash > Drive > Poke
+                if (isValid(SWING_SMASH)) { selectedSwing = SWING_SMASH; }
+                else if (isValid(SWING_DRIVE)) { selectedSwing = SWING_DRIVE; }
+                else if (isValid(SWING_POKE)) { selectedSwing = SWING_POKE; }
+                else { selectedSwing = SWING_NORMAL; }
+                break;
+
+            case PlayerType.PEN_DRIVE:
+                // Penholder Drive: Powerful loops, favors Drive > Smash > Poke
+                if (isValid(SWING_DRIVE)) { selectedSwing = SWING_DRIVE; }
+                else if (isValid(SWING_SMASH)) { selectedSwing = SWING_SMASH; }
+                else if (isValid(SWING_POKE)) { selectedSwing = SWING_POKE; }
+                else { selectedSwing = SWING_NORMAL; }
+                break;
+
+            case PlayerType.SHAKE_DEFENCE:
+                // Shakehand Defence: Cut (Chop) > Poke > Block/Normal
+                if (isValid(SWING_CUT)) { selectedSwing = SWING_CUT; }
+                else if (isValid(SWING_POKE)) { selectedSwing = SWING_POKE; }
+                else if (isValid(SWING_BLOCK)) { selectedSwing = SWING_BLOCK; }
+                else { selectedSwing = SWING_NORMAL; }
+                break;
+
+            case PlayerType.SHAKE_DRIVE:
+            default:
+                // Shakehand Drive: Balanced Attack, Drive > Smash > Poke
+                if (isValid(SWING_DRIVE)) { selectedSwing = SWING_DRIVE; }
+                else if (isValid(SWING_SMASH)) { selectedSwing = SWING_SMASH; }
+                else if (isValid(SWING_POKE)) { selectedSwing = SWING_POKE; }
+                else { selectedSwing = SWING_NORMAL; }
+                break;
+        }
+
+        // Set spin based on selected swing
+        if (selectedSwing === SWING_POKE) { this.spin.y = SPIN_POKE; }
+        else if (selectedSwing === SWING_DRIVE) { this.spin.y = SPIN_DRIVE; }
+        else if (selectedSwing === SWING_SMASH) { this.spin.y = SPIN_SMASH; }
+        else if (selectedSwing === SWING_CUT) { this.spin.y = SPIN_CUT; }
+        else { this.spin.y = SPIN_NORMAL; }
+
+        return selectedSwing;
     }
 
     public getPredictedSwing(ball: Ball): { swingType: number, spinCategory: number } {
@@ -408,7 +493,21 @@ export class Player {
             tmpBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
             tmpBall.checkCollision(oldPos);
         }
+
+        // Check if the side (Forehand/Backhand) has changed.
+        // We infer the current side from the playing animation.
+        const currentAnimName = this.currentAction ? this.currentAction.getClip().name : '';
+        const isCurrentAnimForehand = currentAnimName.startsWith('F');
+
+        // If the side matches, we don't need to change anything.
+        // This prevents flickering caused by re-rolling the probabilistic swing type every frame.
+        if (isForehand === isCurrentAnimForehand) {
+            return;
+        }
+
+        // Side changed! We must re-evaluate the swing type for the new side.
         const newSwingType = this.determineSwingType(tmpBall, isForehand);
+
         let animationName: string;
         switch (newSwingType) {
             case SWING_DRIVE: animationName = 'Fdrive'; break;
@@ -419,17 +518,15 @@ export class Player {
             default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
         }
 
-        // If the animation needs to change
-        if (this.swingType !== newSwingType || (this.currentAction && this.currentAction.getClip().name !== animationName)) {
-            this.swingType = newSwingType;
-            this.playAnimation(animationName, false);
+        // Update the animation
+        this.swingType = newSwingType;
+        this.playAnimation(animationName, false);
 
-            // Pause the animation at the peak of the backswing
-            if (this.currentAction) {
-                this.currentAction.paused = true;
-                const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
-                this.currentAction.time = backswingPeakTime;
-            }
+        // Pause the animation at the peak of the backswing
+        if (this.currentAction) {
+            this.currentAction.paused = true;
+            const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
+            this.currentAction.time = backswingPeakTime;
         }
     }
 
@@ -461,13 +558,27 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
+            // Apply Player Type adjustments BEFORE calculation
+            let shotStrength = this.intendedShotStrength;
+
+            if (this.playerType === PlayerType.PEN_DRIVE) {
+                // Stronger topspin on Forehand (Drive/Smash)
+                if (this.swingType === SWING_DRIVE || this.swingType === SWING_SMASH) {
+                    this.spin.y *= 1.5; // Increase topspin
+                }
+                // Slower speed on Backhand (Poke/Block/Normal if backhand)
+                if (this.swingType === SWING_POKE || this.swingType === SWING_BLOCK || this.swingType === SWING_NORMAL) {
+                    shotStrength *= 0.8;
+                }
+            }
+
             let velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
 
             // Apply shot strength if it's not a full power shot
-            if (this.intendedShotStrength < 1.0) {
+            if (shotStrength < 1.0) {
                 const horizontalVelocity = new THREE.Vector2(velocity.x, velocity.z);
                 const currentSpeed = horizontalVelocity.length();
-                const targetSpeed = currentSpeed * this.intendedShotStrength;
+                const targetSpeed = currentSpeed * shotStrength;
 
                 const adjustedVelocity = ball.calculateVelocityForHorizontalSpeed(this.targetPosition, targetSpeed, this.spin);
                 if (adjustedVelocity) {
@@ -481,6 +592,7 @@ export class Player {
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }
+
     }
 
     private isOpponentHit(ball: Ball): boolean {
@@ -661,8 +773,8 @@ export class Player {
         if (swingParams) {
             if (this.swing > swingParams.backswing) { this.addStatus(SWING_PENALTY); }
         }
-        if (this.velocity.length() > RUN_SPEED) { this.addStatus(RUN_PENALTY); }
-        if (this.velocity.length() < WALK_SPEED) { this.addStatus(WALK_BONUS); }
+        if (this.velocity.length() > RUN_SPEED * this.attributes.runSpeed) { this.addStatus(RUN_PENALTY); }
+        if (this.velocity.length() < WALK_SPEED * this.attributes.walkSpeed) { this.addStatus(WALK_BONUS); }
         if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > this.getAccelLimit()) { this.addStatus(ACCEL_PENALTY); }
         if (ball.status === BallStatus.DEAD || ball.status === BallStatus.WAITING_FOR_SERVE) { this.resetStatus(); }
     }

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
 import { stype, SWING_DRIVE, SWING_CUT } from './SwingTypes';
+import { PlayerType } from './PlayerTypes';
 import {
-    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK, AILevel
+    TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK, AILevel, NET_HEIGHT
 } from './constants';
 import type { Game } from './Game';
 import { BallStatus } from './Ball';
@@ -44,8 +45,8 @@ const AI_MIN_SWING_FRAME_DELAY = 1;
 
 // --- AI Prediction Constants ---
 const AI_PREDICTION_INVALID_HEIGHT = -1.0;
-const AI_PREDICTION_MAX_FRAMES = 500;
-const AI_PREDICTION_TIME_STEP = 0.02; // 50Hz simulation
+const AI_PREDICTION_MAX_FRAMES = 1000; // Increased for 100Hz simulation (10s)
+const AI_PREDICTION_TIME_STEP = 0.02; // Keep for reference or other uses, but getOptimalHitPoint now uses TICK
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
@@ -65,7 +66,7 @@ export class AIController {
 
     // AIの挙動を制御する定数
     private readonly HOME_POSITION_X = 0.0;
-    private readonly HOME_POSITION_Y = (TABLE_LENGTH / 2 + 0.5);
+    private HOME_POSITION_Y = (TABLE_LENGTH / 2 + 0.5);
     private readonly RACKET_OFFSET_X = 0.3;
     private readonly MOVEMENT_ACCELERATION = 0.1;
     private readonly PLANTED_SWING_START_FRAME = 11;
@@ -82,6 +83,14 @@ export class AIController {
         this.ball = ball;
         this.opponent = opponent;
         this.level = level;
+
+        // Adjust Home Position based on Player Type
+        if (this.player.playerType === PlayerType.PEN_DRIVE) {
+            // PenDrive stands further back to allow for full swings (loops)
+            this.HOME_POSITION_Y = (TABLE_LENGTH / 2 + 1.0);
+        } else {
+            this.HOME_POSITION_Y = (TABLE_LENGTH / 2 + 0.5);
+        }
 
         // 初期位置を設定
         this.predictedHitPosition.x = this.HOME_POSITION_X;
@@ -139,6 +148,10 @@ export class AIController {
 
         // 3. スイング開始の判断
         if (this.player.isInBackswing) {
+            // Continuously update backswing to handle ball movement (e.g. switching Forehand/Backhand)
+            const { spinCategory } = this.player.getPredictedSwing(this.ball);
+            this.player.updateBackswing(this.ball, spinCategory);
+
             this.tryForwardSwing();
         } else if (this.player.swing === 0 && this.player.canInitiateSwing(this.ball)) {
             this.tryBackswing();
@@ -167,9 +180,29 @@ export class AIController {
             // For serving, always use the forehand side for positioning.
             idealRacketX = playerPos.x + racketOffsetX;
         } else {
+            let forehandBias = 0;
+            if (this.player.playerType === PlayerType.PEN_ATTACK || this.player.playerType === PlayerType.PEN_DRIVE) {
+                forehandBias = 0.2; // Favor forehand by making backhand seem further away
+            }
+
             const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
-            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX));
-            idealRacketX = (forehandDist < backhandDist) ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX)) + forehandBias;
+
+            let useForehand = forehandDist < backhandDist;
+
+            // Pivot Logic for PEN_DRIVE:
+            // If the ball is on the backhand side but we have enough time to move around it,
+            // force Forehand to execute a Drive (Pivot/Round-the-head).
+            if (this.player.playerType === PlayerType.PEN_DRIVE && !useForehand && timeToHit > 0.0) {
+                // Check if we can reach the forehand position in time
+                const requiredSpeed = forehandDist / timeToHit;
+                // Use 90% of max speed as a safety margin
+                if (requiredSpeed < this.RALLY_MAX_SPEED * 0.9) {
+                    useForehand = true;
+                }
+            }
+
+            idealRacketX = useForehand ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
         }
 
         // スイングの特定フレームでは、移動計算を停止して体を安定させる
@@ -178,37 +211,41 @@ export class AIController {
         } else {
             if (timeToHit > 0.0) {
                 // 【ラリー中の移動】予測時間に基づいて目標速度を計算し、そこに向けて加速する
+                const acceleration = this.MOVEMENT_ACCELERATION * (this.player.attributes.acceleration || 1.0);
+
                 const targetVx = (this.predictedHitPosition.x - idealRacketX) / timeToHit;
-                if (targetVx > playerVel.x + this.MOVEMENT_ACCELERATION) {
-                    playerVel.x += this.MOVEMENT_ACCELERATION;
-                } else if (targetVx < playerVel.x - this.MOVEMENT_ACCELERATION) {
-                    playerVel.x -= this.MOVEMENT_ACCELERATION;
+                if (targetVx > playerVel.x + acceleration) {
+                    playerVel.x += acceleration;
+                } else if (targetVx < playerVel.x - acceleration) {
+                    playerVel.x -= acceleration;
                 } else {
                     playerVel.x = targetVx;
                 }
 
                 const targetVz = (this.predictedHitPosition.y - playerPos.z) / timeToHit;
-                if (targetVz > playerVel.z + this.MOVEMENT_ACCELERATION) {
-                    playerVel.z += this.MOVEMENT_ACCELERATION;
-                } else if (targetVz < playerVel.z - this.MOVEMENT_ACCELERATION) {
-                    playerVel.z -= this.MOVEMENT_ACCELERATION;
+                if (targetVz > playerVel.z + acceleration) {
+                    playerVel.z += acceleration;
+                } else if (targetVz < playerVel.z - acceleration) {
+                    playerVel.z -= acceleration;
                 } else {
                     playerVel.z = targetVz;
                 }
             } else {
                 // 【ポジショニング中の移動】カスタムブレーキロジックを用いて目標地点へ移動
+                const acceleration = this.MOVEMENT_ACCELERATION * (this.player.attributes.acceleration || 1.0);
+
                 const distanceX = this.predictedHitPosition.x - idealRacketX;
-                if (playerVel.x * Math.abs(playerVel.x * this.MOVEMENT_ACCELERATION) / 2 < distanceX) {
-                    playerVel.x += this.MOVEMENT_ACCELERATION;
+                if (playerVel.x * Math.abs(playerVel.x * acceleration) / 2 < distanceX) {
+                    playerVel.x += acceleration;
                 } else {
-                    playerVel.x -= this.MOVEMENT_ACCELERATION;
+                    playerVel.x -= acceleration;
                 }
 
                 const distanceZ = this.predictedHitPosition.y - playerPos.z;
-                if (playerVel.z * Math.abs(playerVel.z * this.MOVEMENT_ACCELERATION) / 2 < distanceZ) {
-                    playerVel.z += this.MOVEMENT_ACCELERATION;
+                if (playerVel.z * Math.abs(playerVel.z * acceleration) / 2 < distanceZ) {
+                    playerVel.z += acceleration;
                 } else {
-                    playerVel.z -= this.MOVEMENT_ACCELERATION;
+                    playerVel.z -= acceleration;
                 }
             }
         }
@@ -309,7 +346,7 @@ export class AIController {
      */
     private calculateHitArea() {
         if (this.player.canInitiateSwing(this.ball)) {
-            const top = this.getBallTop();
+            const top = this.getOptimalHitPoint();
             if (top.maxHeight > 0) {
                 this.predictedHitPosition.copy(top.position);
             }
@@ -325,30 +362,36 @@ export class AIController {
     }
 
     /**
-     * C++版の GetBallTop に相当。
-     * 物理シミュレーションを行い、ボールが自コートでバウンドした後の最高到達点を予測する。
-     * @returns ボールの最高到達点の高さと、その時の2D座標
+     * C++版の GetBallTop に相当するが、戦型に応じて最適な打点を計算するように拡張。
+     * 物理シミュレーションを行い、ボールが自コートでバウンドした後の最適な打点を予測する。
+     * @returns 最適な打点の高さと、その時の2D座標
      */
-    private getBallTop(): { maxHeight: number; position: THREE.Vector2 } {
+    private getOptimalHitPoint(): { maxHeight: number; position: THREE.Vector2 } {
         const simBall = this.ball.clone();
         let maxHeight = AI_PREDICTION_INVALID_HEIGHT;
         const peakPosition = new THREE.Vector2();
+        let peakFrame = -1;
+        const trajectory: { pos: THREE.Vector3, frame: number }[] = [];
 
         // 最大500フレーム（10秒）先までシミュレーション
         for (let i = 0; i < AI_PREDICTION_MAX_FRAMES; i++) {
             // ボールが自コートでバウンドした後の状態かチェック
             if ((simBall.status === BallStatus.RALLY_TO_AI && this.player.side === -1) ||
                 (simBall.status === BallStatus.RALLY_TO_HUMAN && this.player.side === 1)) {
+
+                trajectory.push({ pos: simBall.mesh.position.clone(), frame: i });
+
                 // 最高到達点を更新
                 if (simBall.mesh.position.y > maxHeight) {
                     maxHeight = simBall.mesh.position.y;
                     peakPosition.x = simBall.mesh.position.x;
                     peakPosition.y = simBall.mesh.position.z; // 2D座標のyは3Dのz
+                    peakFrame = i;
                 }
             }
             // 1フレーム分の物理演算を進める
             const oldPos = simBall.mesh.position.clone();
-            simBall._updatePhysics(AI_PREDICTION_TIME_STEP); // 50Hz
+            simBall._updatePhysics(TICK); // Use TICK (0.01) for consistency with game loop
             simBall.checkCollision(oldPos);
 
             // ボールがデッド状態になったらシミュレーション終了
@@ -356,6 +399,32 @@ export class AIController {
                 break;
             }
         }
+
+        // PenDrive Logic: If it's a long ball, look for a point where the ball has dropped slightly.
+        if (this.player.playerType === PlayerType.PEN_DRIVE && maxHeight > 0) {
+            // Define "Long Ball" as peaking deeper than 1/4 of the table length (approx).
+            // Table half length is ~1.37m. 
+            const peakZ = Math.abs(peakPosition.y);
+            const isLongBall = peakZ > TABLE_LENGTH / 4;
+
+            if (isLongBall) {
+                const targetDrop = 0.05; // Drop only 5cm below peak
+                // Ensure target is at least above the net top (TABLE_HEIGHT + NET_HEIGHT)
+                // We add a small margin (0.05) to be safe.
+                const minHeight = TABLE_HEIGHT + NET_HEIGHT + 0.05;
+                const targetHeight = Math.max(maxHeight - targetDrop, minHeight);
+
+                // Find the frame after peak where height is closest to targetHeight
+                for (let i = 0; i < trajectory.length; i++) {
+                    if (trajectory[i].frame > peakFrame) {
+                        if (trajectory[i].pos.y <= targetHeight) {
+                            return { maxHeight: trajectory[i].pos.y, position: new THREE.Vector2(trajectory[i].pos.x, trajectory[i].pos.z) };
+                        }
+                    }
+                }
+            }
+        }
+
         return { maxHeight, position: peakPosition };
     }
 
