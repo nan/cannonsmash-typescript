@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { TICK } from './constants';
 import { stype, SWING_NORMAL } from './SwingTypes';
 
-const MAX_TRAJECTORY_POINTS = 300;
+
 const OPTIMAL_HIT_MARKER_COLOR = 0xff0000;
 const TRAJECTORY_LINE_COLOR = 0x888888; // Thinner line color
 const TRAJECTORY_TUBE_COLOR = 0x00ff00; // Thicker line color

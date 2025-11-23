@@ -61,7 +61,7 @@ async function main() {
     const p1Type = parseInt(p1TypeSelect.value);
     const p2Type = parseInt(p2TypeSelect.value);
 
-    game.start(level, p1Type, p2Type);
+    game.start(level, p1Type as any, p2Type as any);
     uiManager.showGameScreen();
     canvas.requestPointerLock();
   });

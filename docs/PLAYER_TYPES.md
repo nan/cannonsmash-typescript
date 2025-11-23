@@ -38,7 +38,7 @@ AIのスイングは、以下の2段階のプロセスで決定されます。
 *   **High Area**: スマッシュ、ドライブ
 *   **Near Low Area**: ツッツキ、Normal
 *   **Near Middle Area**: ツッツキ、ドライブ、Normal
-*   **Far Middle Area**: カット、ドライブ、Normal、スマッシュ
+*   **Far Middle Area**: カット、ドライブ、Normal
 *   **Far Low Area**: カット、ドライブ、Normal
 
 ### 2. 優先順位による選択 (Deterministic Selection)

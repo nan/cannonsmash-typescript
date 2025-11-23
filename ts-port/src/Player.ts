@@ -1,14 +1,15 @@
-// ts-port/src/Player.ts (New Version)
 import * as THREE from 'three';
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, TABLE_WIDTH, NET_HEIGHT, TICK, AILevel
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, NET_HEIGHT, AILevel
 } from './constants';
 import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
 import type { Game } from './Game';
-import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2, type SwingType } from './SwingTypes';
+import { stype, SWING_NORMAL, SWING_POKE, SWING_SMASH, SWING_DRIVE, SWING_CUT, SWING_BLOCK, SERVE_MIN, SERVE_MAX, SERVE_NORMAL, SERVE_POKE, SERVE_SIDESPIN1, SERVE_SIDESPIN2 } from './SwingTypes';
 import { PlayerType, PLAYER_TYPES, type PlayerAttributes } from './PlayerTypes';
 
 // Player spin constants
@@ -17,7 +18,6 @@ export const SPIN_POKE = -0.8;
 export const SPIN_DRIVE = 0.8;
 export const SPIN_SMASH = 0.2;
 export const SPIN_CUT = -0.8;
-
 
 // Corresponds to SERVEPARAM in Player.h
 export const SERVEPARAM: number[][] = [
@@ -36,36 +36,7 @@ export const SWING_PENALTY = -1;
 export const WALK_SPEED = 1.0;
 export const WALK_BONUS = 1;
 export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EASY, NORMAL, HARD, TSUBORISH}
-// We will map AILevel to indices 0, 1, 2 of ACCEL_LIMIT for now.
-// EASY -> 0 (0.8 - loose limit, stable) ? Wait, original code comment says EASY is 0.8.
-// Let's check the logic.
-// if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > ACCEL_LIMIT[3]) { this.addStatus(ACCEL_PENALTY); }
-// The original code used ACCEL_LIMIT[gameLevel].
-// If gameLevel is EASY (0), limit is 0.8 (High limit, hard to exceed -> Stable).
-// If gameLevel is HARD (2), limit is 0.6 (Low limit, easy to exceed -> Unstable).
-// So HARD AI should have a LOWER limit to make it harder?
-// Wait, if AI is HARD, it should be BETTER at playing.
-// If the limit is lower, it gets penalized more easily.
-// So a "Strong" AI should probably have a HIGHER limit (or be immune to it).
-// But the user wants "Strong" AI to be "Stronger".
-// Let's look at the plan:
-// "Weak AI: Uses stricter acceleration limit (e.g., 0.5)... leading to more errors."
-// "Strong AI: Uses looser acceleration limit (e.g., 0.8)..."
-// So:
-// Weak AI -> Low Limit (e.g. 0.5)
-// Strong AI -> High Limit (e.g. 0.8)
-//
-// Existing ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5];
-// Index 0 (0.8) is the most stable.
-// Index 3 (0.5) is the least stable.
-// So we should map:
-// AILevel.EASY -> Index 3 (0.5) [Unstable]
-// AILevel.NORMAL -> Index 1 (0.7) [Normal]
-// AILevel.HARD -> Index 0 (0.8) [Stable]
-
 export const ACCEL_PENALTY = -1;
-import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // Player movement sensitivity when using Pointer Lock
 const PLAYER_MOVE_SENSITIVITY_X = 0.003;
@@ -88,11 +59,7 @@ const PLAYER_VELOCITY_LERP_FACTOR = 0.1;
 const AUTO_MOVE_DISTANCE_THRESHOLD = 0.05;
 
 const AI_ERROR_POSITION_SENSITIVITY = 0.3;
-// AI_ERROR_MAX_ANGLE_RAD is now dynamic based on level
-
-
 const SERVE_HIT_LEVEL = 0.9;
-
 
 export type PlayerState = 'IDLE' | 'BACKSWING' | 'SWING_DRIVE' | 'SWING_CUT';
 
@@ -133,11 +100,11 @@ export class Player {
         this.isAi = isAi;
         this.side = side;
         this.level = level;
-        this.playerType = playerType;
-        this.attributes = PLAYER_TYPES.get(this.playerType) || PLAYER_TYPES.get(PlayerType.SHAKE_DRIVE)!;
-        this.targetPosition = new THREE.Vector2(0, -this.side * TABLE_LENGTH / 4);
-
         this.mesh = new THREE.Group();
+        this.targetPosition = new THREE.Vector2();
+        this.playerType = playerType;
+        this.attributes = PLAYER_TYPES.get(playerType)!;
+
 
         this.status = STATUS_MAX;
         this.statusMax = STATUS_MAX;
@@ -221,6 +188,7 @@ export class Player {
         // IMPORTANT: Use the animations from the original GLTF, not the cloned one.
         gltf.animations.forEach((clip) => {
             this.animationClips[clip.name] = clip;
+
         });
 
         // Add a listener for when animations finish.
@@ -269,6 +237,7 @@ export class Player {
         }
         const clip = this.animationClips[name];
         if (clip) {
+
             const newAction = this.mixer.clipAction(clip);
             newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
             newAction.clampWhenFinished = !loop;
@@ -286,6 +255,7 @@ export class Player {
             const fallbackClip = this.animationClips[fallbackName];
 
             if (fallbackClip && name !== fallbackName) {
+
                 // To avoid recursion if the fallback is *also* missing, we directly call clipAction.
                 const newAction = this.mixer.clipAction(fallbackClip);
                 newAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
@@ -329,49 +299,93 @@ export class Player {
         return true;
     }
 
-    private determineSwingType(ball: Ball, isForehand: boolean): number {
+    private determineSwingType(ball: Ball, _isForehand: boolean): number {
         this.spin.x = 0.0;
         let validSwings: number[] = [];
 
-        // 1. Identify valid swings based on physics/geometry
-        if (this.canHitBall(ball)) {
-            const ballPos = ball.mesh.position;
-            const ballSpinY = ball.spin.y;
+        // Clone ball for prediction to find the position at impact (when ball reaches player)
+        const simBall = ball.clone();
+        let simPlayerZ = this.mesh.position.z;
+        const playerVelZ = this.velocity.z;
+        const side = this.side;
+        const MAX_PREDICT_FRAMES = 150; // 1.5 seconds max prediction
+        let frames = 0;
 
-            // Zone-based Valid Swings Logic
+        // Simulate forward until ball reaches player's Z plane
+        while (frames < MAX_PREDICT_FRAMES) {
+            // Update predicted player position (Linear prediction)
+            simPlayerZ += playerVelZ * SHORT_SIMULATION_TIME_STEP;
+
+            // Check if ball has reached or passed the player's Z plane
+            if (side === 1 && simBall.mesh.position.z >= simPlayerZ) break;
+            if (side === -1 && simBall.mesh.position.z <= simPlayerZ) break;
+
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
+            simBall.checkCollision(oldPos);
+
+            if (simBall.status === BallStatus.DEAD) break;
+            frames++;
+        }
+
+        // Use the predicted position for zone logic
+        const ballPos = simBall.mesh.position;
+
+
+
+        // 1. Identify valid swings based on physics/geometry (Zone Logic v3)
+        // Note: We use simBall (predicted) for position checks
+        if (this.canHitBall(ball)) {
             const netTopY = TABLE_HEIGHT + NET_HEIGHT;
             const tableEndZ = TABLE_LENGTH / 2;
             const netZ = 0;
+            const oppEndZ = -tableEndZ;
 
-            // Calculate diagonal boundary Y at ball's Z
-            // Line from (0, netTopY) to (tableEndZ, TABLE_HEIGHT)
-            // Slope m = (y2 - y1) / (x2 - x1)
-            const slope = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
-            const boundaryY = slope * (Math.abs(ballPos.z) - netZ) + netTopY;
+            // Boundaries
+            // High Boundary: Line from Opponent End (Table Height) to Net Top (Net Top Y)
+            const slopeHigh = (netTopY - TABLE_HEIGHT) / (netZ - oppEndZ);
+            const highBoundaryY = slopeHigh * (ballPos.z - oppEndZ) + TABLE_HEIGHT;
 
-            if (ballPos.y >= netTopY) {
-                // High Area
-                validSwings.push(SWING_SMASH, SWING_DRIVE);
-            } else {
-                if (Math.abs(ballPos.z) <= tableEndZ) {
-                    // Near Areas
-                    if (ballPos.y < boundaryY) {
-                        // Near-Low Area
-                        validSwings.push(SWING_POKE, SWING_NORMAL);
-                    } else {
-                        // Near-Middle Area
-                        validSwings.push(SWING_POKE, SWING_DRIVE, SWING_NORMAL);
-                    }
+            // Low Boundary: Line from Net Top (Net Top Y) to Own End (Table Height)
+            const slopeLow = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
+            const lowBoundaryY = slopeLow * (ballPos.z - netZ) + netTopY;
+
+            // Far Cap: Horizontal line extending from High Boundary at Own End
+            const farCapY = slopeHigh * (tableEndZ - oppEndZ) + TABLE_HEIGHT;
+
+            // Determine Zone
+            if (ballPos.z < tableEndZ) {
+                // Near Zones
+                if (ballPos.y >= highBoundaryY) {
+                    // High Area
+                    validSwings.push(SWING_SMASH, SWING_DRIVE);
+                } else if (ballPos.y >= lowBoundaryY) {
+                    // Near-Middle Area
+                    validSwings.push(SWING_POKE, SWING_DRIVE, SWING_NORMAL);
+                } else if (ballPos.y >= TABLE_HEIGHT) {
+                    // Near-Low Area
+                    validSwings.push(SWING_POKE, SWING_NORMAL);
                 } else {
-                    // Far Areas
-                    if (ballPos.y < boundaryY) {
-                        // Far-Low Area
-                        validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL);
-                    } else {
-                        // Far-Middle Area
-                        validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL, SWING_SMASH);
-                    }
+                    // Below Table Height (Invalid/Too Low) - Fallback to Normal
+                    validSwings.push(SWING_NORMAL);
                 }
+            } else {
+                // Far Zones
+                if (ballPos.y >= farCapY) {
+                    // High Area (Far-High)
+                    validSwings.push(SWING_SMASH, SWING_DRIVE);
+                } else if (ballPos.y >= lowBoundaryY) {
+                    // Far-Middle Area
+                    validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL);
+                } else {
+                    // Far-Low Area
+                    validSwings.push(SWING_CUT, SWING_DRIVE, SWING_NORMAL);
+                }
+            }
+
+            // Fallback if no swings valid
+            if (validSwings.length === 0) {
+                validSwings.push(SWING_NORMAL);
             }
         } else {
             validSwings.push(SWING_NORMAL);
@@ -406,6 +420,20 @@ export class Player {
                 else if (isValid(SWING_POKE)) { selectedSwing = SWING_POKE; }
                 else if (isValid(SWING_BLOCK)) { selectedSwing = SWING_BLOCK; }
                 else { selectedSwing = SWING_NORMAL; }
+
+                // Debug Log for Shake Defence
+                const netTopY = TABLE_HEIGHT + NET_HEIGHT;
+                const tableEndZ = TABLE_LENGTH / 2;
+                const netZ = 0;
+                const oppEndZ = -tableEndZ;
+
+                const slopeHigh = (netTopY - TABLE_HEIGHT) / (netZ - oppEndZ);
+                const highBoundaryY = slopeHigh * (ballPos.z - oppEndZ) + TABLE_HEIGHT;
+
+                const slopeLow = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
+                const lowBoundaryY = slopeLow * (ballPos.z - netZ) + netTopY;
+
+                console.log(`[Debug] ShakeDefence: PredY=${ballPos.y.toFixed(3)}, PredZ=${ballPos.z.toFixed(3)}, HighBound=${highBoundaryY.toFixed(3)}, LowBound=${lowBoundaryY.toFixed(3)}, Valid=[${validSwings}], Selected=${selectedSwing}`);
                 break;
 
             case PlayerType.SHAKE_DRIVE:
@@ -467,6 +495,8 @@ export class Player {
             default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
         }
 
+
+
         this.setState('BACKSWING');
         this.isInBackswing = true;
         this.swing = 1;
@@ -499,14 +529,15 @@ export class Player {
         const currentAnimName = this.currentAction ? this.currentAction.getClip().name : '';
         const isCurrentAnimForehand = currentAnimName.startsWith('F');
 
-        // If the side matches, we don't need to change anything.
+        // Calculate new swing type first to check if it changed
+        const newSwingType = this.determineSwingType(tmpBall, isForehand);
+
+        // If the side matches AND the swing type matches, we don't need to change anything.
         // This prevents flickering caused by re-rolling the probabilistic swing type every frame.
-        if (isForehand === isCurrentAnimForehand) {
+        // However, if the swing type changes (e.g. from Normal to Cut) due to better positioning/prediction, we MUST update.
+        if (isForehand === isCurrentAnimForehand && newSwingType === this.swingType) {
             return;
         }
-
-        // Side changed! We must re-evaluate the swing type for the new side.
-        const newSwingType = this.determineSwingType(tmpBall, isForehand);
 
         let animationName: string;
         switch (newSwingType) {
@@ -517,6 +548,8 @@ export class Player {
             case SWING_NORMAL:
             default: animationName = isForehand ? 'Fnormal' : 'Bnormal'; break;
         }
+
+
 
         // Update the animation
         this.swingType = newSwingType;
@@ -589,6 +622,8 @@ export class Player {
             if (this.isAi) { this.addError(velocity, ball); }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
+            const animName = this.currentAction ? this.currentAction.getClip().name : 'None';
+            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}`);
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }

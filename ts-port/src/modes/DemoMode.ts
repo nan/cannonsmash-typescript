@@ -1,6 +1,6 @@
 import type { Game, IGameMode } from '../Game';
 import { TABLE_HEIGHT } from '../constants';
-import * as THREE from 'three';
+
 
 const DEMO_CAMERA_SPEED = 0.218;
 const DEMO_CAMERA_RADIUS = 4;

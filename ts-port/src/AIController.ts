@@ -1,13 +1,12 @@
 import * as THREE from 'three';
-import { Ball } from './Ball';
+import { Ball, BallStatus } from './Ball';
 import { Player } from './Player';
-import { stype, SWING_DRIVE, SWING_CUT } from './SwingTypes';
+import { stype } from './SwingTypes';
 import { PlayerType } from './PlayerTypes';
 import {
     TABLE_HEIGHT, TABLE_LENGTH, TABLE_WIDTH, TICK, AILevel, NET_HEIGHT
 } from './constants';
 import type { Game } from './Game';
-import { BallStatus } from './Ball';
 
 // --- AI Controller Constants ---
 
@@ -46,17 +45,17 @@ const AI_MIN_SWING_FRAME_DELAY = 1;
 // --- AI Prediction Constants ---
 const AI_PREDICTION_INVALID_HEIGHT = -1.0;
 const AI_PREDICTION_MAX_FRAMES = 1000; // Increased for 100Hz simulation (10s)
-const AI_PREDICTION_TIME_STEP = 0.02; // Keep for reference or other uses, but getOptimalHitPoint now uses TICK
+// const AI_PREDICTION_TIME_STEP = 0.02; // Unused
 
 /**
  * AIControllerクラスは、AIプレイヤーの思考と行動を管理します。
  * C++版のComControllerおよびComPenAttackControllerのロジックを移植したものです。
  */
 export class AIController {
-    private game: Game;
+
     private player: Player;
     private ball: Ball;
-    private opponent: Player;
+    // private opponent: Player; // Unused
     private level: AILevel;
 
     // C++版の _prevBallstatus に相当。ボールの状態変化を検知するために使用。
@@ -77,11 +76,11 @@ export class AIController {
     private readonly HITTING_ZONE_NEAR_BOUNDARY = -0.6;
     private readonly WAIT_FOR_BETTER_SHOT_MARGIN = 0.01;
 
-    constructor(game: Game, player: Player, ball: Ball, opponent: Player, level: AILevel = AILevel.NORMAL) {
-        this.game = game;
+    constructor(player: Player, ball: Ball, level: AILevel = AILevel.NORMAL) {
+        // this.game = game;
         this.player = player;
         this.ball = ball;
-        this.opponent = opponent;
+        // this.opponent = opponent;
         this.level = level;
 
         // Adjust Home Position based on Player Type
@@ -102,7 +101,7 @@ export class AIController {
      * C++版の Think() メソッドに相当します。
      * @param deltaTime フレーム間の経過時間
      */
-    public update(deltaTime: number, game: Game) { // game is passed here now
+    public update(_deltaTime: number, game: Game) { // game is passed here now
         // --- Serve Logic ---
         if (this.ball.status === BallStatus.WAITING_FOR_SERVE && game.getService() === this.player.side) {
             // 1. Set the target to the home position for serving. This ensures the AI
