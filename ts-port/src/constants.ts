@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 // Constants from ttinc.h
 export const TABLE_LENGTH = 2.74;
 export const TABLE_WIDTH = 1.525;
@@ -13,8 +11,9 @@ export const AREAZSIZE = 6.0;
 
 export const TICK = 0.01; // Original fixed time step
 
-export enum AILevel {
-    EASY = 0,
-    NORMAL = 1,
-    HARD = 2
-}
+export const AILevel = {
+    EASY: 0,
+    NORMAL: 1,
+    HARD: 2
+} as const;
+export type AILevel = typeof AILevel[keyof typeof AILevel];

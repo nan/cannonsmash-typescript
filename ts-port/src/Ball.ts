@@ -2,28 +2,29 @@
  * Represents the status of the ball during the game.
  * These values are ported from the original C++ implementation's logic.
  */
-export enum BallStatus {
+export const BallStatus = {
     /** The ball is dead and the point is over. */
-    DEAD = -1,
+    DEAD: -1,
     /** Ball is in rally, heading towards Player 2 (AI), after bouncing on Player 1's side. */
-    RALLY_TO_AI = 0,
+    RALLY_TO_AI: 0,
     /** Ball is in rally, heading towards Player 1 (Human), after bouncing on Player 2's side. */
-    RALLY_TO_HUMAN = 1,
+    RALLY_TO_HUMAN: 1,
     /** Ball was hit by AI, now heading towards Player 1's side for a bounce. */
-    IN_PLAY_TO_HUMAN = 2,
+    IN_PLAY_TO_HUMAN: 2,
     /** Ball was hit by Human, now heading towards Player 2's side for a bounce. */
-    IN_PLAY_TO_AI = 3,
+    IN_PLAY_TO_AI: 3,
     /** Ball was served by Player 1, heading towards Player 2's side for a bounce. */
-    SERVE_TO_AI = 4,
+    SERVE_TO_AI: 4,
     /** Ball was served by Player 2, heading towards Player 1's side for a bounce. */
-    SERVE_TO_HUMAN = 5,
+    SERVE_TO_HUMAN: 5,
     /** Ball is being tossed for a serve by Player 1. */
-    TOSS_P1 = 6,
+    TOSS_P1: 6,
     /** Ball is being tossed for a serve by Player 2. */
-    TOSS_P2 = 7,
+    TOSS_P2: 7,
     /** Ball is waiting for the player to initiate a serve. */
-    WAITING_FOR_SERVE = 8,
-}
+    WAITING_FOR_SERVE: 8,
+} as const;
+export type BallStatus = typeof BallStatus[keyof typeof BallStatus];
 
 import * as THREE from 'three';
 import type { Player } from './Player';
@@ -113,7 +114,7 @@ export class Ball {
      * Updates the ball's state for the game loop.
      * This includes physics, collision, and game state logic.
      */
-    public update(deltaTime: number, game: Game) {
+    public update(game: Game) {
         if (this.status === BallStatus.WAITING_FOR_SERVE) { return; }
 
         // Handle the reset timer for a dead ball
@@ -207,7 +208,7 @@ export class Ball {
             this.spin.y *= TABLE_COLLISION_SPIN_Y_FACTOR;
             // REMINDER: Player 1 (Human) is +Z, Player 2 (AI) is -Z
             if (this.mesh.position.z > 0) { // Bounce on Player 1 (Human) side
-                switch(this.status) {
+                switch (this.status) {
                     // Human serves, ball bounces on their own side first.
                     case BallStatus.SERVE_TO_AI:
                         this.status = BallStatus.IN_PLAY_TO_AI; // Now it's in play, heading to AI
@@ -221,7 +222,7 @@ export class Ball {
                         break;
                 }
             } else { // Bounce on Player 2 (AI) side
-                switch(this.status) {
+                switch (this.status) {
                     // AI serves, ball bounces on their own side first.
                     case BallStatus.SERVE_TO_HUMAN:
                         this.status = BallStatus.IN_PLAY_TO_HUMAN; // Now it's in play, heading to Human
@@ -379,9 +380,9 @@ export class Ball {
         if (Math.abs(spin.x) < TIME_PRECISION_THRESHOLD) { // No side spin
             let targetX = 0;
             if (Math.abs(v.z) > VELOCITY_PRECISION_THRESHOLD) {
-                 targetX = currentPos.x + v.x / v.z * (targetZ - currentPos.y);
+                targetX = currentPos.x + v.x / v.z * (targetZ - currentPos.y);
             } else {
-                 targetX = currentPos.x;
+                targetX = currentPos.x;
             }
             const target = new THREE.Vector2(targetX, targetZ);
             const relativeTarget = target.sub(currentPos);
@@ -510,7 +511,7 @@ export class Ball {
             let finalBoundX = 0;
             let finalHeight = 0;
 
-            for(let v_iter = 0; v_iter < SERVE_CALC_ITERATIONS; v_iter++) {
+            for (let v_iter = 0; v_iter < SERVE_CALC_ITERATIONS; v_iter++) {
                 if (vMax - vMin < SERVE_CALC_PRECISION) break;
                 const vHorizontal = (vMin + vMax) / 2;
                 const result = this._calculateServeFinalState(vHorizontal, new THREE.Vector2(0, boundZ), spin, target, initialBallPos, initialBallPos2D);
@@ -519,7 +520,7 @@ export class Ball {
                 if (finalHeight > TABLE_HEIGHT) vMax = vHorizontal;
                 else vMin = vHorizontal;
             }
-             // --- End Binary search ---
+            // --- End Binary search ---
 
             if (Math.abs(finalHeight - TABLE_HEIGHT) > SERVE_CALC_HEIGHT_TOLERANCE) continue;
 
@@ -583,7 +584,7 @@ export class Ball {
         return fallbackVelocity;
     }
 
-    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2, maxSpeed: number = RALLY_HIT_MAX_SPEED): THREE.Vector3 {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
@@ -618,7 +619,7 @@ export class Ball {
         };
 
         let low = RALLY_HIT_MIN_SPEED;
-        let high = RALLY_HIT_MAX_SPEED;
+        let high = maxSpeed;
         let bestSolution: THREE.Vector3 | null = null;
 
         for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
@@ -648,11 +649,11 @@ export class Ball {
         // Final check: If the loop ended, but the last known 'bestSolution' was from a much
         // slower speed, it's possible 'low' is now a valid, faster speed. Let's check it.
         if (bestSolution) {
-             const finalCheck = checkSpeed(low);
-             if (finalCheck instanceof THREE.Vector3) {
-                 return finalCheck;
-             }
-             return bestSolution;
+            const finalCheck = checkSpeed(low);
+            if (finalCheck instanceof THREE.Vector3) {
+                return finalCheck;
+            }
+            return bestSolution;
         }
 
 
@@ -671,7 +672,7 @@ export class Ball {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
         const relativeTarget = target.clone().sub(initialBallPos2D);
-        
+
         const initialVelocityGuess = new THREE.Vector3();
         const timeToTarget = this._getTimeToReachTarget(relativeTarget, speed, spin, initialVelocityGuess);
 
@@ -681,7 +682,7 @@ export class Ball {
 
         const requiredVy = this._getVz0ToReachTarget(TABLE_HEIGHT - initialBallPos.y, spin, timeToTarget);
         const v0 = new THREE.Vector3(initialVelocityGuess.x, requiredVy, initialVelocityGuess.z);
-        
+
         // Check net clearance
         const timeToNet = this._getTimeToReachY(0, initialBallPos2D, spin, v0).time;
         const requiredNetClearance = TABLE_HEIGHT + NET_HEIGHT + NET_CLEARANCE_MARGIN;
@@ -694,12 +695,12 @@ export class Ball {
                 return v0;
             }
         } else {
-             // Doesn't cross the net plane (e.g. target is on the same side), technically valid if it hits the target?
-             // But for a rally hit, we usually expect it to cross the net.
-             // However, if the target is on the other side, timeToNet should be < timeToTarget.
-             // If timeToNet > timeToTarget, it means the ball hits the target before the net? That's weird for a rally.
-             // Let's assume if it clears the net check or doesn't need to cross it (unlikely for rally), it's valid.
-             return v0;
+            // Doesn't cross the net plane (e.g. target is on the same side), technically valid if it hits the target?
+            // But for a rally hit, we usually expect it to cross the net.
+            // However, if the target is on the other side, timeToNet should be < timeToTarget.
+            // If timeToNet > timeToTarget, it means the ball hits the target before the net? That's weird for a rally.
+            // Let's assume if it clears the net check or doesn't need to cross it (unlikely for rally), it's valid.
+            return v0;
         }
         return null;
     }

@@ -1,20 +1,19 @@
 import * as THREE from 'three';
 import type { GameAssets } from './AssetManager';
 import { Player } from './Player';
-import { SERVE_MIN, SERVE_NORMAL } from './SwingTypes';
+
 import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
-import { inputManager } from './InputManager';
-import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, AILevel } from './constants';
+import { TABLE_HEIGHT, TABLE_LENGTH, AILevel } from './constants';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 import { UIManager } from './UIManager';
-import { BallStatus } from './Ball';
 import { DemoMode } from './modes/DemoMode';
 import { PlayMode } from './modes/PlayMode';
 import { ScoreManager, type IGameScoringContext } from './ScoreManager';
 import { InputController, type IGameInputContext } from './InputController';
+import { PlayerType } from './PlayerTypes';
 
 // --- Game Setup Constants ---
 const PLAYER_INITIAL_Y = 0.77;
@@ -35,7 +34,7 @@ export interface IGameMode {
     update(deltaTime: number, game: Game): void;
 }
 
-type GameMode = '5PTS' | '11PTS' | '21PTS';
+
 
 export class Game implements IGameScoringContext, IGameInputContext {
     public scene: THREE.Scene;
@@ -70,7 +69,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
     }
 
 
-    private resetGame(isDemo: boolean, aiLevel: AILevel = AILevel.NORMAL) {
+    private resetGame(isDemo: boolean, aiLevel: AILevel = AILevel.NORMAL, p1Type: PlayerType = PlayerType.SHAKE_DRIVE, p2Type: PlayerType = PlayerType.PEN_DRIVE) {
         this.currentMode = isDemo ? new DemoMode() : new PlayMode();
         this.isPaused = false;
         this.aiLevel = aiLevel;
@@ -88,10 +87,11 @@ export class Game implements IGameScoringContext, IGameInputContext {
         this.field = new Field();
         this.scene.add(this.field.mesh);
 
-        this.player1 = new Player(this.assets, isDemo, 1, AILevel.NORMAL); // Player 1 is Human (or Demo AI), level doesn't matter much but keep normal
+        this.player1 = new Player(this.assets, isDemo, 1, AILevel.NORMAL, p1Type); // Player 1 is Human (or Demo AI)
         this.scene.add(this.player1.mesh);
 
-        this.player2 = new Player(this.assets, true, -1, this.aiLevel); // Player2 is always AI
+        // Player2 is always AI.
+        this.player2 = new Player(this.assets, true, -1, this.aiLevel, p2Type);
         this.scene.add(this.player2.mesh);
 
 
@@ -100,9 +100,11 @@ export class Game implements IGameScoringContext, IGameInputContext {
 
         // Create AI controllers where needed
         if (this.player1.isAi) {
-            this.player1.aiController = new AIController(this, this.player1, this.ball, this.player2, AILevel.NORMAL);
+            this.player1.aiController = new AIController(this.player1, this.ball, AILevel.NORMAL);
         }
-        this.player2.aiController = new AIController(this, this.player2, this.ball, this.player1, this.aiLevel);
+        if (this.player2.isAi) {
+            this.player2.aiController = new AIController(this.player2, this.ball, this.aiLevel);
+        }
 
 
         // Position them
@@ -166,7 +168,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
         // The core game logic update (common to all modes)
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
-        this.ball.update(deltaTime, this);
+        this.ball.update(this);
 
         // --- Scoring Logic (common to all modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
@@ -193,8 +195,8 @@ export class Game implements IGameScoringContext, IGameInputContext {
         return this.currentMode instanceof DemoMode;
     }
 
-    public start(aiLevel: AILevel = AILevel.NORMAL): void {
-        this.resetGame(false, aiLevel);
+    public start(aiLevel: AILevel = AILevel.NORMAL, p1Type: PlayerType = PlayerType.SHAKE_DRIVE, p2Type: PlayerType = PlayerType.PEN_DRIVE): void {
+        this.resetGame(false, aiLevel, p1Type, p2Type);
     }
 
 

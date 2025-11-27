@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { GLTFAnimationPointerExtension } from '@needle-tools/three-animation-pointer';
+
 // A structure to hold all game assets
 export interface GameAssets {
     playerModel?: GLTF;
@@ -8,7 +9,8 @@ export interface GameAssets {
 
 class AssetManager {
     private manager = new THREE.LoadingManager();
-    private gltfLoader = new GLTFLoader(this.manager);
+    // private gltfLoader = new GLTFLoader(this.manager); // Unused
+    // private textureLoader: THREE.TextureLoader; // Unused
 
     public async loadAll(): Promise<GameAssets> {
         console.log('AssetManager: Starting asset loading...');
@@ -29,8 +31,8 @@ class AssetManager {
                 console.log('AssetManager: Player model loaded successfully.');
                 resolve(gltf);
             }, undefined, (error) => {
-                 console.error('AssetManager: An error happened while loading the player model', error);
-                 reject(error);
+                console.error('AssetManager: An error happened while loading the player model', error);
+                reject(error);
             });
         });
     }
