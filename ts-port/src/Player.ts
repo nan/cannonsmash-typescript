@@ -63,6 +63,22 @@ const SERVE_HIT_LEVEL = 0.9;
 
 export type PlayerState = 'IDLE' | 'BACKSWING' | 'SWING_DRIVE' | 'SWING_CUT';
 
+// Max speeds for each swing type (m/s)
+const SWING_MAX_SPEEDS: { [key: string]: number } = {
+    "F_NORMAL": 20.0,
+    "F_DRIVE": 25.0,
+    "F_SMASH": 30.0,
+    "F_POKE": 15.0,
+    "F_CUT": 15.0,
+    "F_BLOCK": 15.0, // Added Block as it was missing from user list but exists in game
+    "B_NORMAL": 15.0,
+    "B_DRIVE": 20.0,
+    "B_SMASH": 25.0,
+    "B_POKE": 15.0,
+    "B_CUT": 15.0,
+    "B_BLOCK": 15.0 // Added Block
+};
+
 export class Player {
     public mesh: THREE.Group;
     public state: PlayerState = 'IDLE';
@@ -591,23 +607,35 @@ export class Player {
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
         } else if (this.canHitBall(ball)) {
-            // Apply Player Type adjustments BEFORE calculation
-            let shotStrength = this.intendedShotStrength;
-
-            if (this.playerType === PlayerType.PEN_DRIVE) {
-                // Stronger topspin on Forehand (Drive/Smash)
-                if (this.swingType === SWING_DRIVE || this.swingType === SWING_SMASH) {
-                    this.spin.y *= 1.5; // Increase topspin
-                }
-                // Slower speed on Backhand (Poke/Block/Normal if backhand)
-                if (this.swingType === SWING_POKE || this.swingType === SWING_BLOCK || this.swingType === SWING_NORMAL) {
-                    shotStrength *= 0.8;
-                }
+            // Determine Shot Stats Key
+            const animName = this.currentAction ? this.currentAction.getClip().name : '';
+            const isForehand = animName.startsWith('F');
+            const handPrefix = isForehand ? 'F_' : 'B_';
+            let swingName = 'NORMAL';
+            switch (this.swingType) {
+                case SWING_DRIVE: swingName = 'DRIVE'; break;
+                case SWING_SMASH: swingName = 'SMASH'; break;
+                case SWING_CUT: swingName = 'CUT'; break;
+                case SWING_POKE: swingName = 'POKE'; break;
+                case SWING_BLOCK: swingName = 'BLOCK'; break;
+                default: swingName = 'NORMAL'; break;
             }
+            const statKey = handPrefix + swingName;
+            const stats = this.attributes.shotStats[statKey] || { speed: 1.0, precision: 0.1, spin: 1.0 };
 
-            let velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin);
+            // Calculate Player Max Speed for this swing
+            const baseMaxSpeed = SWING_MAX_SPEEDS[statKey] || 20.0;
+            const playerMaxSpeed = baseMaxSpeed * stats.speed;
+
+            // Apply Spin Multiplier from Stats
+            this.spin.x *= stats.spin;
+            this.spin.y *= stats.spin;
+
+            // Calculate velocity with the player's max speed cap
+            let velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin, playerMaxSpeed);
 
             // Apply shot strength if it's not a full power shot
+            let shotStrength = this.intendedShotStrength;
             if (shotStrength < 1.0) {
                 const horizontalVelocity = new THREE.Vector2(velocity.x, velocity.z);
                 const currentSpeed = horizontalVelocity.length();
@@ -619,11 +647,12 @@ export class Player {
                 }
             }
 
-            if (this.isAi) { this.addError(velocity, ball); }
+            if (this.isAi) {
+                this.addError(velocity, ball, stats.precision);
+            }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
-            const animName = this.currentAction ? this.currentAction.getClip().name : 'None';
-            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}`);
+            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}`);
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }
@@ -684,9 +713,14 @@ export class Player {
         const direction = new THREE.Vector3(targetPosition.x - this.mesh.position.x, 0, targetPosition.y - this.mesh.position.z);
         const distance = direction.length();
         if (distance < AUTO_MOVE_DISTANCE_THRESHOLD) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
-        const maxSpeed = this.isOpponentHit(ball) ? this.RALLY_MAX_SPEED : this.POSITIONING_MAX_SPEED;
+
+        const baseMaxSpeed = this.isOpponentHit(ball) ? this.RALLY_MAX_SPEED : this.POSITIONING_MAX_SPEED;
+        const maxSpeed = baseMaxSpeed * this.attributes.runSpeed;
+
         let targetVelocity = direction.normalize().multiplyScalar(maxSpeed);
-        this.velocity.lerp(targetVelocity, this.MOVEMENT_ACCELERATION);
+
+        const acceleration = this.MOVEMENT_ACCELERATION * this.attributes.acceleration;
+        this.velocity.lerp(targetVelocity, acceleration);
     }
 
     private _updateSwing(ball: Ball) {
@@ -718,8 +752,8 @@ export class Player {
             if (inputManager.isPointerLocked) {
                 const movement = inputManager.getMouseMovement();
                 if (movement.x !== 0 || movement.y !== 0) {
-                    this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X;
-                    this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z;
+                    this.mesh.position.x += movement.x * PLAYER_MOVE_SENSITIVITY_X * this.attributes.runSpeed;
+                    this.mesh.position.z += movement.y * PLAYER_MOVE_SENSITIVITY_Z * this.attributes.runSpeed;
                     this.velocity.set(0, 0, 0);
                     manualMove = true;
                 }
@@ -745,18 +779,23 @@ export class Player {
         }
     }
 
-    private addError(v: THREE.Vector3, ball: Ball) {
+    private addError(v: THREE.Vector3, ball: Ball, precision: number = 0.1) {
         const playerPos = this.mesh.position;
         const ballPos = ball.mesh.position;
         const xDiff = (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY;
         const yDiff = (playerPos.z - ballPos.z) / AI_ERROR_POSITION_SENSITIVITY;
         let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
+
         let maxErrorRad = Math.PI / 12; // Default Normal
         if (this.level === AILevel.EASY) {
             maxErrorRad = Math.PI / 10; // 18 degrees
         } else if (this.level === AILevel.HARD) {
             maxErrorRad = Math.PI / 60; // 3 degrees
         }
+
+        // Apply Precision Modifier
+        const precisionFactor = precision / 0.1;
+        maxErrorRad *= precisionFactor;
 
         radDiff *= (this.statusMax - this.status) / this.statusMax * maxErrorRad;
         const vl = v.length();

@@ -584,7 +584,7 @@ export class Ball {
         return fallbackVelocity;
     }
 
-    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2): THREE.Vector3 {
+    public calculateRallyHitVelocity(target: THREE.Vector2, spin: THREE.Vector2, maxSpeed: number = RALLY_HIT_MAX_SPEED): THREE.Vector3 {
         const initialBallPos = this.mesh.position.clone();
         const initialBallPos2D = new THREE.Vector2(initialBallPos.x, initialBallPos.z);
 
@@ -619,7 +619,7 @@ export class Ball {
         };
 
         let low = RALLY_HIT_MIN_SPEED;
-        let high = RALLY_HIT_MAX_SPEED;
+        let high = maxSpeed;
         let bestSolution: THREE.Vector3 | null = null;
 
         for (let i = 0; i < RALLY_CALC_ITERATIONS; i++) {
