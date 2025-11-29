@@ -76,6 +76,22 @@ export class InputController {
                 } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click - Strong
                     player1.startForwardswing(0.9);
                 }
+            } else if (player1.canInitiateSwing(ball)) {
+                // Force start backswing if valid, to allow immediate hit
+                let strength = 0;
+                if (inputManager.isMouseButtonJustPressed(0)) strength = 0.7;
+                else if (inputManager.isMouseButtonJustPressed(1)) strength = 0.8;
+                else if (inputManager.isMouseButtonJustPressed(2)) strength = 0.9;
+
+                if (strength > 0) {
+                    const predictedSwing = player1.getPredictedSwing(ball);
+                    player1.startBackswing(ball, predictedSwing.spinCategory);
+                    // Try forward swing immediately
+                    if (player1.isInBackswing) {
+                        player1.startForwardswing(strength);
+                        // console.log("[InputController] Force-started swing for user input");
+                    }
+                }
             }
         }
 

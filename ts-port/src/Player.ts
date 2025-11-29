@@ -31,8 +31,8 @@ export const SERVEPARAM: number[][] = [
 // --- Status System Constants (from Player.h) ---
 export const STATUS_MAX = 200;
 export const RUN_SPEED = 2.0;
-export const RUN_PENALTY = -1;
-export const SWING_PENALTY = -1;
+export const RUN_PENALTY = -0.1;
+export const SWING_PENALTY = -0.5;
 export const WALK_SPEED = 1.0;
 export const WALK_BONUS = 1;
 export const ACCEL_LIMIT = [0.8, 0.7, 0.6, 0.5]; // Corresponds to gameLevel {EASY, NORMAL, HARD, TSUBORISH}
@@ -58,7 +58,7 @@ const PLAYER_FALLBACK_Z_OFFSET = 0.5;
 const PLAYER_VELOCITY_LERP_FACTOR = 0.1;
 const AUTO_MOVE_DISTANCE_THRESHOLD = 0.05;
 
-const AI_ERROR_POSITION_SENSITIVITY = 0.3;
+const AI_ERROR_POSITION_SENSITIVITY = 0.5;
 const SERVE_HIT_LEVEL = 0.9;
 
 export type PlayerState = 'IDLE' | 'BACKSWING' | 'SWING_DRIVE' | 'SWING_CUT';
@@ -449,7 +449,6 @@ export class Player {
                 const slopeLow = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
                 const lowBoundaryY = slopeLow * (ballPos.z - netZ) + netTopY;
 
-                console.log(`[Debug] ShakeDefence: PredY=${ballPos.y.toFixed(3)}, PredZ=${ballPos.z.toFixed(3)}, HighBound=${highBoundaryY.toFixed(3)}, LowBound=${lowBoundaryY.toFixed(3)}, Valid=[${validSwings}], Selected=${selectedSwing}`);
                 break;
 
             case PlayerType.SHAKE_DRIVE:
@@ -627,15 +626,41 @@ export class Player {
             const baseMaxSpeed = SWING_MAX_SPEEDS[statKey] || 20.0;
             const playerMaxSpeed = baseMaxSpeed * stats.speed;
 
-            // Apply Spin Multiplier from Stats
-            this.spin.x *= stats.spin;
-            this.spin.y *= stats.spin;
+            // Apply AI Level Multipliers
+            let speedMultiplier = 1.0;
+            let spinMultiplier = 1.0;
+
+            if (this.isAi) {
+                switch (this.level) {
+                    case AILevel.EASY:
+                        speedMultiplier = 0.7;
+                        spinMultiplier = 0.6;
+                        break;
+                    case AILevel.NORMAL:
+                        speedMultiplier = 0.85;
+                        spinMultiplier = 0.8;
+                        break;
+                    case AILevel.HARD:
+                        speedMultiplier = 1.0;
+                        spinMultiplier = 1.0;
+                        break;
+                }
+            }
+
+            // Apply Spin Multiplier from Stats AND AI Level
+            this.spin.x *= stats.spin * spinMultiplier;
+            this.spin.y *= stats.spin * spinMultiplier;
 
             // Calculate velocity with the player's max speed cap
+            // We apply the speedMultiplier to the max speed to limit the "power" of the shot
             let velocity = ball.calculateRallyHitVelocity(this.targetPosition, this.spin, playerMaxSpeed);
 
             // Apply shot strength if it's not a full power shot
-            let shotStrength = this.intendedShotStrength;
+            // We also combine the AI Level speed multiplier here to ensure the ball follows a valid trajectory
+            // but effectively "slower" (higher arc) if the multiplier is < 1.0.
+            let shotStrength = this.intendedShotStrength * speedMultiplier;
+
+            // Ensure shotStrength doesn't drop too low to be playable, but 0.7 is fine.
             if (shotStrength < 1.0) {
                 const horizontalVelocity = new THREE.Vector2(velocity.x, velocity.z);
                 const currentSpeed = horizontalVelocity.length();
@@ -652,7 +677,7 @@ export class Player {
             }
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
-            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}`);
+            // console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}, Level=${this.level}, SpdMult=${speedMultiplier}, SpinMult=${spinMultiplier}`);
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }
@@ -782,22 +807,37 @@ export class Player {
     private addError(v: THREE.Vector3, ball: Ball, precision: number = 0.1) {
         const playerPos = this.mesh.position;
         const ballPos = ball.mesh.position;
-        const xDiff = (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY;
-        const yDiff = (playerPos.z - ballPos.z) / AI_ERROR_POSITION_SENSITIVITY;
-        let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
+        const xDiff = Math.max(0, (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY);
+        const yDiff = Math.max(0, (Math.abs(playerPos.z - ballPos.z) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY);
+        let radDiff = Math.hypot(xDiff, yDiff);
 
-        let maxErrorRad = Math.PI / 12; // Default Normal
+        // Base Error and Max Error (at 0 status) in Radians
+        let baseErrorRad = 0.002; // Default Normal
+        let maxErrorRad = 0.03;  // Default Normal
+
         if (this.level === AILevel.EASY) {
-            maxErrorRad = Math.PI / 10; // 18 degrees
+            baseErrorRad = 0.01; // ~0.6 degrees
+            maxErrorRad = 0.1;   // ~6.0 degrees
         } else if (this.level === AILevel.HARD) {
-            maxErrorRad = Math.PI / 60; // 3 degrees
+            baseErrorRad = 0.000; // 0 degrees
+            maxErrorRad = 0.01;   // ~0.6 degrees
         }
 
-        // Apply Precision Modifier
+        // Apply Precision Modifier from Player Stats
         const precisionFactor = precision / 0.1;
+        baseErrorRad *= precisionFactor;
         maxErrorRad *= precisionFactor;
 
-        radDiff *= (this.statusMax - this.status) / this.statusMax * maxErrorRad;
+        // Calculate Total Error based on Status
+        // Formula: base + (max - base) * (1 - status/max)
+        const statusFactor = 1.0 - (this.status / this.statusMax);
+        const currentErrorRad = baseErrorRad + (maxErrorRad - baseErrorRad) * statusFactor;
+
+        // Scale error by position difficulty (radDiff)
+        // Clamp the positional error to avoid wild misses (max 0.1 rad ~ 6 degrees)
+        const positionError = Math.min(0.1, radDiff * 0.05);
+        const totalErrorRad = currentErrorRad + positionError;
+
         const vl = v.length();
         if (vl === 0) return;
         const n1 = new THREE.Vector3();
@@ -808,7 +848,7 @@ export class Player {
         n1.crossVectors(vNorm, nonParallel).normalize();
         n2.crossVectors(vNorm, n1).normalize();
         const radRand = Math.random() * 2 * Math.PI;
-        const errorMagnitude = vl * Math.tan(radDiff);
+        const errorMagnitude = vl * Math.tan(totalErrorRad);
         const errorVector = n1.multiplyScalar(Math.cos(radRand)).add(n2.multiplyScalar(Math.sin(radRand))).multiplyScalar(errorMagnitude);
         v.add(errorVector);
     }
@@ -843,11 +883,14 @@ export class Player {
         if (this.mixer) {
             this.mixer.update(deltaTime);
         }
+
+        const fatigueMultiplier = (this.isAi && this.level === AILevel.EASY) ? 3.0 : 1.0;
+
         const swingParams = stype.get(this.swingType);
         if (swingParams) {
-            if (this.swing > swingParams.backswing) { this.addStatus(SWING_PENALTY); }
+            if (this.swing > swingParams.backswing) { this.addStatus(SWING_PENALTY * fatigueMultiplier); }
         }
-        if (this.velocity.length() > RUN_SPEED * this.attributes.runSpeed) { this.addStatus(RUN_PENALTY); }
+        if (this.velocity.length() > RUN_SPEED * this.attributes.runSpeed) { this.addStatus(RUN_PENALTY * fatigueMultiplier); }
         if (this.velocity.length() < WALK_SPEED * this.attributes.walkSpeed) { this.addStatus(WALK_BONUS); }
         if (this.velocity.distanceTo(this.prevVelocity) / deltaTime > this.getAccelLimit()) { this.addStatus(ACCEL_PENALTY); }
         if (ball.status === BallStatus.DEAD || ball.status === BallStatus.WAITING_FOR_SERVE) { this.resetStatus(); }
