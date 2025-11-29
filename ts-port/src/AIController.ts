@@ -326,11 +326,34 @@ export class AIController {
      * This method checks the current ball position and triggers the forward swing if it's optimal.
      */
     private tryForwardSwing() {
+        // 1. Get swing parameters to know how long the swing takes.
+        const swingParams = stype.get(this.player.swingType);
+        if (!swingParams) return;
+
+        // 2. Calculate frames remaining until impact.
+        // Note: Player.swing starts at 1 in backswing.
+        const framesToHit = swingParams.hitStart - this.player.swing;
+
+        if (framesToHit <= 0) {
+            // Should not happen if logic is correct, but safety check.
+            this.player.startForwardswing();
+            return;
+        }
+
+        // 3. Simulate ball position at impact.
+        // The game advances physics by TICK per frame.
+        const simBall = this.ball.clone();
+        for (let i = 0; i < framesToHit; i++) {
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(TICK);
+            simBall.checkCollision(oldPos);
+        }
+
         const playerPos = this.player.mesh.position;
-        const ballPos = this.ball.mesh.position;
+        const ballPos = simBall.mesh.position; // Use simulated position
         const playerBallZDiff = (playerPos.z - ballPos.z) * this.player.side;
 
-        // Check if the ball is within the ideal hitting zone right now.
+        // 4. Check if the PREDICTED ball position is within the ideal hitting zone.
         if (playerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
             playerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
 
