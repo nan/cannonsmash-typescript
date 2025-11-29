@@ -812,8 +812,8 @@ export class Player {
         let radDiff = Math.hypot(xDiff, yDiff);
 
         // Base Error and Max Error (at 0 status) in Radians
-        let baseErrorRad = 0.002; // Default Normal
-        let maxErrorRad = 0.03;  // Default Normal
+        let baseErrorRad = 0.005; // Default Normal (~0.3 degrees)
+        let maxErrorRad = 0.05;  // Default Normal (~2.9 degrees)
 
         if (this.level === AILevel.EASY) {
             baseErrorRad = 0.01; // ~0.6 degrees
@@ -884,7 +884,11 @@ export class Player {
             this.mixer.update(deltaTime);
         }
 
-        const fatigueMultiplier = (this.isAi && this.level === AILevel.EASY) ? 3.0 : 1.0;
+        let fatigueMultiplier = 1.0;
+        if (this.isAi) {
+            if (this.level === AILevel.EASY) fatigueMultiplier = 3.0;
+            else if (this.level === AILevel.NORMAL) fatigueMultiplier = 2.0;
+        }
 
         const swingParams = stype.get(this.swingType);
         if (swingParams) {
