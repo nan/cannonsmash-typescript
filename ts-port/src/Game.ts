@@ -5,7 +5,8 @@ import { Player } from './Player';
 import { Ball } from './Ball';
 import { Field } from './Field';
 import { AIController } from './AIController';
-import { TABLE_HEIGHT, TABLE_LENGTH, AILevel } from './constants';
+import { TABLE_HEIGHT, TABLE_LENGTH, AILevel, TICK } from './constants';
+import { stype } from './SwingTypes';
 import { CameraManager } from './CameraManager';
 import { TrajectoryVisualizer } from './TrajectoryVisualizer';
 import { UIManager } from './UIManager';
@@ -144,19 +145,30 @@ export class Game implements IGameScoringContext, IGameInputContext {
 
         // The core game logic update (common to all modes)
         // --- Automatic Backswing Logic ---
-        const backswingThreshold = 3.0; // Distance from player to ball to trigger backswing
         const ballPos = this.ball.mesh.position;
         const playerPos = this.player1.mesh.position;
         const distanceToBall = ballPos.distanceTo(playerPos);
 
+        // Calculate time to impact
+        const distZ = playerPos.z - ballPos.z;
+        const velZ = this.ball.velocity.z;
+        let timeToImpact = 999;
+        if (velZ > 0) { // Ball moving towards player
+            timeToImpact = distZ / velZ;
+        }
+
+        // Calculate dynamic required time based on predicted swing
+        const predictedSwing = this.player1.getPredictedSwing(this.ball);
+        const swingParams = stype.get(predictedSwing.swingType);
+        // We want to start the backswing such that we are ready to hit exactly when the ball arrives.
+        // Total swing time = hitStart * TICK.
+        const requiredTime = (swingParams ? swingParams.hitStart : 20) * TICK;
+
         if (
             this.player1.canInitiateSwing(this.ball) &&
-            distanceToBall < backswingThreshold &&
+            (timeToImpact < requiredTime || distanceToBall < 2.0) && // Time-based trigger with distance fallback
             this.ball.velocity.z > 0 // Ball is moving towards the player
         ) {
-            // Determine swing type and spin category automatically for the backswing
-            const predictedSwing = this.player1.getPredictedSwing(this.ball);
-
             if (this.player1.state === 'IDLE') {
                 this.player1.startBackswing(this.ball, predictedSwing.spinCategory);
             } else if (this.player1.state === 'BACKSWING') {
