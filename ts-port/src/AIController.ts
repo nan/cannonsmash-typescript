@@ -184,8 +184,16 @@ export class AIController {
                 forehandBias = 0.2; // Favor forehand by making backhand seem further away
             }
 
-            const forehandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x + racketOffsetX));
-            const backhandDist = Math.abs(this.predictedHitPosition.x - (playerPos.x - racketOffsetX)) + forehandBias;
+            // Corrected Forehand/Backhand logic
+            // P1 (Side 1): Right is +X (Forehand), Left is -X (Backhand)
+            // P2 (Side -1): Right is -X (Forehand), Left is +X (Backhand)
+            // FH = PlayerX + racketOffsetX. BH = PlayerX - racketOffsetX.
+
+            const forehandPos = playerPos.x + racketOffsetX;
+            const backhandPos = playerPos.x - racketOffsetX;
+
+            const forehandDist = Math.abs(this.predictedHitPosition.x - forehandPos);
+            const backhandDist = Math.abs(this.predictedHitPosition.x - backhandPos) + forehandBias;
 
             let useForehand = forehandDist < backhandDist;
 
@@ -201,7 +209,7 @@ export class AIController {
                 }
             }
 
-            idealRacketX = useForehand ? (playerPos.x + racketOffsetX) : (playerPos.x - racketOffsetX);
+            idealRacketX = useForehand ? forehandPos : backhandPos;
         }
 
         // スイングの特定フレームでは、移動計算を停止して体を安定させる
@@ -326,22 +334,20 @@ export class AIController {
      * This method checks the current ball position and triggers the forward swing if it's optimal.
      */
     private tryForwardSwing() {
-        // 1. Get swing parameters to know how long the swing takes.
+        // We need to predict where the ball will be when the racket actually hits it.
+        // The hit occurs at 'hitStart' frame. Current swing frame is 1 (start of backswing).
+        // So we need to look ahead (hitStart - 1) frames.
+
         const swingParams = stype.get(this.player.swingType);
         if (!swingParams) return;
 
-        // 2. Calculate frames remaining until impact.
-        // Note: Player.swing starts at 1 in backswing.
-        const framesToHit = swingParams.hitStart - this.player.swing;
-
+        const framesToHit = swingParams.hitStart - 1;
         if (framesToHit <= 0) {
-            // Should not happen if logic is correct, but safety check.
             this.player.startForwardswing();
             return;
         }
 
-        // 3. Simulate ball position at impact.
-        // The game advances physics by TICK per frame.
+        // Simulate ball forward
         const simBall = this.ball.clone();
         for (let i = 0; i < framesToHit; i++) {
             const oldPos = simBall.mesh.position.clone();
@@ -350,10 +356,10 @@ export class AIController {
         }
 
         const playerPos = this.player.mesh.position;
-        const ballPos = simBall.mesh.position; // Use simulated position
+        const ballPos = simBall.mesh.position;
         const playerBallZDiff = (playerPos.z - ballPos.z) * this.player.side;
 
-        // 4. Check if the PREDICTED ball position is within the ideal hitting zone.
+        // Check if the PREDICTED ball position is within the ideal hitting zone.
         if (playerBallZDiff < this.HITTING_ZONE_FAR_BOUNDARY &&
             playerBallZDiff > this.HITTING_ZONE_NEAR_BOUNDARY) {
 

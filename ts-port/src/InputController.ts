@@ -70,11 +70,11 @@ export class InputController {
             // --- Rally hit controls ---
             if (player1.isInBackswing) {
                 if (inputManager.isMouseButtonJustPressed(0)) { // Left click - Weak
-                    player1.startForwardswing(0.7);
+                    player1.startForwardswing(0.7, ball);
                 } else if (inputManager.isMouseButtonJustPressed(1)) { // Middle click - Medium
-                    player1.startForwardswing(0.8);
+                    player1.startForwardswing(0.8, ball);
                 } else if (inputManager.isMouseButtonJustPressed(2)) { // Right click - Strong
-                    player1.startForwardswing(0.9);
+                    player1.startForwardswing(0.9, ball);
                 }
             } else if (player1.canInitiateSwing(ball)) {
                 // Force start backswing if valid, to allow immediate hit

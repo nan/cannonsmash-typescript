@@ -180,7 +180,7 @@ export class Game implements IGameScoringContext, IGameInputContext {
         // The core game logic update (common to all modes)
         this.player1.update(deltaTime, this.ball, this);
         this.player2.update(deltaTime, this.ball, this);
-        this.ball.update(this);
+        this.ball.update(this, deltaTime);
 
         // --- Scoring Logic (common to all modes) ---
         if (this.prevBallStatus >= 0 && this.ball.status < 0) {
