@@ -459,18 +459,6 @@ export class Player {
                 else if (isValid(SWING_BLOCK)) { selectedSwing = SWING_BLOCK; }
                 else { selectedSwing = SWING_NORMAL; }
 
-                // Debug Log for Shake Defence
-                const netTopY = TABLE_HEIGHT + NET_HEIGHT;
-                const tableEndZ = TABLE_LENGTH / 2;
-                const netZ = 0;
-                const oppEndZ = -tableEndZ;
-
-                const slopeHigh = (netTopY - TABLE_HEIGHT) / (netZ - oppEndZ);
-                const highBoundaryY = slopeHigh * (ballPos.z - oppEndZ) + TABLE_HEIGHT;
-
-                const slopeLow = (TABLE_HEIGHT - netTopY) / (tableEndZ - netZ);
-                const lowBoundaryY = slopeLow * (ballPos.z - netZ) + netTopY;
-
                 break;
 
             case PlayerType.SHAKE_DRIVE:
@@ -787,7 +775,7 @@ export class Player {
 
             const animTime = this.currentAction ? this.currentAction.time : 0;
             const duration = this.currentAction ? this.currentAction.getClip().duration : 0;
-            console.log(`[SwingTiming] Ball Hit! AnimTime=${animTime.toFixed(3)}s (Progress: ${(animTime/duration*100).toFixed(1)}%), SwingCount=${this.swing}, Duration=${duration.toFixed(3)}s`);
+            console.log(`[SwingTiming] Ball Hit! AnimTime=${animTime.toFixed(3)}s (Progress: ${(animTime / duration * 100).toFixed(1)}%), SwingCount=${this.swing}, Duration=${duration.toFixed(3)}s`);
 
             console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, PlayerPos=(${this.mesh.position.x.toFixed(3)}, ${this.mesh.position.y.toFixed(3)}, ${this.mesh.position.z.toFixed(3)}), Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}`);
             const afterSwingPenalty = velocity.length();
@@ -1005,19 +993,17 @@ export class Player {
         } else if (this.level === AILevel.EASY) {
             maxErrorRad = Math.PI / 10; // 18 degrees
         } else if (this.level === AILevel.HARD) {
-            baseErrorRad = 0.000; // 0 degrees
             maxErrorRad = 0.01;   // ~0.6 degrees
         }
 
         // Apply Precision Modifier from Player Stats
         const precisionFactor = precision / 0.1;
-        baseErrorRad *= precisionFactor;
         maxErrorRad *= precisionFactor;
 
         // Calculate Total Error based on Status
         // Formula: base + (max - base) * (1 - status/max)
         const statusFactor = 1.0 - (this.status / this.statusMax);
-        const currentErrorRad = baseErrorRad + (maxErrorRad - baseErrorRad) * statusFactor;
+        const currentErrorRad = maxErrorRad * statusFactor;
 
         // Scale error by position difficulty (radDiff)
         // Clamp the positional error to avoid wild misses (max 0.1 rad ~ 6 degrees)
