@@ -33,7 +33,7 @@ import { TABLE_HEIGHT, TABLE_WIDTH, TABLE_LENGTH, NET_HEIGHT, TICK } from './con
 import type { Game } from './Game';
 
 // --- Physics Constants ---
-const PHY = 0.15; // Air resistance coefficient
+const PHY = 0.5; // Air resistance coefficient (increased from 0.15 for more realism)
 const GRAVITY_BASE = 9.8;
 const MAGNUS_FORCE_FACTOR = 5;
 const GRAVITY = (spin: number) => GRAVITY_BASE + spin * MAGNUS_FORCE_FACTOR;
@@ -88,6 +88,7 @@ export class Ball {
     public mesh: THREE.Mesh;
     public velocity = new THREE.Vector3();
     public spin = new THREE.Vector2();
+    public prevPosition = new THREE.Vector3();
     public status: BallStatus = BallStatus.WAITING_FOR_SERVE;
     public justHitBySide: number = 0; // 0: none, 1: player1, -1: player2 (AI)
 
@@ -114,8 +115,12 @@ export class Ball {
      * Updates the ball's state for the game loop.
      * This includes physics, collision, and game state logic.
      */
-    public update(game: Game) {
-        if (this.status === BallStatus.WAITING_FOR_SERVE) { return; }
+    public update(game: Game, deltaTime: number = TICK) {
+        if (this.status === BallStatus.WAITING_FOR_SERVE) {
+            this.velocity.set(0, 0, 0);
+            this.spin.set(0, 0);
+            return;
+        }
 
         // Handle the reset timer for a dead ball
         if (this.status < 0) { // DEAD is -1, so this check is fine
@@ -130,7 +135,7 @@ export class Ball {
 
         // Always run physics simulation unless ball is waiting for serve
         const oldPos = this.mesh.position.clone();
-        this._updatePhysics(TICK);
+        this._updatePhysics(deltaTime);
         this.checkCollision(oldPos);
     }
 

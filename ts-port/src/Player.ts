@@ -4,7 +4,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { GameAssets } from './AssetManager';
 import { inputManager } from './InputManager';
 import {
-    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, NET_HEIGHT, AILevel
+    AREAXSIZE, AREAYSIZE, TABLE_LENGTH, TABLE_HEIGHT, NET_HEIGHT, AILevel, TICK
 } from './constants';
 import { Ball, BallStatus } from './Ball';
 import { AIController } from './AIController';
@@ -85,6 +85,7 @@ export class Player {
     public isInBackswing = false;
     public velocity = new THREE.Vector3();
     private prevVelocity = new THREE.Vector3();
+    public prevPosition = new THREE.Vector3();
     public targetPosition: THREE.Vector2;
     public isAi: boolean;
     public predictedHitPosition = new THREE.Vector2();
@@ -110,6 +111,11 @@ export class Player {
     private readonly MOVEMENT_ACCELERATION = 0.05;
     private readonly RALLY_MAX_SPEED = 4.0;
     private readonly POSITIONING_MAX_SPEED = 1.0;
+
+    // Auto-assist properties
+    private autoAssistActive = false;
+    private autoAssistTarget = new THREE.Vector3();
+
 
     constructor(assets: GameAssets, isAi = false, side: number = 1, level: AILevel = AILevel.NORMAL, playerType: PlayerType = PlayerType.SHAKE_DRIVE) {
         this.assets = assets;
@@ -312,6 +318,22 @@ export class Player {
             this.spin.y = 0;
         }
         this.playAnimation('Fcut', false);
+
+        // Adjust timeScale for serve to match physics hit timing
+        if (this.currentAction) {
+            const swingParams = stype.get(this.swingType);
+            if (swingParams) {
+                const duration = this.currentAction.getClip().duration;
+                const realTimeToHit = (swingParams.hitStart - 1) * TICK;
+                if (realTimeToHit > 0) {
+                    // Assume serve contact occurs at 50% of the animation duration.
+                    // Since serve starts from 0%, we cover 50% of the duration.
+                    const animDistance = duration * 0.5;
+                    this.currentAction.timeScale = animDistance / realTimeToHit;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -479,6 +501,10 @@ export class Player {
             tmpBall._updatePhysics(SHORT_SIMULATION_TIME_STEP);
             tmpBall.checkCollision(oldPos);
         }
+        // Fix: Forehand is on the Right side.
+        // P1 (Side 1, Face -Z): Right is +X. Ball > Player. (Px - Bx) < 0. (<0 * 1 < 0)
+        // P2 (Side -1, Face +Z): Right is -X. Ball < Player. (Px - Bx) > 0. (>0 * -1 < 0)
+        // So (Px - Bx) * Side < 0 implies Forehand.
         const isForehand = (this.mesh.position.x - tmpBall.mesh.position.x) * this.side < 0;
         const spinCategory = isForehand ? 3 : 1;
         const swingType = this.determineSwingType(tmpBall, isForehand);
@@ -521,6 +547,7 @@ export class Player {
         // Pause the animation at the peak of the backswing
         if (this.currentAction) {
             this.currentAction.paused = true;
+            this.currentAction.timeScale = 1.0; // Reset timeScale
             // Estimate backswing peak at 40% of the animation. This is a guess.
             const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
             this.currentAction.time = backswingPeakTime;
@@ -574,17 +601,98 @@ export class Player {
         // Pause the animation at the peak of the backswing
         if (this.currentAction) {
             this.currentAction.paused = true;
+            this.currentAction.timeScale = 1.0; // Reset timeScale
             const backswingPeakTime = this.currentAction.getClip().duration * 0.4;
             this.currentAction.time = backswingPeakTime;
         }
     }
 
-    public startForwardswing(strength: number = 1.0) {
+    public predictImpact(ball: Ball): { position: THREE.Vector3, time: number } | null {
+        const swingParams = stype.get(this.swingType);
+        if (!swingParams) return null;
+
+        const framesToImpact = swingParams.hitStart - this.swing;
+        if (framesToImpact <= 0) return null;
+
+        const timeToImpact = framesToImpact * TICK;
+
+        const simBall = ball.clone();
+        for (let i = 0; i < framesToImpact; i++) {
+            const oldPos = simBall.mesh.position.clone();
+            simBall._updatePhysics(TICK);
+            simBall.checkCollision(oldPos);
+        }
+
+        return { position: simBall.mesh.position.clone(), time: timeToImpact };
+    }
+
+    public startForwardswing(strength: number = 1.0, ball?: Ball) {
         if (!this.isInBackswing || !this.currentAction) return false;
 
         this.isInBackswing = false;
+
+        // Adjust timeScale to match physics hit timing (hitStart)
+        const swingParams = stype.get(this.swingType);
+        if (swingParams && this.currentAction) {
+            const duration = this.currentAction.getClip().duration;
+            const realTimeToHit = (swingParams.hitStart - 1) * TICK;
+            if (realTimeToHit > 0) {
+                // Assume visual contact occurs at 65% of the animation clip duration.
+                // We are resuming from the backswing peak at 40%.
+                // So we need to cover 25% (0.65 - 0.40) of the duration in realTimeToHit seconds.
+                const animDistance = duration * 0.25;
+                this.currentAction.timeScale = animDistance / realTimeToHit;
+            } else {
+                this.currentAction.timeScale = 1.0;
+            }
+        }
+
         this.currentAction.paused = false;
         this.intendedShotStrength = strength;
+
+        if (ball && !this.isAi) {
+            const impact = this.predictImpact(ball);
+            if (impact) {
+                const swingParams = stype.get(this.swingType);
+                const hitX = swingParams ? swingParams.hitX : 0.3;
+                const hitY = swingParams ? swingParams.hitY : 0.0;
+
+                const animName = this.currentAction.getClip().name;
+                const isForehand = animName.startsWith('F');
+
+                // Calculate target position
+                // Player 1 (Side 1): Right is -X. Left is +X.
+                // Player 2 (Side -1): Right is +X. Left is -X.
+                // Forehand is Right hand (usually). Backhand is Left hand.
+
+                // Offset from Player to Ball (Ball relative to Player)
+                // P1 Forehand: Ball is at Player - hitX => Player = Ball + hitX
+                // P1 Backhand: Ball is at Player + hitX => Player = Ball - hitX
+                // P2 Forehand: Ball is at Player + hitX => Player = Ball - hitX
+                // P2 Backhand: Ball is at Player - hitX => Player = Ball + hitX
+
+                const sideSign = this.side;
+                const handSign = isForehand ? 1 : -1;
+                // We want Player position relative to Ball.
+                // P1 (Side 1): Right is +X. FH (Right) -> Player = Ball - hitX.
+                // P2 (Side -1): Right is -X. FH (Right) -> Player = Ball + hitX.
+                // Formula: -hitX * handSign * sideSign
+                const offsetX = -hitX * handSign * sideSign;
+
+                // Depth: Ball is in front.
+                // P1 (Face -Z): Ball at Player - hitY => Player = Ball + hitY
+                // P2 (Face +Z): Ball at Player + hitY => Player = Ball - hitY
+                const offsetZ = hitY * sideSign;
+
+                this.autoAssistTarget.copy(impact.position);
+                this.autoAssistTarget.x += offsetX;
+                this.autoAssistTarget.z += offsetZ;
+                this.autoAssistActive = true;
+                const animTime = this.currentAction ? this.currentAction.time : 0;
+                console.log(`[SwingTiming] Forwardswing Started: AnimTime=${animTime.toFixed(3)}s, SwingCount=${this.swing}`);
+                console.log(`[AutoAssist] Start: Target=(${this.autoAssistTarget.x.toFixed(3)}, ${this.autoAssistTarget.z.toFixed(3)}), Current=(${this.mesh.position.x.toFixed(3)}, ${this.mesh.position.z.toFixed(3)})`);
+            }
+        }
 
         // The rest of the swing logic is handled by _updateSwing
         return true;
@@ -647,12 +755,16 @@ export class Player {
                 }
             }
 
-            if (this.isAi) {
-                this.addError(velocity, ball, stats.precision);
-            }
+            // Apply error based on position for both AI and Human players
+            this.addError(velocity, ball, stats.precision);
             ball.hit(velocity, this.spin);
             ball.justHitBySide = this.side;
-            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}`);
+
+            const animTime = this.currentAction ? this.currentAction.time : 0;
+            const duration = this.currentAction ? this.currentAction.getClip().duration : 0;
+            console.log(`[SwingTiming] Ball Hit! AnimTime=${animTime.toFixed(3)}s (Progress: ${(animTime/duration*100).toFixed(1)}%), SwingCount=${this.swing}, Duration=${duration.toFixed(3)}s`);
+
+            console.log(`[Player] Hit Ball at: X=${ball.mesh.position.x.toFixed(3)}, Y=${ball.mesh.position.y.toFixed(3)}, Z=${ball.mesh.position.z.toFixed(3)}, PlayerPos=(${this.mesh.position.x.toFixed(3)}, ${this.mesh.position.y.toFixed(3)}, ${this.mesh.position.z.toFixed(3)}), Anim=${animName}, Key=${statKey}, Speed=${stats.speed}, Spin=${stats.spin}, Prec=${stats.precision}`);
             const afterSwingPenalty = velocity.length();
             this.addStatus(-afterSwingPenalty);
         }
@@ -733,7 +845,7 @@ export class Player {
         if (!swingParams) { this.swing = 0; return; }
 
         if (this.canServe(ball)) {
-            if (ball.velocity.y < 0) { this.swing++; }
+            this.swing++;
         } else {
             if (this.swingType >= SERVE_MIN && swingParams.toss > 0 && this.swing === swingParams.toss) {
                 ball.toss(this, swingParams.tossV);
@@ -762,6 +874,51 @@ export class Player {
                 if (this.shouldAutoMove()) { this.autoMove(ball); }
                 else { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); }
             }
+
+            if (this.autoAssistActive) {
+                const swingParams = stype.get(this.swingType);
+                if (swingParams) {
+                    const framesToImpact = swingParams.hitStart - this.swing;
+                    const timeToImpact = framesToImpact * TICK;
+
+                    if (timeToImpact > 0) {
+                        // Calculate required velocity to reach target
+                        const diff = new THREE.Vector3().subVectors(this.autoAssistTarget, this.mesh.position);
+                        diff.y = 0;
+                        const requiredVelocity = diff.divideScalar(timeToImpact);
+
+                        // Calculate acceleration needed
+                        // v = v0 + a * t -> a = (v - v0) / t
+                        // We apply this acceleration over deltaTime
+                        const currentVelocity = new THREE.Vector3(this.velocity.x, 0, this.velocity.z);
+                        const requiredAccel = new THREE.Vector3().subVectors(requiredVelocity, currentVelocity).divideScalar(deltaTime);
+
+                        // Clamp acceleration
+                        const maxAccel = this.getAccelLimit();
+                        if (requiredAccel.lengthSq() > maxAccel * maxAccel) {
+                            requiredAccel.normalize().multiplyScalar(maxAccel);
+                        }
+
+                        // Apply acceleration
+                        this.velocity.add(requiredAccel.multiplyScalar(deltaTime));
+
+                        console.log(`[AutoAssist] Tick: Swing=${this.swing}, dt=${deltaTime.toFixed(4)}, BallPos=(${ball.mesh.position.x.toFixed(3)}, ${ball.mesh.position.y.toFixed(3)}, ${ball.mesh.position.z.toFixed(3)}), BallVel=(${ball.velocity.x.toFixed(3)}, ${ball.velocity.y.toFixed(3)}, ${ball.velocity.z.toFixed(3)}), PlayerPos=(${this.mesh.position.x.toFixed(3)}, ${this.mesh.position.y.toFixed(3)}, ${this.mesh.position.z.toFixed(3)}), PlayerVel=(${this.velocity.x.toFixed(3)}, ${this.velocity.y.toFixed(3)}, ${this.velocity.z.toFixed(3)}), Accel=(${requiredAccel.x.toFixed(3)}, ${requiredAccel.y.toFixed(3)}, ${requiredAccel.z.toFixed(3)})`);
+                    }
+                }
+
+                if (swingParams && this.swing >= swingParams.hitStart) {
+                    const xDiff = this.mesh.position.x - this.autoAssistTarget.x;
+                    const zDiff = this.mesh.position.z - this.autoAssistTarget.z;
+                    console.log(`[AutoAssist] End (Hit): Final=(${this.mesh.position.x.toFixed(3)}, ${this.mesh.position.z.toFixed(3)}), Dist=${this.mesh.position.distanceTo(this.autoAssistTarget).toFixed(3)}, xDiff=${xDiff.toFixed(3)}, zDiff=${zDiff.toFixed(3)}`);
+                    this.autoAssistActive = false;
+                }
+                if (ball.status === BallStatus.DEAD || ball.justHitBySide === this.side) {
+                    if (this.autoAssistActive) {
+                        console.log(`[AutoAssist] End (Abort): Status=${ball.status}, JustHit=${ball.justHitBySide}`);
+                    }
+                    this.autoAssistActive = false;
+                }
+            }
         } else {
             if (this.aiController) { this.aiController.update(deltaTime, game); }
         }
@@ -782,12 +939,45 @@ export class Player {
     private addError(v: THREE.Vector3, ball: Ball, precision: number = 0.1) {
         const playerPos = this.mesh.position;
         const ballPos = ball.mesh.position;
-        const xDiff = (Math.abs(playerPos.x - ballPos.x) - AI_ERROR_POSITION_SENSITIVITY) / AI_ERROR_POSITION_SENSITIVITY;
-        const yDiff = (playerPos.z - ballPos.z) / AI_ERROR_POSITION_SENSITIVITY;
+
+        // Determine swing properties for offset calculation
+        const animName = this.currentAction ? this.currentAction.getClip().name : '';
+        const isForehand = animName.startsWith('F');
+        const swingParams = stype.get(this.swingType);
+        const hitX = swingParams ? swingParams.hitX : 0.3;
+        const hitY = swingParams ? swingParams.hitY : 0.0;
+
+        const sideSign = this.side;
+        const handSign = isForehand ? 1 : -1;
+
+        // Calculate optimal player position relative to ball
+        // Formula from startForwardswing:
+        // offsetX = -hitX * handSign * sideSign
+        // offsetZ = hitY * sideSign
+        // Optimal Player = Ball + Offset
+        const offsetX = -hitX * handSign * sideSign;
+        const offsetZ = hitY * sideSign;
+
+        const idealPlayerX = ballPos.x + offsetX;
+        const idealPlayerZ = ballPos.z + offsetZ;
+
+        // Calculate difference between actual and ideal
+        const xDiffRaw = playerPos.x - idealPlayerX;
+        const zDiffRaw = playerPos.z - idealPlayerZ;
+
+        // Normalize by sensitivity
+        const xDiff = Math.abs(xDiffRaw) / AI_ERROR_POSITION_SENSITIVITY;
+        const yDiff = Math.abs(zDiffRaw) / AI_ERROR_POSITION_SENSITIVITY;
+
+        console.log(`[Player.addError] xDiff=${xDiff.toFixed(3)}, yDiff=${yDiff.toFixed(3)} (Raw: dx=${xDiffRaw.toFixed(3)}, dz=${zDiffRaw.toFixed(3)})`);
+
         let radDiff = Math.hypot(xDiff * (1 + Math.abs(ball.spin.x)), yDiff * (1 + Math.abs(ball.spin.y)));
 
         let maxErrorRad = Math.PI / 12; // Default Normal
-        if (this.level === AILevel.EASY) {
+
+        if (!this.isAi) {
+            maxErrorRad = Math.PI / 12; // Fixed for Human Player (Normal equivalent)
+        } else if (this.level === AILevel.EASY) {
             maxErrorRad = Math.PI / 10; // 18 degrees
         } else if (this.level === AILevel.HARD) {
             maxErrorRad = Math.PI / 60; // 3 degrees

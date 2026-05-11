@@ -3,7 +3,7 @@ import { assetManager } from './AssetManager';
 import { Game } from './Game';
 import { UIManager } from './UIManager';
 import { CAMERA_FOV } from './CameraManager';
-import { AILevel } from './constants';
+import { AILevel, TICK } from './constants';
 
 async function main() {
   // --- Basic Three.js setup ---
@@ -111,8 +111,14 @@ async function main() {
     return needResize;
   }
 
+  let accumulatedTime = 0;
+  let totalRealTime = 0;
+  let totalGameTime = 0;
+
   function render() {
     const deltaTime = clock.getDelta();
+    accumulatedTime += deltaTime;
+    totalRealTime += deltaTime;
 
     if (resizeRendererToDisplaySize(renderer)) {
       const canvas = renderer.domElement;
@@ -120,9 +126,46 @@ async function main() {
       camera.updateProjectionMatrix();
     }
 
-    game.update(deltaTime);
+    // Fixed time step update
+    // Prevent spiral of death by clamping max steps per frame
+    let steps = 0;
+    const MAX_STEPS = 5;
+    while (accumulatedTime >= TICK && steps < MAX_STEPS) {
+      // Save current positions as previous for interpolation
+      game.ball.prevPosition.copy(game.ball.mesh.position);
+      game.player1.prevPosition.copy(game.player1.mesh.position);
+      game.player2.prevPosition.copy(game.player2.mesh.position);
+
+      game.update(TICK);
+      totalGameTime += TICK;
+      accumulatedTime -= TICK;
+      steps++;
+    }
+
+    // If we are still behind, just discard the time to avoid spiraling
+    if (accumulatedTime >= TICK) {
+      accumulatedTime = 0;
+    }
+
+    // --- Interpolation for smooth rendering ---
+    const alpha = Math.max(0, Math.min(1, accumulatedTime / TICK));
+    
+    // Store true physics positions using temp vectors to avoid GC
+    const ballTruePos = game.ball.mesh.position.clone();
+    const p1TruePos = game.player1.mesh.position.clone();
+    const p2TruePos = game.player2.mesh.position.clone();
+
+    // Interpolate mesh positions for this frame
+    game.ball.mesh.position.lerpVectors(game.ball.prevPosition, ballTruePos, alpha);
+    game.player1.mesh.position.lerpVectors(game.player1.prevPosition, p1TruePos, alpha);
+    game.player2.mesh.position.lerpVectors(game.player2.prevPosition, p2TruePos, alpha);
 
     renderer.render(scene, camera);
+
+    // Restore true physics positions for the next update
+    game.ball.mesh.position.copy(ballTruePos);
+    game.player1.mesh.position.copy(p1TruePos);
+    game.player2.mesh.position.copy(p2TruePos);
 
     requestAnimationFrame(render);
   }

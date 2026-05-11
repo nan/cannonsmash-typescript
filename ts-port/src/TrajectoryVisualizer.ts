@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Ball } from './Ball';
 import { Player } from './Player';
-import { stype, SWING_NORMAL } from './SwingTypes';
+import { stype } from './SwingTypes';
 
 
 const OPTIMAL_HIT_MARKER_COLOR = 0xff0000;
@@ -45,7 +45,8 @@ export class TrajectoryVisualizer {
         }
 
         // 3. A hit point was found, so calculate the timing marker position.
-        const swingParams = stype.get(SWING_NORMAL);
+        const predictedSwing = player.getPredictedSwing(startBall);
+        const swingParams = stype.get(predictedSwing.swingType);
         if (!swingParams) return; // Should not happen
 
         const swingLagFrames = swingParams.hitStart - swingParams.backswing; // e.g., 20 - 10 = 10 frames
