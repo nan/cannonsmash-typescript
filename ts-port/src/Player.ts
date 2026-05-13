@@ -834,8 +834,8 @@ export class Player {
         const prediction = this.predictOptimalPlayerPosition(ball);
         if (!prediction || !prediction.position) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
         const targetPosition = prediction.position;
-        this.predictedHitPosition.copy(targetPosition);
-        const direction = new THREE.Vector3(targetPosition.x - this.mesh.position.x, 0, targetPosition.y - this.mesh.position.z);
+        this.predictedHitPosition.set(targetPosition.x, targetPosition.z);
+        const direction = new THREE.Vector3(targetPosition.x - this.mesh.position.x, 0, targetPosition.z - this.mesh.position.z);
         const distance = direction.length();
         if (distance < AUTO_MOVE_DISTANCE_THRESHOLD) { this.velocity.lerp(new THREE.Vector3(0, 0, 0), PLAYER_VELOCITY_LERP_FACTOR); return; }
 
@@ -940,11 +940,23 @@ export class Player {
         if (this.mesh.position.x < -halfArenaX) { this.mesh.position.x = -halfArenaX; this.velocity.x = 0; }
         if (this.mesh.position.x > halfArenaX) { this.mesh.position.x = halfArenaX; this.velocity.x = 0; }
         const halfTableZ = TABLE_LENGTH / 2;
+        const minZFromNet = 0.3; // Relaxed boundary to allow reaching net-side balls during rally
+
+        // During serve, the server must stay behind the end line.
+        // We check ball status and swing type to determine if the player is serving.
+        const isServer = game.getService() === this.side;
+        const isServePhase = ball.status === BallStatus.WAITING_FOR_SERVE || 
+                           ball.status === BallStatus.TOSS_P1 || 
+                           ball.status === BallStatus.TOSS_P2;
+        const isServing = isServer && (isServePhase || this.swingType >= SERVE_MIN);
+        
+        const currentMinZ = isServing ? halfTableZ : minZFromNet;
+
         if (this.side === 1) {
-            if (this.mesh.position.z < halfTableZ) { this.mesh.position.z = halfTableZ; this.velocity.z = 0; }
+            if (this.mesh.position.z < currentMinZ) { this.mesh.position.z = currentMinZ; this.velocity.z = 0; }
             if (this.mesh.position.z > AREAYSIZE) { this.mesh.position.z = AREAYSIZE; this.velocity.z = 0; }
         } else {
-            if (this.mesh.position.z > -halfTableZ) { this.mesh.position.z = -halfTableZ; this.velocity.z = 0; }
+            if (this.mesh.position.z > -currentMinZ) { this.mesh.position.z = -currentMinZ; this.velocity.z = 0; }
             if (this.mesh.position.z < -AREAYSIZE) { this.mesh.position.z = -AREAYSIZE; this.velocity.z = 0; }
         }
     }
